@@ -1,152 +1,54 @@
-// Ported from https://github.com/georgeflower/nectarine-demoscene-radio (app.js)
-export const API_ROOT = "https://scenestream.net/demovibes/xml/";
+// Nectarine demoscene radio API client.
+// All requests routed through the `xml-proxy` edge function to bypass CORS.
 
-const ARTIST_TAGS = ["artist", "song artist", "track artist"];
-const TITLE_TAGS = ["title", "song", "track", "name"];
-const REQUESTED_BY_TAGS = ["requestedby", "requested_by", "requested by"];
-const TIME_LEFT_TAGS = ["timeleft", "time_left", "time left"];
-const RATING_TAGS = ["rating"];
-const VOTES_TAGS = ["votes"];
-const ONELINER_USER_TAGS = ["username", "nick", "user", "name"];
-const ONELINER_TEXT_TAGS = ["text", "message", "msg", "line"];
-const ONELINER_TIME_TAGS = ["time", "timestamp", "date"];
-const USER_TAGS = ["username", "nick", "name", "user"];
-const USER_TOTAL_TAGS = ["total", "count", "online", "users_online", "total_online"];
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const PROXY_URL = `${SUPABASE_URL}/functions/v1/xml-proxy`;
 
-export const FALLBACK_ENDPOINTS = [
-  "now_playing.xml",
-  "oneliner.xml",
-  "users.xml",
-  "queue.xml",
-  "lastplayed.xml",
-  "stats.xml",
-  "news.xml",
-];
+export const ENDPOINTS = ["queue", "oneliner", "online", "streams"] as const;
+export type Endpoint = (typeof ENDPOINTS)[number];
 
 export const AUTO_REFRESH_INTERVAL_MS = 30_000;
-const FETCH_TIMEOUT_MS = 10_000;
-const MAX_ONELINERS = 8;
-
-const API_PROXY =
-  typeof window !== "undefined"
-    ? new URLSearchParams(window.location.search).get("apiProxy")
-    : null;
+const FETCH_TIMEOUT_MS = 15_000;
+const MAX_ONELINERS = 12;
+const MAX_QUEUE = 5;
+const MAX_HISTORY = 5;
 
 export function toTitle(endpoint: string) {
-  return endpoint
-    .replace(/\.xml$/i, "")
-    .replace(/[_-]/g, " ")
-    .replace(/\b\w/g, (m) => m.toUpperCase());
+  return endpoint.replace(/[_-]/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-function normalizeTag(tag: string) {
-  return String(tag).toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function getNodesByTags(doc: Document, tags: string[], parent: Document | Element = doc) {
-  const wanted = new Set(tags.map(normalizeTag));
-  const source =
-    parent === doc
-      ? Array.from(doc.getElementsByTagName("*"))
-      : Array.from((parent as Element).children);
-  return source.filter((n) => wanted.has(normalizeTag(n.tagName)));
-}
-
-function getText(doc: Document, tags: string[], parent: Document | Element = doc): string {
-  const source =
-    parent === doc
-      ? Array.from(doc.getElementsByTagName("*"))
-      : Array.from((parent as Element).children);
-  for (const tag of tags) {
-    const wanted = normalizeTag(tag);
-    for (const c of source) {
-      if (normalizeTag(c.tagName) !== wanted) continue;
-      const v = c.textContent?.trim();
-      if (v) return v;
-    }
+async function fetchWithTimeout(url: string) {
+  const ctrl = new AbortController();
+  const id = window.setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { cache: "no-store", signal: ctrl.signal });
+  } finally {
+    window.clearTimeout(id);
   }
-  return "-";
 }
 
-export function listUsers(doc: Document): string[] {
-  const values = new Set<string>();
-  getNodesByTags(doc, USER_TAGS).forEach((n) => {
-    const v = n.textContent?.trim();
-    if (v) values.add(v);
-  });
-  return Array.from(values);
+export async function fetchEndpoint(path: string): Promise<string> {
+  const url = `${PROXY_URL}?path=${encodeURIComponent(path)}`;
+  const r = await fetchWithTimeout(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.text();
 }
 
-export type OnelinerEntry = { username: string; text: string; time: string };
-
-export function parseOneliners(doc: Document): OnelinerEntry[] {
-  const entries: OnelinerEntry[] = [];
-  for (const el of Array.from(doc.getElementsByTagName("*"))) {
-    if (el.children.length === 0) continue;
-    const username = getText(doc, ONELINER_USER_TAGS, el);
-    const text = getText(doc, ONELINER_TEXT_TAGS, el);
-    if (username === "-" || text === "-") continue;
-    const time = getText(doc, ONELINER_TIME_TAGS, el);
-    entries.push({ username, text, time });
-  }
-  if (entries.length) return entries.slice(0, MAX_ONELINERS);
-  return [
-    {
-      username: getText(doc, ONELINER_USER_TAGS),
-      text: getText(doc, ONELINER_TEXT_TAGS),
-      time: getText(doc, ONELINER_TIME_TAGS),
-    },
-  ];
+export function parseXml(text: string) {
+  return new DOMParser().parseFromString(text, "application/xml");
 }
 
-export function formatOnelinerTime(raw?: string) {
-  const v = raw?.trim();
-  if (!v || v === "-") return "--:--:--";
-  const m = v.match(/(\d{2}:\d{2}:\d{2})/);
-  return m ? m[1] : v;
-}
-
-export function buildStars(rating: number) {
-  const safe = Number.isFinite(rating) ? Math.max(0, Math.min(5, rating)) : 0;
-  const filled = Math.round(safe);
-  return "★".repeat(filled) + "☆".repeat(5 - filled);
-}
-
-export type NowPlaying = {
-  title: string;
-  artist: string;
-  requestedBy: string;
-  timeLeft: string;
-  rating: string;
-  votes: string;
-  numericRating: number;
-};
-
-export function parseNowPlaying(doc: Document): NowPlaying {
-  const rating = getText(doc, RATING_TAGS);
-  return {
-    title: getText(doc, TITLE_TAGS),
-    artist: getText(doc, ARTIST_TAGS),
-    requestedBy: getText(doc, REQUESTED_BY_TAGS),
-    timeLeft: getText(doc, TIME_LEFT_TAGS),
-    rating,
-    votes: getText(doc, VOTES_TAGS),
-    numericRating: Number.parseFloat(rating),
-  };
-}
-
-export function parseUsersDoc(doc: Document) {
-  const users = listUsers(doc);
-  const totalText = getText(doc, USER_TOTAL_TAGS);
-  const n = Number.parseInt(totalText, 10);
-  const total = Number.isFinite(n) ? n : users.length;
-  return { users, total };
-}
-
+// ─── Pretty printer (XML → JSON-ish) ───────────────────────────────────────────
 function xmlNodeToObject(node: Element): unknown {
   const hasEl = Array.from(node.childNodes).some((c) => c.nodeType === Node.ELEMENT_NODE);
-  if (!hasEl) return node.textContent?.trim() ?? "";
-  const result: Record<string, unknown> = {};
+  const attrs: Record<string, string> = {};
+  for (const a of Array.from(node.attributes)) attrs[`@${a.name}`] = a.value;
+  if (!hasEl) {
+    const text = node.textContent?.trim() ?? "";
+    if (Object.keys(attrs).length === 0) return text;
+    return { ...attrs, ...(text ? { "#text": text } : {}) };
+  }
+  const result: Record<string, unknown> = { ...attrs };
   for (const child of Array.from(node.children)) {
     const parsed = xmlNodeToObject(child);
     if (Object.prototype.hasOwnProperty.call(result, child.tagName)) {
@@ -164,58 +66,126 @@ export function xmlToPretty(xml: Document) {
   return JSON.stringify({ [root.tagName]: xmlNodeToObject(root) }, null, 2);
 }
 
-export function parseXml(text: string) {
-  return new DOMParser().parseFromString(text, "application/xml");
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+function txt(el: Element | null | undefined, tag: string): string {
+  if (!el) return "";
+  const c = el.getElementsByTagName(tag)[0];
+  return c?.textContent?.trim() ?? "";
 }
 
-function buildRequestUrls(url: string) {
-  if (API_PROXY) {
-    const hasPlaceholder = API_PROXY.includes("{url}");
-    return [
-      hasPlaceholder
-        ? API_PROXY.replace("{url}", encodeURIComponent(url))
-        : `${API_PROXY}${encodeURIComponent(url)}`,
-    ];
-  }
-  return [url];
+function attr(el: Element | null | undefined, tag: string, name: string): string {
+  if (!el) return "";
+  const c = el.getElementsByTagName(tag)[0];
+  return c?.getAttribute(name) ?? "";
 }
 
-async function fetchWithTimeout(url: string) {
-  const ctrl = new AbortController();
-  const id = window.setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(url, { cache: "no-store", signal: ctrl.signal });
-  } finally {
-    window.clearTimeout(id);
-  }
+// ─── Types ─────────────────────────────────────────────────────────────────────
+export type QueueEntry = {
+  artist: string;
+  artistId: string;
+  song: string;
+  songId: string;
+  lengthSec: number;
+  requester: string;
+  playstart: string; // ISO-ish
+};
+
+export type PlaylistData = {
+  now: QueueEntry | null;
+  queue: QueueEntry[];
+  history: QueueEntry[];
+};
+
+export type OnelinerEntry = { username: string; text: string; time: string };
+
+export type StreamSource = { name: string; url: string; bitrate: string; type: string };
+
+// ─── Parsers ───────────────────────────────────────────────────────────────────
+function parseEntry(entry: Element): QueueEntry {
+  const artistEl = entry.getElementsByTagName("artist")[0];
+  const songEl = entry.getElementsByTagName("song")[0];
+  const lengthAttr = songEl?.getAttribute("length") ?? "0";
+  return {
+    artist: artistEl?.textContent?.trim() ?? "-",
+    artistId: artistEl?.getAttribute("id") ?? "",
+    song: songEl?.textContent?.trim() ?? "-",
+    songId: songEl?.getAttribute("id") ?? "",
+    lengthSec: Number.parseInt(lengthAttr, 10) || 0,
+    requester: txt(entry, "requester") || "-",
+    playstart: txt(entry, "playstart"),
+  };
 }
 
-export async function fetchText(url: string) {
-  const urls = buildRequestUrls(url);
-  let lastErr: unknown = new Error(`fetch failed: ${url}`);
-  for (const u of urls) {
-    try {
-      const r = await fetchWithTimeout(u);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return await r.text();
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw lastErr;
+export function parsePlaylist(doc: Document): PlaylistData {
+  const root = doc.documentElement;
+  const nowEl = root.getElementsByTagName("now")[0];
+  const queueEl = root.getElementsByTagName("queue")[0];
+  const historyEl = root.getElementsByTagName("history")[0];
+
+  const nowEntry = nowEl?.getElementsByTagName("entry")[0];
+  const queueEntries = queueEl ? Array.from(queueEl.getElementsByTagName("entry")) : [];
+  const historyEntries = historyEl ? Array.from(historyEl.getElementsByTagName("entry")) : [];
+
+  return {
+    now: nowEntry ? parseEntry(nowEntry) : null,
+    queue: queueEntries.slice(0, MAX_QUEUE).map(parseEntry),
+    history: historyEntries.slice(0, MAX_HISTORY).map(parseEntry),
+  };
 }
 
-export async function discoverEndpoints(): Promise<string[]> {
-  try {
-    const html = await fetchText(API_ROOT);
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const found = Array.from(doc.querySelectorAll("a[href$='.xml']"))
-      .map((a) => a.getAttribute("href")?.trim())
-      .filter(Boolean)
-      .map((h) => h!.split("/").pop()!)
-      .filter(Boolean);
-    return Array.from(new Set([...FALLBACK_ENDPOINTS, ...found]));
-  } catch {
-    return FALLBACK_ENDPOINTS;
-  }
+export function parseOneliners(doc: Document): OnelinerEntry[] {
+  const items = Array.from(doc.getElementsByTagName("item"));
+  const source = items.length ? items : Array.from(doc.getElementsByTagName("entry"));
+  return source.slice(0, MAX_ONELINERS).map((el) => ({
+    username: txt(el, "user") || txt(el, "username") || txt(el, "nick") || "anon",
+    text: txt(el, "message") || txt(el, "text") || el.textContent?.trim() || "",
+    time: txt(el, "time") || txt(el, "timestamp") || el.getAttribute("time") || "",
+  }));
+}
+
+export function parseOnline(doc: Document): { users: string[]; total: number } {
+  const userEls = Array.from(doc.getElementsByTagName("user"));
+  const users = userEls
+    .map((u) => u.textContent?.trim() || u.getAttribute("name") || "")
+    .filter(Boolean);
+  const totalAttr = doc.documentElement.getAttribute("count");
+  const total = totalAttr ? Number.parseInt(totalAttr, 10) : users.length;
+  return { users, total: Number.isFinite(total) ? total : users.length };
+}
+
+export function parseStreams(doc: Document): StreamSource[] {
+  const streamEls = Array.from(doc.getElementsByTagName("stream"));
+  return streamEls.map((s) => ({
+    name: s.getAttribute("name") || txt(s, "name") || "Stream",
+    url: s.getAttribute("url") || txt(s, "url") || s.textContent?.trim() || "",
+    bitrate: s.getAttribute("bitrate") || txt(s, "bitrate") || "",
+    type: s.getAttribute("type") || txt(s, "type") || "",
+  }));
+}
+
+// ─── Display helpers ───────────────────────────────────────────────────────────
+export function formatDuration(sec: number) {
+  if (!Number.isFinite(sec) || sec <= 0) return "0:00";
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+export function computeTimeLeft(playstart: string, lengthSec: number): string {
+  if (!playstart || !lengthSec) return "-";
+  const start = Date.parse(playstart);
+  if (!Number.isFinite(start)) return formatDuration(lengthSec);
+  const endMs = start + lengthSec * 1000;
+  const remaining = Math.max(0, Math.round((endMs - Date.now()) / 1000));
+  return formatDuration(remaining);
+}
+
+export function formatOnelinerTime(raw?: string) {
+  const v = raw?.trim();
+  if (!v) return "--:--:--";
+  const m = v.match(/(\d{2}:\d{2}:\d{2})/);
+  if (m) return m[1];
+  const t = Date.parse(v);
+  if (Number.isFinite(t)) return new Date(t).toLocaleTimeString();
+  return v;
 }
