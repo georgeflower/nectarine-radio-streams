@@ -222,3 +222,16 @@ export function formatOnelinerTime(raw?: string) {
   if (Number.isFinite(t)) return new Date(t).toLocaleTimeString();
   return v;
 }
+
+// ─── Scenestream / Demovibes external link helpers ─────────────────────────────
+const DEMOVIBES_BASE = "https://scenestream.net/demovibes";
+
+export function songUrl(id: string): string | null {
+  return id ? `${DEMOVIBES_BASE}/song/${encodeURIComponent(id)}/` : null;
+}
+export function artistUrl(id: string): string | null {
+  return id ? `${DEMOVIBES_BASE}/artist/${encodeURIComponent(id)}/` : null;
+}
+export function userUrl(name: string): string | null {
+  return name ? `${DEMOVIBES_BASE}/user/${encodeURIComponent(name)}/` : null;
+}
