@@ -7,6 +7,10 @@ type Props = {
   onAnalyserReady?: (analyser: AnalyserNode) => void;
 };
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const proxiedUrl = (url: string) =>
+  `${SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(url)}`;
+
 const AudioPlayer = ({ streams, onAnalyserReady }: Props) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -85,8 +89,8 @@ const AudioPlayer = ({ streams, onAnalyserReady }: Props) => {
       setError(null);
       setLoading(true);
       ensureAudioGraph();
-      a.src = selectedUrl;
       a.crossOrigin = "anonymous";
+      a.src = proxiedUrl(selectedUrl);
       await a.play();
       setPlaying(true);
     } catch (e) {
@@ -106,7 +110,7 @@ const AudioPlayer = ({ streams, onAnalyserReady }: Props) => {
       try {
         setLoading(true);
         a.pause();
-        a.src = url;
+        a.src = proxiedUrl(url);
         await a.play();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Stream switch failed");
