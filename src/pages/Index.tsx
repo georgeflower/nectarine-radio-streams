@@ -24,6 +24,30 @@ import Visualizer, { type VisualizerStyle } from "@/components/Visualizer";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
+import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
+
+function SongRating({ songId }: { songId: string }) {
+  const [info, setInfo] = useState(() => getCachedInfo("song", songId));
+  useEffect(() => {
+    if (!songId) return;
+    if (info?.rating === undefined) requestInfo("song", songId);
+    const unsub = subscribeEntities(() => {
+      const next = getCachedInfo("song", songId);
+      if (next) setInfo(next);
+    });
+    return unsub;
+  }, [songId, info?.rating]);
+  if (!info || info.rating === undefined) return null;
+  return (
+    <span
+      className="text-xs text-muted-foreground"
+      title={`${info.rating.toFixed(4)} from ${info.votes ?? 0} vote${info.votes === 1 ? "" : "s"}`}
+    >
+      ★ {info.rating.toFixed(2)}
+      {info.votes !== undefined ? ` (${info.votes})` : ""}
+    </span>
+  );
+}
 
 type ExtLinkProps = {
   href: string | null;
@@ -224,7 +248,8 @@ const Index = () => {
                 {now ? (
                   <>
                     <p className="text-lg font-bold neon break-words">
-                      <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink>
+                      <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink>{" "}
+                      <SongRating songId={now.songId} />
                     </p>
                     <p className="text-sm text-muted-foreground mb-3">
                       by <ExtLink href={artistUrl(now.artistId)}>{now.artist}</ExtLink>
@@ -269,6 +294,7 @@ const Index = () => {
                           {q.artist}
                         </ExtLink>{" "}
                         — <ExtLink href={songUrl(q.songId)}>{q.song}</ExtLink>{" "}
+                        <SongRating songId={q.songId} />{" "}
                         <span className="text-xs text-muted-foreground">
                           ({formatDuration(q.lengthSec)} · req{" "}
                           <ExtLink href={userUrl(q.requester)}>{q.requester}</ExtLink>)
@@ -300,7 +326,8 @@ const Index = () => {
                         <ExtLink href={artistUrl(h.artistId)} className="neon-accent">
                           {h.artist}
                         </ExtLink>{" "}
-                        — <ExtLink href={songUrl(h.songId)}>{h.song}</ExtLink>
+                        — <ExtLink href={songUrl(h.songId)}>{h.song}</ExtLink>{" "}
+                        <SongRating songId={h.songId} />
                       </li>
                     ))}
                   </ul>

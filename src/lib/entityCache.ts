@@ -7,11 +7,13 @@ export type EntityKind = "song" | "artist" | "group" | "compilation";
 export interface EntityInfo {
   title: string;
   meta?: string; // e.g. "by Foo Artist", "23 songs", etc.
+  rating?: number; // 0–5 average (songs only)
+  votes?: number;  // vote count (songs only)
 }
 
 type CacheMap = Record<string, EntityInfo>;
 
-const STORAGE_PREFIX = "nectarine-entity-cache-";
+const STORAGE_PREFIX = "nectarine-entity-cache-v2-";
 const KINDS: EntityKind[] = ["song", "artist", "group", "compilation"];
 
 const memCache: Record<EntityKind, CacheMap> = {
@@ -75,6 +77,10 @@ function extractInfo(kind: EntityKind, xml: Document): EntityInfo {
       const artists = root.getElementsByTagName("artists")[0];
       const firstArtist = artists?.getElementsByTagName("artist")[0]?.textContent?.trim();
       const length = firstText(root, "songlength");
+      // Rating: <rating votes="N">3.0619</rating>
+      const ratingEl = root.getElementsByTagName("rating")[0];
+      const ratingNum = ratingEl ? parseFloat(ratingEl.textContent || "") : NaN;
+      const votesNum = ratingEl ? parseInt(ratingEl.getAttribute("votes") || "", 10) : NaN;
       const parts: string[] = [];
       if (firstArtist) parts.push(`by ${firstArtist}`);
       if (length) {
@@ -85,7 +91,15 @@ function extractInfo(kind: EntityKind, xml: Document): EntityInfo {
           parts.push(`${m}:${s}`);
         }
       }
-      return { title, meta: parts.join(" · ") || undefined };
+      if (Number.isFinite(ratingNum)) {
+        parts.push(`★ ${ratingNum.toFixed(2)}${Number.isFinite(votesNum) ? ` (${votesNum})` : ""}`);
+      }
+      return {
+        title,
+        meta: parts.join(" · ") || undefined,
+        rating: Number.isFinite(ratingNum) ? ratingNum : undefined,
+        votes: Number.isFinite(votesNum) ? votesNum : undefined,
+      };
     }
     case "artist": {
       const title = firstText(root, "handle") || firstText(root, "name");
