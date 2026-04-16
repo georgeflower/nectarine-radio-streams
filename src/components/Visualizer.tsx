@@ -35,11 +35,11 @@ const Visualizer = ({ analyser, style }: Props) => {
     if (!ctx) return;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    let freq: Uint8Array | null = analyser
-      ? new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount))
+    let freq: Uint8Array<ArrayBuffer> | null = analyser
+      ? (new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>)
       : null;
-    let time: Uint8Array | null = analyser
-      ? new Uint8Array(new ArrayBuffer(analyser.fftSize))
+    let time: Uint8Array<ArrayBuffer> | null = analyser
+      ? (new Uint8Array(new ArrayBuffer(analyser.fftSize)) as Uint8Array<ArrayBuffer>)
       : null;
 
     const resize = () => {
