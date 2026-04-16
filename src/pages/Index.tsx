@@ -26,7 +26,7 @@ import { renderWithSmileys } from "@/lib/smileys";
 const VIZ_STYLES: VisualizerStyle[] = ["starfield", "bars", "plasma"];
 const VIZ_STORAGE_KEY = "nectarine-viz";
 
-type EndpointState = { content: string; ok: boolean };
+
 
 const EMPTY_PLAYLIST: PlaylistData = { now: null, queue: [], history: [] };
 
@@ -36,9 +36,7 @@ const Index = () => {
   const [users, setUsers] = useState<{ name: string; flag: string }[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
   const [streams, setStreams] = useState<StreamSource[]>([]);
-  const [sections, setSections] = useState<Record<string, EndpointState>>({});
   const [status, setStatus] = useState("Loading API data...");
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [tick, setTick] = useState(0);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [vizStyle, setVizStyle] = useState<VisualizerStyle>(() => {
