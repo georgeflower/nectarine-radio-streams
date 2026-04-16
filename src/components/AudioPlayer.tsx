@@ -1,20 +1,42 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import type { StreamSource } from "@/lib/nectarine";
 
 type Props = {
-  src: string | null;
-  label?: string;
+  streams: StreamSource[];
+  onAnalyserReady?: (analyser: AnalyserNode) => void;
 };
 
-const AudioPlayer = ({ src, label }: Props) => {
+const AudioPlayer = ({ streams, onAnalyserReady }: Props) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+
+  const playable = useMemo(
+    () => streams.filter((s) => s.url.startsWith("https://")),
+    [streams],
+  );
+
+  const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
 
-  // Sync volume/mute to element
+  // Auto-pick first playable stream when list arrives or selection becomes invalid
+  useEffect(() => {
+    if (playable.length === 0) {
+      setSelectedUrl(null);
+      return;
+    }
+    if (!selectedUrl || !playable.some((s) => s.url === selectedUrl)) {
+      setSelectedUrl(playable[0].url);
+    }
+  }, [playable, selectedUrl]);
+
+  // Sync volume/mute
   useEffect(() => {
     const a = audioRef.current;
     if (!a) return;
@@ -22,16 +44,38 @@ const AudioPlayer = ({ src, label }: Props) => {
     a.muted = muted;
   }, [volume, muted]);
 
-  // Reset on src change
-  useEffect(() => {
-    setPlaying(false);
-    setError(null);
-    setLoading(false);
-  }, [src]);
+  const ensureAudioGraph = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (!audioCtxRef.current) {
+      const Ctx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      audioCtxRef.current = new Ctx();
+    }
+    const ctx = audioCtxRef.current;
+    if (!sourceRef.current) {
+      try {
+        sourceRef.current = ctx.createMediaElementSource(a);
+        analyserRef.current = ctx.createAnalyser();
+        analyserRef.current.fftSize = 256;
+        analyserRef.current.smoothingTimeConstant = 0.8;
+        sourceRef.current.connect(analyserRef.current);
+        analyserRef.current.connect(ctx.destination);
+        if (analyserRef.current && onAnalyserReady) {
+          onAnalyserReady(analyserRef.current);
+        }
+      } catch {
+        // ignore — already connected
+      }
+    }
+    if (ctx.state === "suspended") void ctx.resume();
+  };
 
   const toggle = async () => {
     const a = audioRef.current;
-    if (!a || !src) return;
+    if (!a || !selectedUrl) return;
     if (playing) {
       a.pause();
       setPlaying(false);
@@ -40,8 +84,9 @@ const AudioPlayer = ({ src, label }: Props) => {
     try {
       setError(null);
       setLoading(true);
-      // Force reload to avoid stale buffer on streams
-      a.src = src;
+      ensureAudioGraph();
+      a.src = selectedUrl;
+      a.crossOrigin = "anonymous";
       await a.play();
       setPlaying(true);
     } catch (e) {
@@ -52,7 +97,32 @@ const AudioPlayer = ({ src, label }: Props) => {
     }
   };
 
-  const disabled = !src;
+  // Switch stream while playing
+  const handleSelect = async (url: string) => {
+    setSelectedUrl(url);
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) {
+      try {
+        setLoading(true);
+        a.pause();
+        a.src = url;
+        await a.play();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Stream switch failed");
+        setPlaying(false);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const disabled = !selectedUrl;
+  const currentLabel = (() => {
+    const s = playable.find((x) => x.url === selectedUrl);
+    if (!s) return "No stream";
+    return `${s.name}${s.bitrate ? ` · ${s.bitrate}kbps` : ""}`;
+  })();
 
   return (
     <div className="panel !p-3 flex items-center gap-3 flex-wrap">
@@ -73,13 +143,27 @@ const AudioPlayer = ({ src, label }: Props) => {
         )}
       </button>
 
-      <div className="flex-1 min-w-[140px]">
+      <div className="flex-1 min-w-[180px]">
         <p className="text-xs uppercase tracking-widest text-muted-foreground">
           {playing ? "● Live" : "Stream"}
         </p>
-        <p className="text-sm neon-accent truncate" title={label ?? src ?? ""}>
-          {label ?? (src ? src : "No stream available")}
-        </p>
+        <select
+          value={selectedUrl ?? ""}
+          onChange={(e) => handleSelect(e.target.value)}
+          disabled={playable.length === 0}
+          aria-label="Select stream"
+          className="w-full bg-background/60 border border-border text-foreground text-sm px-2 py-1 rounded-sm focus:outline-none focus:border-primary mt-0.5"
+          title={currentLabel}
+        >
+          {playable.length === 0 && <option value="">No streams</option>}
+          {playable.map((s) => (
+            <option key={s.url} value={s.url}>
+              {s.name}
+              {s.bitrate ? ` · ${s.bitrate}kbps` : ""}
+              {s.type ? ` · ${s.type}` : ""}
+            </option>
+          ))}
+        </select>
         {error && <p className="text-xs text-destructive mt-0.5">{error}</p>}
       </div>
 
@@ -115,6 +199,7 @@ const AudioPlayer = ({ src, label }: Props) => {
       <audio
         ref={audioRef}
         preload="none"
+        crossOrigin="anonymous"
         onEnded={() => setPlaying(false)}
         onError={() => {
           setError("Stream error");
