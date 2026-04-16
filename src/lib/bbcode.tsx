@@ -291,7 +291,9 @@ function renderTag(node: Extract<Node, { type: "tag" }>, key: string): ReactNode
     case "group": {
       const id = text();
       const href = groupUrl(id);
-      return href ? <ExtA key={key} href={href}>group #{id}</ExtA> : <span key={key}>{id}</span>;
+      return href ? (
+        <EntityLink key={key} kind="group" id={id} href={href} fallback={`group #${id}`} />
+      ) : <span key={key}>{id}</span>;
     }
     case "label": {
       const id = text();
