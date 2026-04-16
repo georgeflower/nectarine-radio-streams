@@ -19,10 +19,12 @@ import {
   type StreamSource,
 } from "@/lib/nectarine";
 import AudioPlayer from "@/components/AudioPlayer";
-import Visualizer from "@/components/Visualizer";
+import Visualizer, { type VisualizerStyle } from "@/components/Visualizer";
 import Flag from "@/components/Flag";
-import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { renderWithSmileys } from "@/lib/smileys";
+
+const VIZ_STYLES: VisualizerStyle[] = ["starfield", "bars", "plasma"];
+const VIZ_STORAGE_KEY = "nectarine-viz";
 
 type EndpointState = { content: string; ok: boolean };
 
