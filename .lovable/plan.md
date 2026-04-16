@@ -1,35 +1,42 @@
 
 
-## Plan: Smiley emoticons in the Oneliner
+## Plan: Audio-reactive visualizer + stream picker
 
-### Approach
+Two additions, both touching the existing audio pipeline.
 
-Build a smiley map of all ~130 codes from `scenestream.net/demovibes/smileys/` and render them inline in the Oneliner messages by replacing each code (e.g. `:)`, `:beer:`, `<3`) with the matching `<img>`.
+### 1. Stream picker (in `AudioPlayer`)
 
-The smiley GIFs/PNGs are hosted on `scenestream.net/static/emoticons/...`. Browsers load `<img>` cross-origin without CORS, so we can reference those URLs directly — no proxy, no asset import.
+- Extend `AudioPlayer` props to accept `streams: StreamSource[]` instead of a single `src`/`label`.
+- Add a `<select>` (native, styled to match the CRT panel — keeps it lightweight, no Radix needed) listing all streams as `name · bitrate kbps · type`.
+- Default selection: first `https://` stream (current behavior).
+- Changing the selection updates internal `selectedUrl`; if currently playing, pause + reload + play the new URL.
+- Filter out non-`https://` streams in the dropdown (they'd be blocked as mixed content anyway), or show them disabled with a "(http — blocked)" hint. Going with **filter out** for simplicity.
+- Update `Index.tsx` to pass the full `streams` array.
 
-### Implementation
+### 2. Fullscreen audio-reactive visualizer
 
-**1. New file `src/lib/smileys.ts`**
-- Export a `SMILEYS` record mapping every code → full image URL (all ~130 from the source page, including `:)`, `:(`, `;)`, `<3`, `</3`, `D:`, `:beer:`, `:lol:`, `:necta:`, `:dance:`, `:facepalm:`, meme set, xmas set, atari/amiga set, etc.).
-- Export `renderWithSmileys(text: string): ReactNode[]` that scans the text and splits it into a mix of strings and `<img>` nodes.
-- Tokenizer rules:
-  - Build a single regex from all codes, sorted **longest-first** so `:facepalm2:` matches before `:facepalm:` and `</3` before `<3`.
-  - Properly escape regex special chars (`(`, `)`, `*`, `[`, `|`, `<`, `^`, etc.).
-  - For each match, emit an `<img>` with `src`, `alt={code}`, `title={code}`, `loading="lazy"`, `className="inline-block h-4 align-text-bottom mx-0.5"` (keeps line height tidy in the panel).
-  - Non-matching segments stay as plain text.
+New component `src/components/Visualizer.tsx`:
+- Fixed `<canvas>` behind everything: `fixed inset-0 -z-10 pointer-events-none`.
+- Receives the `HTMLAudioElement` via a ref forwarded from `AudioPlayer` (lift the audio element ref up, or expose it through a context/callback). Cleanest: `AudioPlayer` calls an `onAudioReady(el)` callback once mounted, `Index` stores it in state, passes to `Visualizer`.
+- On first play, lazily create `AudioContext` + `MediaElementSource(audio)` + `AnalyserNode` (fftSize 256, ~128 freq bins) + connect `source → analyser → ctx.destination`. Guard against re-creating the source (Web Audio only allows one `MediaElementSource` per element — store it on a ref).
+- `requestAnimationFrame` loop reads `getByteFrequencyData` and renders a **starfield** that reacts to audio:
+  - ~400 stars with `(x, y, z, baseSpeed)`, perspective-projected from origin.
+  - Per-frame speed multiplier = `1 + bassEnergy * 4` where `bassEnergy = avg(freqData[0..8]) / 255`.
+  - Star color shifts with mid energy (HSL hue); trail length with treble.
+  - Amber/primary palette to match the existing CRT theme (`hsl(var(--primary))` base).
+- Resize handler for `window.resize` + devicePixelRatio.
+- When audio is paused/no signal: stars drift at slow base speed (still looks alive).
+- Cleanup: cancel RAF, disconnect nodes on unmount.
 
-**2. Update `src/pages/Index.tsx`**
-- Import `renderWithSmileys`.
-- In the Oneliner panel, replace `{entry.text}` with `{renderWithSmileys(entry.text)}`.
-- No other changes.
+### Technical notes
 
-### Notes
-- Codes like `:)` and `;)` use ASCII punctuation that is unlikely to appear elsewhere in the chat in a way that should NOT be replaced — matching plain text the same way the original site does is the desired behavior.
-- The `:|` and `;(` codes from the table will also be matched; harmless for chat content.
-- Images hotlinked from scenestream are already used elsewhere on that site; no caching/storage needed.
+- `AudioContext` must be created after a user gesture → create it inside the play handler, then notify visualizer via callback or shared ref.
+- Don't `close()` the AudioContext on stream change — just leave the graph; switching `audio.src` keeps the same `MediaElementSource` working.
+- Plasma is tempting but starfield reads better on top of text content and matches the demoscene vibe; sticking with starfield.
 
 ### Files
-- **New**: `src/lib/smileys.ts`
-- **Update**: `src/pages/Index.tsx` (one-line change in the oneliner render)
+
+- **Update** `src/components/AudioPlayer.tsx` — add streams prop, dropdown, selection state, expose audio element + analyser via callback.
+- **New** `src/components/Visualizer.tsx` — canvas + RAF starfield driven by AnalyserNode.
+- **Update** `src/pages/Index.tsx` — pass full `streams` to player, mount `<Visualizer>`, wire up the audio-element / analyser callback.
 
