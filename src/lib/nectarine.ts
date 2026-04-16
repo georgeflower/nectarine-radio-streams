@@ -96,7 +96,9 @@ export type PlaylistData = {
   history: QueueEntry[];
 };
 
-export type OnelinerEntry = { username: string; text: string; time: string };
+export type OnelinerEntry = { username: string; text: string; time: string; flag: string };
+
+export type OnlineUser = { name: string; flag: string };
 
 export type StreamSource = { name: string; url: string; bitrate: string; type: string };
 
@@ -142,6 +144,12 @@ export function parsePlaylist(doc: Document): PlaylistData {
   };
 }
 
+function flagFrom(el: Element | null | undefined, tag: string): string {
+  if (!el) return "";
+  const c = el.getElementsByTagName(tag)[0];
+  return c?.getAttribute("flag") ?? "";
+}
+
 export function parseOneliners(doc: Document): OnelinerEntry[] {
   const entries = Array.from(doc.getElementsByTagName("entry"));
   return entries.slice(0, MAX_ONELINERS).map((el) => ({
@@ -149,14 +157,23 @@ export function parseOneliners(doc: Document): OnelinerEntry[] {
       txt(el, "author") || txt(el, "user") || txt(el, "username") || txt(el, "nick") || "anon",
     text: txt(el, "message") || txt(el, "text") || el.textContent?.trim() || "",
     time: el.getAttribute("time") || txt(el, "time") || txt(el, "timestamp") || "",
+    flag:
+      flagFrom(el, "author") ||
+      flagFrom(el, "user") ||
+      flagFrom(el, "username") ||
+      flagFrom(el, "nick") ||
+      "",
   }));
 }
 
-export function parseOnline(doc: Document): { users: string[]; total: number } {
+export function parseOnline(doc: Document): { users: OnlineUser[]; total: number } {
   const userEls = Array.from(doc.getElementsByTagName("user"));
-  const users = userEls
-    .map((u) => u.textContent?.trim() || u.getAttribute("name") || "")
-    .filter(Boolean);
+  const users: OnlineUser[] = userEls
+    .map((u) => ({
+      name: u.textContent?.trim() || u.getAttribute("name") || "",
+      flag: u.getAttribute("flag") || "",
+    }))
+    .filter((u) => u.name);
   const countEl = doc.getElementsByTagName("count")[0];
   const totalAttr = doc.documentElement.getAttribute("count");
   const fromText = countEl ? Number.parseInt(countEl.textContent || "", 10) : NaN;
