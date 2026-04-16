@@ -26,7 +26,7 @@ import { renderWithSmileys } from "@/lib/smileys";
 const VIZ_STYLES: VisualizerStyle[] = ["starfield", "bars", "plasma"];
 const VIZ_STORAGE_KEY = "nectarine-viz";
 
-type EndpointState = { content: string; ok: boolean };
+
 
 const EMPTY_PLAYLIST: PlaylistData = { now: null, queue: [], history: [] };
 
@@ -36,9 +36,7 @@ const Index = () => {
   const [users, setUsers] = useState<{ name: string; flag: string }[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
   const [streams, setStreams] = useState<StreamSource[]>([]);
-  const [sections, setSections] = useState<Record<string, EndpointState>>({});
   const [status, setStatus] = useState("Loading API data...");
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [tick, setTick] = useState(0);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [vizStyle, setVizStyle] = useState<VisualizerStyle>(() => {
@@ -66,8 +64,6 @@ const Index = () => {
       const xml = parseXml(text);
       if (xml.querySelector("parsererror")) throw new Error("Invalid XML response");
 
-      setSections((s) => ({ ...s, [endpoint]: { content: xmlToPretty(xml), ok: true } }));
-
       if (endpoint === "queue") setPlaylist(parsePlaylist(xml));
       if (endpoint === "oneliner") setOneliners(parseOneliners(xml));
       if (endpoint === "online") {
@@ -77,11 +73,7 @@ const Index = () => {
       }
       if (endpoint === "streams") setStreams(parseStreams(xml));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setSections((s) => ({
-        ...s,
-        [endpoint]: { content: `Failed to load ${endpoint}: ${msg}`, ok: false },
-      }));
+      console.error(`Failed to load ${endpoint}:`, e);
     }
   }, []);
 
@@ -90,11 +82,6 @@ const Index = () => {
     inFlight.current = true;
     setStatus("Refreshing...");
     try {
-      setOpenSections((prev) => {
-        const next = { ...prev };
-        for (const e of ENDPOINTS) if (!(e in next)) next[e] = false;
-        return next;
-      });
       await Promise.all(ENDPOINTS.map(loadEndpoint));
       setStatus(`Last updated: ${new Date().toLocaleTimeString()}`);
     } catch {
@@ -132,26 +119,6 @@ const Index = () => {
   return (
     <div className="crt min-h-screen relative">
       <Visualizer analyser={analyser} style={vizStyle} />
-      <div
-        className="fixed bottom-3 right-3 z-30 flex items-center gap-1 panel !p-1"
-        role="group"
-        aria-label="Visualizer style"
-      >
-        {VIZ_STYLES.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setVizStyle(s)}
-            className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm transition-opacity ${
-              vizStyle === s
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
       <main className="mx-auto max-w-5xl px-4 py-6 md:py-10 relative" style={{ zIndex: 1 }}>
         <header className="flex items-center justify-between mb-6 border-b border-border pb-4">
           <div>
@@ -162,13 +129,35 @@ const Index = () => {
               Demoscene Radio · Compact viewer
             </p>
           </div>
-          <button
-            onClick={refreshAll}
-            className="px-4 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity"
-            style={{ boxShadow: "var(--glow-primary)" }}
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-1">
+            <div
+              className="flex items-center gap-1 border border-border rounded-sm p-0.5 bg-card/60"
+              role="group"
+              aria-label="Visualizer style"
+            >
+              {VIZ_STYLES.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setVizStyle(s)}
+                  className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm transition-opacity ${
+                    vizStyle === s
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={refreshAll}
+              className="px-4 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity"
+              style={{ boxShadow: "var(--glow-primary)" }}
+            >
+              Refresh
+            </button>
+          </div>
         </header>
 
         <div className="mb-4">
@@ -311,37 +300,6 @@ const Index = () => {
         >
           {status}
         </p>
-
-        <section className="mt-6 space-y-2" aria-label="All API sections">
-          <h2 className="panel-heading !border-0 !mb-2">▶ Raw XML Feeds (debug)</h2>
-          {Object.keys(sections).length === 0 && (
-            <p className="text-xs text-muted-foreground">No endpoints loaded yet.</p>
-          )}
-          {Object.entries(sections).map(([endpoint, s]) => {
-            const open = openSections[endpoint] ?? false;
-            return (
-              <div key={endpoint} className="panel !p-0 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOpenSections((p) => ({ ...p, [endpoint]: !open }))
-                  }
-                  className="w-full flex items-center justify-between px-4 py-2 text-left text-xs uppercase tracking-widest hover:bg-secondary/40"
-                >
-                  <span className={s.ok ? "text-primary" : "text-destructive"}>
-                    {open ? "▼" : "▶"} {toTitle(endpoint)}
-                  </span>
-                  <span className="text-muted-foreground">{endpoint}/</span>
-                </button>
-                {open && (
-                  <pre className="text-[11px] leading-snug px-4 py-3 border-t border-border bg-background/40 overflow-x-auto max-h-80">
-                    {s.content}
-                  </pre>
-                )}
-              </div>
-            );
-          })}
-        </section>
 
         <footer className="mt-10 text-center text-xs text-muted-foreground">
           Ported from{" "}
