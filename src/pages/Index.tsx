@@ -356,7 +356,7 @@ const Index = () => {
                           </span>
                           <span className="text-muted-foreground">({formatOnelinerTime(entry.time)})</span>
                         </div>
-                        <p className="text-sm leading-snug mt-0.5 break-words">{renderWithSmileys(entry.text)}</p>
+                        <p className="text-sm leading-snug mt-0.5 break-words">{renderBBCode(entry.text)}</p>
                       </article>
                     ))
                   )}
