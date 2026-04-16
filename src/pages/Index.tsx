@@ -20,6 +20,8 @@ import {
 } from "@/lib/nectarine";
 import AudioPlayer from "@/components/AudioPlayer";
 import Visualizer from "@/components/Visualizer";
+import Flag from "@/components/Flag";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { renderWithSmileys } from "@/lib/smileys";
 
 type EndpointState = { content: string; ok: boolean };
@@ -29,7 +31,7 @@ const EMPTY_PLAYLIST: PlaylistData = { now: null, queue: [], history: [] };
 const Index = () => {
   const [playlist, setPlaylist] = useState<PlaylistData>(EMPTY_PLAYLIST);
   const [oneliners, setOneliners] = useState<OnelinerEntry[]>([]);
-  const [users, setUsers] = useState<string[]>([]);
+  const [users, setUsers] = useState<{ name: string; flag: string }[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
   const [streams, setStreams] = useState<StreamSource[]>([]);
   const [sections, setSections] = useState<Record<string, EndpointState>>({});
@@ -121,13 +123,16 @@ const Index = () => {
               Demoscene Radio · Compact viewer
             </p>
           </div>
-          <button
-            onClick={refreshAll}
-            className="px-4 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity"
-            style={{ boxShadow: "var(--glow-primary)" }}
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeSwitcher />
+            <button
+              onClick={refreshAll}
+              className="px-4 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity"
+              style={{ boxShadow: "var(--glow-primary)" }}
+            >
+              Refresh
+            </button>
+          </div>
         </header>
 
         <div className="mb-4">
@@ -196,7 +201,10 @@ const Index = () => {
                 oneliners.map((entry, i) => (
                   <article key={i} className="border-l-2 border-accent/60 pl-2 py-1">
                     <div className="flex items-baseline gap-2 text-xs">
-                      <span className="neon-accent font-bold">{entry.username}</span>
+                      <span className="neon-accent font-bold">
+                        <Flag code={entry.flag} />
+                        {entry.username}
+                      </span>
                       <span className="text-muted-foreground">
                         ({formatOnelinerTime(entry.time)})
                       </span>
@@ -225,7 +233,15 @@ const Index = () => {
               <span className="neon-accent font-bold">{usersTotal}</span> users online now:
             </p>
             <p className="text-sm mt-2 text-muted-foreground break-words">
-              {users.length > 0 ? users.join(", ") : "-"}
+              {users.length > 0
+                ? users.map((u, i) => (
+                    <span key={`${u.name}-${i}`} className="inline-block mr-2">
+                      <Flag code={u.flag} />
+                      {u.name}
+                      {i < users.length - 1 ? "," : ""}
+                    </span>
+                  ))
+                : "-"}
             </p>
 
             <h3 className="panel-heading mt-6">▶ Live Streams</h3>
