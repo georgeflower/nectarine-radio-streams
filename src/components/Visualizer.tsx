@@ -1,7 +1,10 @@
 import { useEffect, useRef } from "react";
 
+export type VisualizerStyle = "starfield" | "bars" | "plasma";
+
 type Props = {
   analyser: AnalyserNode | null;
+  style: VisualizerStyle;
 };
 
 type Star = { x: number; y: number; z: number };
@@ -9,10 +12,11 @@ type Star = { x: number; y: number; z: number };
 const STAR_COUNT = 400;
 const MAX_DEPTH = 1000;
 
-const Visualizer = ({ analyser }: Props) => {
+const Visualizer = ({ analyser, style }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const starsRef = useRef<Star[]>([]);
   const rafRef = useRef<number | null>(null);
+  const plasmaTRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -31,7 +35,6 @@ const Visualizer = ({ analyser }: Props) => {
     resize();
     window.addEventListener("resize", resize);
 
-    // init stars
     starsRef.current = Array.from({ length: STAR_COUNT }, () => ({
       x: (Math.random() - 0.5) * 2000,
       y: (Math.random() - 0.5) * 2000,
@@ -40,15 +43,8 @@ const Visualizer = ({ analyser }: Props) => {
 
     const freq = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
 
-    const render = () => {
-      const w = canvas.width;
-      const h = canvas.height;
-      const cx = w / 2;
-      const cy = h / 2;
-
-      let bass = 0;
-      let mid = 0;
-      let treble = 0;
+    const computeBands = () => {
+      let bass = 0, mid = 0, treble = 0;
       if (analyser && freq) {
         analyser.getByteFrequencyData(freq);
         const n = freq.length;
@@ -64,17 +60,19 @@ const Visualizer = ({ analyser }: Props) => {
         for (let i = mEnd; i < n; i++) ts += freq[i];
         treble = ts / (n - mEnd) / 255;
       }
+      return { bass, mid, treble };
+    };
 
-      // trail/fade — more treble = shorter trail (lower alpha clear)
+    const renderStarfield = () => {
+      const w = canvas.width, h = canvas.height;
+      const cx = w / 2, cy = h / 2;
+      const { bass, mid, treble } = computeBands();
       const fade = 0.15 + treble * 0.5;
       ctx.fillStyle = `hsla(20, 25%, 6%, ${fade})`;
       ctx.fillRect(0, 0, w, h);
-
       const speed = (1 + bass * 6) * dpr * 1.2;
-      const hue = 28 + mid * 80; // amber -> pink shift
-      const sat = 100;
+      const hue = 28 + mid * 80;
       const light = 55 + treble * 20;
-
       const stars = starsRef.current;
       for (let i = 0; i < stars.length; i++) {
         const s = stars[i];
@@ -90,10 +88,60 @@ const Visualizer = ({ analyser }: Props) => {
         if (px < 0 || px >= w || py < 0 || py >= h) continue;
         const size = (1 - s.z / MAX_DEPTH) * 3 * dpr + 0.5;
         const alpha = Math.min(1, (1 - s.z / MAX_DEPTH) * (0.5 + bass * 0.8));
-        ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
+        ctx.fillStyle = `hsla(${hue}, 100%, ${light}%, ${alpha})`;
         ctx.fillRect(px, py, size, size);
       }
+    };
 
+    const renderBars = () => {
+      const w = canvas.width, h = canvas.height;
+      ctx.fillStyle = "hsla(20, 25%, 6%, 1)";
+      ctx.fillRect(0, 0, w, h);
+      if (!analyser || !freq) return;
+      const bins = Math.min(64, freq.length);
+      const step = Math.floor(freq.length / bins);
+      const barW = w / bins;
+      for (let i = 0; i < bins; i++) {
+        let sum = 0;
+        for (let j = 0; j < step; j++) sum += freq[i * step + j];
+        const v = sum / step / 255;
+        const barH = v * h * 0.8;
+        const hue = 28 + (i / bins) * 80;
+        const grad = ctx.createLinearGradient(0, h, 0, h - barH);
+        grad.addColorStop(0, `hsla(${hue}, 100%, 50%, 0.9)`);
+        grad.addColorStop(1, `hsla(${hue + 40}, 100%, 70%, 0.9)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(i * barW + 1, h - barH, barW - 2, barH);
+      }
+    };
+
+    const renderPlasma = () => {
+      const w = canvas.width, h = canvas.height;
+      const { bass, mid, treble } = computeBands();
+      plasmaTRef.current += 0.02 + bass * 0.08;
+      const t = plasmaTRef.current;
+      const cell = Math.max(8, Math.floor(12 * dpr));
+      const energy = 0.4 + bass * 0.6 + mid * 0.3;
+      for (let y = 0; y < h; y += cell) {
+        for (let x = 0; x < w; x += cell) {
+          const nx = x / w - 0.5;
+          const ny = y / h - 0.5;
+          const v =
+            Math.sin(nx * 8 + t) +
+            Math.sin(ny * 8 + t * 1.3) +
+            Math.sin((nx + ny) * 6 + t * 0.7) +
+            Math.sin(Math.sqrt(nx * nx + ny * ny) * 12 - t);
+          const hue = (v * 40 + t * 20 + treble * 60) % 360;
+          ctx.fillStyle = `hsl(${(hue + 360) % 360}, 90%, ${40 + energy * 20}%)`;
+          ctx.fillRect(x, y, cell, cell);
+        }
+      }
+    };
+
+    const render = () => {
+      if (style === "bars") renderBars();
+      else if (style === "plasma") renderPlasma();
+      else renderStarfield();
       rafRef.current = requestAnimationFrame(render);
     };
 
@@ -103,7 +151,7 @@ const Visualizer = ({ analyser }: Props) => {
       window.removeEventListener("resize", resize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [analyser]);
+  }, [analyser, style]);
 
   return (
     <canvas
