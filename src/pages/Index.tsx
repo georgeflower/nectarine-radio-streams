@@ -131,7 +131,27 @@ const Index = () => {
 
   return (
     <div className="crt min-h-screen relative">
-      <Visualizer analyser={analyser} />
+      <Visualizer analyser={analyser} style={vizStyle} />
+      <div
+        className="fixed bottom-3 right-3 z-30 flex items-center gap-1 panel !p-1"
+        role="group"
+        aria-label="Visualizer style"
+      >
+        {VIZ_STYLES.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setVizStyle(s)}
+            className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm transition-opacity ${
+              vizStyle === s
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
       <main className="mx-auto max-w-5xl px-4 py-6 md:py-10 relative" style={{ zIndex: 1 }}>
         <header className="flex items-center justify-between mb-6 border-b border-border pb-4">
           <div>
