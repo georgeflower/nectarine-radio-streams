@@ -35,8 +35,12 @@ const Visualizer = ({ analyser, style }: Props) => {
     if (!ctx) return;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    let freq: Uint8Array | null = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
-    let time: Uint8Array | null = analyser ? new Uint8Array(analyser.fftSize) : null;
+    let freq: Uint8Array | null = analyser
+      ? new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount))
+      : null;
+    let time: Uint8Array | null = analyser
+      ? new Uint8Array(new ArrayBuffer(analyser.fftSize))
+      : null;
 
     const resize = () => {
       canvas.width = Math.floor(window.innerWidth * dpr);
@@ -52,8 +56,8 @@ const Visualizer = ({ analyser, style }: Props) => {
       let rms = 0;
 
       if (analyser && freq && time) {
-        analyser.getByteFrequencyData(freq as Uint8Array);
-        analyser.getByteTimeDomainData(time as Uint8Array);
+        analyser.getByteFrequencyData(freq);
+        analyser.getByteTimeDomainData(time);
 
         const n = freq.length;
         const bEnd = Math.max(1, Math.floor(n * 0.08));
