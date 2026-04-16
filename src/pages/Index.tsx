@@ -11,8 +11,6 @@ import {
   parsePlaylist,
   parseStreams,
   parseXml,
-  toTitle,
-  xmlToPretty,
   type Endpoint,
   type OnelinerEntry,
   type PlaylistData,
@@ -23,10 +21,8 @@ import Visualizer, { type VisualizerStyle } from "@/components/Visualizer";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 
-const VIZ_STYLES: VisualizerStyle[] = ["starfield", "bars", "plasma"];
+const VIZ_STYLES: VisualizerStyle[] = ["starfield", "bars", "plasma", "oscilloscope"];
 const VIZ_STORAGE_KEY = "nectarine-viz";
-
-
 
 const EMPTY_PLAYLIST: PlaylistData = { now: null, queue: [], history: [] };
 
@@ -37,6 +33,7 @@ const Index = () => {
   const [usersTotal, setUsersTotal] = useState(0);
   const [streams, setStreams] = useState<StreamSource[]>([]);
   const [status, setStatus] = useState("Loading API data...");
+  const [streamsOpen, setStreamsOpen] = useState(false);
   const [tick, setTick] = useState(0);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [vizStyle, setVizStyle] = useState<VisualizerStyle>(() => {
@@ -105,7 +102,6 @@ const Index = () => {
     return () => window.clearInterval(id);
   }, [refreshAll]);
 
-  // tick each second to update "Time Left"
   useEffect(() => {
     const id = window.setInterval(() => setTick((t) => t + 1), 1000);
     return () => window.clearInterval(id);
@@ -113,14 +109,13 @@ const Index = () => {
 
   const now = playlist.now;
   const timeLeft = now ? computeTimeLeft(now.playstart, now.lengthSec) : "-";
-  // reference tick so React re-renders for the timer
   void tick;
 
   return (
     <div className="crt min-h-screen relative">
       <Visualizer analyser={analyser} style={vizStyle} />
       <main className="mx-auto max-w-5xl px-4 py-6 md:py-10 relative" style={{ zIndex: 1 }}>
-        <header className="flex items-center justify-between mb-6 border-b border-border pb-4">
+        <header className="flex flex-col gap-3 mb-6 border-b border-border pb-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold neon tracking-widest uppercase">
               ▌Nectarine API
@@ -129,7 +124,7 @@ const Index = () => {
               Demoscene Radio · Compact viewer
             </p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
             <div
               className="flex items-center gap-1 border border-border rounded-sm p-0.5 bg-card/60"
               role="group"
@@ -165,7 +160,6 @@ const Index = () => {
         </div>
 
         <section className="grid gap-4 md:grid-cols-2" aria-label="Demovibes panels">
-          {/* LEFT: Now Playing + Up Next + History */}
           <article className="panel">
             <h2 className="panel-heading">▶ Currently Playing</h2>
             {now ? (
@@ -216,7 +210,6 @@ const Index = () => {
             )}
           </article>
 
-          {/* RIGHT: Oneliner + Online + Streams */}
           <article className="panel">
             <h2 className="panel-heading">▶ Infamous OneLiner</h2>
             <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
@@ -230,13 +223,9 @@ const Index = () => {
                         <Flag code={entry.flag} />
                         {entry.username}
                       </span>
-                      <span className="text-muted-foreground">
-                        ({formatOnelinerTime(entry.time)})
-                      </span>
+                      <span className="text-muted-foreground">({formatOnelinerTime(entry.time)})</span>
                     </div>
-                    <p className="text-sm leading-snug mt-0.5 break-words">
-                      {renderWithSmileys(entry.text)}
-                    </p>
+                    <p className="text-sm leading-snug mt-0.5 break-words">{renderWithSmileys(entry.text)}</p>
                   </article>
                 ))
               )}
@@ -254,8 +243,7 @@ const Index = () => {
 
             <h3 className="panel-heading mt-6">▶ Who's Online?</h3>
             <p className="text-sm">
-              There are a total of{" "}
-              <span className="neon-accent font-bold">{usersTotal}</span> users online now:
+              There are a total of <span className="neon-accent font-bold">{usersTotal}</span> users online now:
             </p>
             <p className="text-sm mt-2 text-muted-foreground break-words">
               {users.length > 0
@@ -269,35 +257,46 @@ const Index = () => {
                 : "-"}
             </p>
 
-            <h3 className="panel-heading mt-6">▶ Live Streams</h3>
-            {streams.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No streams listed.</p>
-            ) : (
-              <ul className="space-y-1 text-sm">
-                {streams.map((s, i) => (
-                  <li key={`s-${i}`}>
-                    <a
-                      href={s.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline break-all"
-                    >
-                      ▶ {s.name || s.url}
-                    </a>{" "}
-                    <span className="text-xs text-muted-foreground">
-                      {[s.bitrate && `${s.bitrate}kbps`, s.type].filter(Boolean).join(" · ")}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => setStreamsOpen((open) => !open)}
+                className="panel-heading w-full !mb-0 flex items-center justify-between text-left hover:opacity-90"
+                aria-expanded={streamsOpen}
+              >
+                <span>{streamsOpen ? "▼" : "▶"} Live Streams</span>
+                <span className="text-muted-foreground text-[10px]">{streams.length}</span>
+              </button>
+              {streamsOpen && (
+                <div className="mt-3">
+                  {streams.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No streams listed.</p>
+                  ) : (
+                    <ul className="space-y-1 text-sm">
+                      {streams.map((s, i) => (
+                        <li key={`s-${i}`}>
+                          <a
+                            href={s.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline break-all"
+                          >
+                            ▶ {s.name || s.url}
+                          </a>{" "}
+                          <span className="text-xs text-muted-foreground">
+                            {[s.bitrate && `${s.bitrate}kbps`, s.type].filter(Boolean).join(" · ")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
           </article>
         </section>
 
-        <p
-          className="text-xs text-muted-foreground mt-6 text-center"
-          aria-live="polite"
-        >
+        <p className="text-xs text-muted-foreground mt-6 text-center" aria-live="polite">
           {status}
         </p>
 
