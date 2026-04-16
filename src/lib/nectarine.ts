@@ -235,3 +235,27 @@ export function artistUrl(id: string): string | null {
 export function userUrl(name: string): string | null {
   return name ? `${DEMOVIBES_BASE}/user/${encodeURIComponent(name)}/` : null;
 }
+export function groupUrl(id: string): string | null {
+  return id ? `${DEMOVIBES_BASE}/group/${encodeURIComponent(id)}/` : null;
+}
+export function labelUrl(id: string): string | null {
+  return id ? `${DEMOVIBES_BASE}/label/${encodeURIComponent(id)}/` : null;
+}
+export function platformUrl(value: string): string | null {
+  return value ? `${DEMOVIBES_BASE}/platform/${encodeURIComponent(value)}/` : null;
+}
+export function compilationUrl(value: string): string | null {
+  return value ? `${DEMOVIBES_BASE}/compilation/${encodeURIComponent(value)}/` : null;
+}
+export function themeUrl(id: string): string | null {
+  return id ? `${DEMOVIBES_BASE}/theme/${encodeURIComponent(id)}/` : null;
+}
+export function faqUrl(id: string): string | null {
+  return id ? `${DEMOVIBES_BASE}/faq/${encodeURIComponent(id)}/` : null;
+}
+export function threadUrl(id: string): string | null {
+  return id ? `https://scenestream.net/forum/thread/${encodeURIComponent(id)}/` : null;
+}
+export function forumUrl(slug: string): string | null {
+  return slug ? `https://scenestream.net/forum/${encodeURIComponent(slug)}/` : null;
+}
