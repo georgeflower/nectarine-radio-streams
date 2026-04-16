@@ -78,6 +78,56 @@
   }
 }
 
+/* ─── Atari ST GEM Desktop theme ─────────────────────────────────────────── */
+[data-theme="gem"] {
+  --background: 130 100% 30%;          /* bright green desktop */
+  --foreground: 0 0% 0%;
+  --card: 0 0% 100%;                    /* white windows */
+  --card-foreground: 0 0% 0%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 0%;
+  --primary: 0 0% 0%;                   /* black title bars */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 90%;
+  --secondary-foreground: 0 0% 0%;
+  --muted: 0 0% 95%;
+  --muted-foreground: 0 0% 30%;
+  --accent: 0 0% 0%;
+  --accent-foreground: 0 0% 100%;
+  --border: 0 0% 0%;
+  --input: 0 0% 0%;
+  --ring: 0 0% 0%;
+  --radius: 0;
+  --glow-primary: none;
+  --glow-accent: none;
+  --gradient-scanlines: none;
+}
+
+/* ─── Amiga Workbench 1.3 theme ──────────────────────────────────────────── */
+[data-theme="workbench"] {
+  --background: 210 100% 33%;           /* medium blue desktop */
+  --foreground: 0 0% 0%;
+  --card: 0 0% 100%;                    /* white windows */
+  --card-foreground: 0 0% 0%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 0%;
+  --primary: 28 100% 50%;               /* orange */
+  --primary-foreground: 0 0% 0%;
+  --secondary: 28 100% 50%;
+  --secondary-foreground: 0 0% 0%;
+  --muted: 0 0% 92%;
+  --muted-foreground: 0 0% 25%;
+  --accent: 28 100% 50%;
+  --accent-foreground: 0 0% 0%;
+  --border: 0 0% 0%;
+  --input: 0 0% 0%;
+  --ring: 28 100% 50%;
+  --radius: 0;
+  --glow-primary: none;
+  --glow-accent: none;
+  --gradient-scanlines: none;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -90,6 +140,11 @@
     font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
     background-image: var(--gradient-scanlines);
   }
+  [data-theme="gem"] body,
+  [data-theme="workbench"] body {
+    font-family: "Chicago", "Pixelated MS Sans Serif", Geneva, Verdana, sans-serif;
+    background-image: none;
+  }
 }
 
 @layer components {
@@ -97,16 +152,37 @@
     @apply bg-card/80 border border-border rounded-sm p-4 backdrop-blur-sm;
     box-shadow: inset 0 0 30px hsl(20 30% 0% / 0.6), 0 0 0 1px hsl(28 60% 25% / 0.4);
   }
+  [data-theme="gem"] .panel,
+  [data-theme="workbench"] .panel {
+    @apply bg-card backdrop-blur-none;
+    box-shadow: 2px 2px 0 0 hsl(0 0% 0%);
+  }
   .panel-heading {
     @apply text-primary uppercase tracking-widest text-xs mb-3 pb-2 border-b border-border;
     text-shadow: var(--glow-primary);
   }
+  [data-theme="gem"] .panel-heading {
+    @apply bg-primary text-primary-foreground px-2 py-1 -mx-2 -mt-2 mb-3 border-0;
+    text-shadow: none;
+  }
+  [data-theme="workbench"] .panel-heading {
+    @apply bg-primary text-primary-foreground px-2 py-1 -mx-2 -mt-2 mb-3 border-0;
+    text-shadow: none;
+  }
   .neon {
     text-shadow: var(--glow-primary);
+  }
+  [data-theme="gem"] .neon,
+  [data-theme="workbench"] .neon {
+    text-shadow: none;
   }
   .neon-accent {
     color: hsl(var(--accent));
     text-shadow: var(--glow-accent);
+  }
+  [data-theme="gem"] .neon-accent,
+  [data-theme="workbench"] .neon-accent {
+    text-shadow: none;
   }
   .crt::before {
     content: "";
@@ -115,5 +191,9 @@
     pointer-events: none;
     background: radial-gradient(ellipse at center, transparent 55%, hsl(20 30% 0% / 0.55) 100%);
     z-index: 50;
+  }
+  [data-theme="gem"] .crt::before,
+  [data-theme="workbench"] .crt::before {
+    display: none;
   }
 }
