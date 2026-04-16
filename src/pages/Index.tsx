@@ -23,6 +23,7 @@ import AudioPlayer from "@/components/AudioPlayer";
 import Visualizer, { type VisualizerStyle } from "@/components/Visualizer";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
+import { renderBBCode } from "@/lib/bbcode";
 
 type ExtLinkProps = {
   href: string | null;
@@ -355,7 +356,7 @@ const Index = () => {
                           </span>
                           <span className="text-muted-foreground">({formatOnelinerTime(entry.time)})</span>
                         </div>
-                        <p className="text-sm leading-snug mt-0.5 break-words">{renderWithSmileys(entry.text)}</p>
+                        <p className="text-sm leading-snug mt-0.5 break-words">{renderBBCode(entry.text)}</p>
                       </article>
                     ))
                   )}
