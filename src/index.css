@@ -197,3 +197,23 @@
     display: none;
   }
 }
+
+/* ─── BBCode silly tags ──────────────────────────────────────────────────── */
+@keyframes bb-silly3 {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes bb-silly4 {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+@keyframes bb-silly5 {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.bb-silly1 { display: inline-block; transform: rotate(180deg); }
+.bb-silly2 { display: inline-block; direction: rtl; unicode-bidi: bidi-override; }
+.bb-silly3 { display: inline-block; animation: bb-silly3 1.2s ease-in-out infinite; }
+.bb-silly4 { display: inline-block; animation: bb-silly4 0.6s ease-in-out infinite; }
+.bb-silly5 { display: inline-block; animation: bb-silly5 1s ease-in-out infinite; }
