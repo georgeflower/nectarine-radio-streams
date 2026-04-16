@@ -326,7 +326,8 @@ const Index = () => {
                         <ExtLink href={artistUrl(h.artistId)} className="neon-accent">
                           {h.artist}
                         </ExtLink>{" "}
-                        — <ExtLink href={songUrl(h.songId)}>{h.song}</ExtLink>
+                        — <ExtLink href={songUrl(h.songId)}>{h.song}</ExtLink>{" "}
+                        <SongRating songId={h.songId} />
                       </li>
                     ))}
                   </ul>
