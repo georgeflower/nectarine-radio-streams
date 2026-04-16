@@ -1,1 +1,4 @@
 project_id = "lrdehtgfpvpmxyfmdkzv"
+
+[functions.xml-proxy]
+verify_jwt = false
