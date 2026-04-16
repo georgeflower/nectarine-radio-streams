@@ -308,7 +308,9 @@ function renderTag(node: Extract<Node, { type: "tag" }>, key: string): ReactNode
     case "compilation": {
       const v = text();
       const href = compilationUrl(v);
-      return href ? <ExtA key={key} href={href}>compilation {v}</ExtA> : <span key={key}>{v}</span>;
+      return href ? (
+        <EntityLink key={key} kind="compilation" id={v} href={href} fallback={`compilation #${v}`} />
+      ) : <span key={key}>{v}</span>;
     }
     case "thread": {
       const id = text();
