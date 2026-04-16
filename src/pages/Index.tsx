@@ -34,6 +34,10 @@ const Index = () => {
   const [streams, setStreams] = useState<StreamSource[]>([]);
   const [status, setStatus] = useState("Loading API data...");
   const [streamsOpen, setStreamsOpen] = useState(false);
+  const [onelinerOpen, setOnelinerOpen] = useState(true);
+  const [onelinerExpanded, setOnelinerExpanded] = useState(false);
+  const [onlineOpen, setOnlineOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(true);
   const [tick, setTick] = useState(0);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [vizStyle, setVizStyle] = useState<VisualizerStyle>(() => {
@@ -196,66 +200,124 @@ const Index = () => {
               </ol>
             )}
 
-            <h3 className="panel-heading mt-6">▶ Recently Played</h3>
-            {playlist.history.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No history.</p>
-            ) : (
-              <ul className="space-y-1 text-sm">
-                {playlist.history.map((h, i) => (
-                  <li key={`h-${i}`} className="break-words">
-                    <span className="neon-accent">{h.artist}</span> — {h.song}
-                  </li>
-                ))}
-              </ul>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((o) => !o)}
+              className="panel-heading mt-6 w-full !mb-0 flex items-center justify-between text-left hover:opacity-90"
+              aria-expanded={historyOpen}
+            >
+              <span>{historyOpen ? "▼" : "▶"} Recently Played</span>
+              <span className="text-muted-foreground text-[10px]">{playlist.history.length}</span>
+            </button>
+            {historyOpen && (
+              <div className="mt-3">
+                {playlist.history.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">No history.</p>
+                ) : (
+                  <ul className="space-y-1 text-sm">
+                    {playlist.history.map((h, i) => (
+                      <li key={`h-${i}`} className="break-words">
+                        <span className="neon-accent">{h.artist}</span> — {h.song}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
           </article>
 
           <article className="panel">
-            <h2 className="panel-heading">▶ Infamous OneLiner</h2>
-            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-              {oneliners.length === 0 ? (
-                <p className="text-muted-foreground text-sm">Awaiting transmission…</p>
-              ) : (
-                oneliners.map((entry, i) => (
-                  <article key={i} className="border-l-2 border-accent/60 pl-2 py-1">
-                    <div className="flex items-baseline gap-2 text-xs">
-                      <span className="neon-accent font-bold">
-                        <Flag code={entry.flag} />
-                        {entry.username}
-                      </span>
-                      <span className="text-muted-foreground">({formatOnelinerTime(entry.time)})</span>
-                    </div>
-                    <p className="text-sm leading-snug mt-0.5 break-words">{renderWithSmileys(entry.text)}</p>
-                  </article>
-                ))
-              )}
-            </div>
-            <p className="mt-3 text-xs">
-              <a
-                href="https://scenestream.net/demovibes/oneliner/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                » Oneliner History
-              </a>
-            </p>
+            <button
+              type="button"
+              onClick={() => setOnelinerOpen((o) => !o)}
+              className="panel-heading w-full !mb-0 flex items-center justify-between text-left hover:opacity-90"
+              aria-expanded={onelinerOpen}
+            >
+              <span>{onelinerOpen ? "▼" : "▶"} Infamous OneLiner</span>
+              <span className="flex items-center gap-2">
+                {onelinerOpen && oneliners.length > 0 && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOnelinerExpanded((x) => !x);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setOnelinerExpanded((x) => !x);
+                      }
+                    }}
+                    className="text-primary text-[10px] uppercase tracking-widest hover:underline"
+                  >
+                    {onelinerExpanded ? "Collapse" : "Expand"}
+                  </span>
+                )}
+                <span className="text-muted-foreground text-[10px]">{oneliners.length}</span>
+              </span>
+            </button>
+            {onelinerOpen && (
+              <>
+                <div className={`space-y-2 mt-3 pr-1 ${onelinerExpanded ? "" : "max-h-72 overflow-y-auto"}`}>
+                  {oneliners.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">Awaiting transmission…</p>
+                  ) : (
+                    oneliners.map((entry, i) => (
+                      <article key={i} className="border-l-2 border-accent/60 pl-2 py-1">
+                        <div className="flex items-baseline gap-2 text-xs">
+                          <span className="neon-accent font-bold">
+                            <Flag code={entry.flag} />
+                            {entry.username}
+                          </span>
+                          <span className="text-muted-foreground">({formatOnelinerTime(entry.time)})</span>
+                        </div>
+                        <p className="text-sm leading-snug mt-0.5 break-words">{renderWithSmileys(entry.text)}</p>
+                      </article>
+                    ))
+                  )}
+                </div>
+                <p className="mt-3 text-xs">
+                  <a
+                    href="https://scenestream.net/demovibes/oneliner/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    » Oneliner History
+                  </a>
+                </p>
+              </>
+            )}
 
-            <h3 className="panel-heading mt-6">▶ Who's Online?</h3>
-            <p className="text-sm">
-              There are a total of <span className="neon-accent font-bold">{usersTotal}</span> users online now:
-            </p>
-            <p className="text-sm mt-2 text-muted-foreground break-words">
-              {users.length > 0
-                ? users.map((u, i) => (
-                    <span key={`${u.name}-${i}`} className="inline-block mr-2">
-                      <Flag code={u.flag} />
-                      {u.name}
-                      {i < users.length - 1 ? "," : ""}
-                    </span>
-                  ))
-                : "-"}
-            </p>
+            <button
+              type="button"
+              onClick={() => setOnlineOpen((o) => !o)}
+              className="panel-heading mt-6 w-full !mb-0 flex items-center justify-between text-left hover:opacity-90"
+              aria-expanded={onlineOpen}
+            >
+              <span>{onlineOpen ? "▼" : "▶"} Who's Online?</span>
+              <span className="text-muted-foreground text-[10px]">{usersTotal}</span>
+            </button>
+            {onlineOpen && (
+              <div className="mt-3">
+                <p className="text-sm">
+                  There are a total of <span className="neon-accent font-bold">{usersTotal}</span> users online now:
+                </p>
+                <p className="text-sm mt-2 text-muted-foreground break-words">
+                  {users.length > 0
+                    ? users.map((u, i) => (
+                        <span key={`${u.name}-${i}`} className="inline-block mr-2">
+                          <Flag code={u.flag} />
+                          {u.name}
+                          {i < users.length - 1 ? "," : ""}
+                        </span>
+                      ))
+                    : "-"}
+                </p>
+              </div>
+            )}
 
             <div className="mt-6">
               <button
