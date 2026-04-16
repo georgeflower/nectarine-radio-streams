@@ -13,7 +13,7 @@ export interface EntityInfo {
 
 type CacheMap = Record<string, EntityInfo>;
 
-const STORAGE_PREFIX = "nectarine-entity-cache-";
+const STORAGE_PREFIX = "nectarine-entity-cache-v2-";
 const KINDS: EntityKind[] = ["song", "artist", "group", "compilation"];
 
 const memCache: Record<EntityKind, CacheMap> = {
