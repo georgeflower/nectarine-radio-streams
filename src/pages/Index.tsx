@@ -64,8 +64,6 @@ const Index = () => {
       const xml = parseXml(text);
       if (xml.querySelector("parsererror")) throw new Error("Invalid XML response");
 
-      setSections((s) => ({ ...s, [endpoint]: { content: xmlToPretty(xml), ok: true } }));
-
       if (endpoint === "queue") setPlaylist(parsePlaylist(xml));
       if (endpoint === "oneliner") setOneliners(parseOneliners(xml));
       if (endpoint === "online") {
@@ -75,11 +73,7 @@ const Index = () => {
       }
       if (endpoint === "streams") setStreams(parseStreams(xml));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setSections((s) => ({
-        ...s,
-        [endpoint]: { content: `Failed to load ${endpoint}: ${msg}`, ok: false },
-      }));
+      console.error(`Failed to load ${endpoint}:`, e);
     }
   }, []);
 
@@ -88,11 +82,6 @@ const Index = () => {
     inFlight.current = true;
     setStatus("Refreshing...");
     try {
-      setOpenSections((prev) => {
-        const next = { ...prev };
-        for (const e of ENDPOINTS) if (!(e in next)) next[e] = false;
-        return next;
-      });
       await Promise.all(ENDPOINTS.map(loadEndpoint));
       setStatus(`Last updated: ${new Date().toLocaleTimeString()}`);
     } catch {
