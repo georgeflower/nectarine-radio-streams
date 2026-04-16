@@ -41,7 +41,24 @@ const Index = () => {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [tick, setTick] = useState(0);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+  const [vizStyle, setVizStyle] = useState<VisualizerStyle>(() => {
+    try {
+      const v = localStorage.getItem(VIZ_STORAGE_KEY) as VisualizerStyle | null;
+      if (v && VIZ_STYLES.includes(v)) return v;
+    } catch {
+      // ignore
+    }
+    return "starfield";
+  });
   const inFlight = useRef(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIZ_STORAGE_KEY, vizStyle);
+    } catch {
+      // ignore
+    }
+  }, [vizStyle]);
 
   const loadEndpoint = useCallback(async (endpoint: Endpoint) => {
     try {
@@ -125,16 +142,13 @@ const Index = () => {
               Demoscene Radio · Compact viewer
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <ThemeSwitcher />
-            <button
-              onClick={refreshAll}
-              className="px-4 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity"
-              style={{ boxShadow: "var(--glow-primary)" }}
-            >
-              Refresh
-            </button>
-          </div>
+          <button
+            onClick={refreshAll}
+            className="px-4 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity"
+            style={{ boxShadow: "var(--glow-primary)" }}
+          >
+            Refresh
+          </button>
         </header>
 
         <div className="mb-4">
