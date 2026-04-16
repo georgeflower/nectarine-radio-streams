@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-export type VisualizerStyle = "starfield" | "bars" | "plasma" | "oscilloscope";
+export type VisualizerStyle = "off" | "starfield" | "bars" | "plasma" | "oscilloscope";
 
 type Props = {
   analyser: AnalyserNode | null;
@@ -178,7 +178,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const w = canvas.width;
       const h = canvas.height;
       const { bass, mid, treble } = sampleAudio();
-      plasmaTRef.current += 0.02 + bass * 0.08;
+      plasmaTRef.current += 0.005 + bass * 0.025;
       const t = plasmaTRef.current;
       const cell = Math.max(8, Math.floor(12 * dpr));
       const energy = 0.4 + bass * 0.6 + mid * 0.3;
@@ -192,7 +192,7 @@ const Visualizer = ({ analyser, style }: Props) => {
             Math.sin(ny * 8 + t * 1.3) +
             Math.sin((nx + ny) * 6 + t * 0.7) +
             Math.sin(Math.sqrt(nx * nx + ny * ny) * 12 - t);
-          const hue = (v * 40 + t * 20 + treble * 60) % 360;
+          const hue = (v * 40 + t * 6 + treble * 60) % 360;
           ctx.fillStyle = `hsl(${(hue + 360) % 360}, 90%, ${40 + energy * 20}%)`;
           ctx.fillRect(x, y, cell, cell);
         }
@@ -247,11 +247,15 @@ const Visualizer = ({ analyser, style }: Props) => {
       if (style === "bars") renderBars();
       else if (style === "plasma") renderPlasma();
       else if (style === "oscilloscope") renderOscilloscope();
-      else renderStarfield();
+      else if (style === "starfield") renderStarfield();
       rafRef.current = requestAnimationFrame(render);
     };
 
-    rafRef.current = requestAnimationFrame(render);
+    if (style === "off") {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } else {
+      rafRef.current = requestAnimationFrame(render);
+    }
 
     return () => {
       window.removeEventListener("resize", resize);
