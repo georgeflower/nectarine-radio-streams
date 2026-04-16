@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { renderWithSmileys } from "./smileys";
 import Flag from "@/components/Flag";
 import {
@@ -14,6 +14,40 @@ import {
   threadUrl,
   forumUrl,
 } from "./nectarine";
+import { getCachedTitle, requestTitle, subscribe } from "./entityCache";
+
+function EntityLink({
+  kind,
+  id,
+  href,
+  fallback,
+}: {
+  kind: "song" | "artist";
+  id: string;
+  href: string;
+  fallback: string;
+}) {
+  const [title, setTitle] = useState<string | undefined>(() => getCachedTitle(kind, id));
+  useEffect(() => {
+    if (!id) return;
+    if (!title) requestTitle(kind, id);
+    const unsub = subscribe(() => {
+      const t = getCachedTitle(kind, id);
+      if (t) setTitle(t);
+    });
+    return unsub;
+  }, [kind, id, title]);
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-primary hover:underline"
+    >
+      {title || fallback}
+    </a>
+  );
+}
 
 // ─── BBCode renderer ───────────────────────────────────────────────────────────
 // Supports formatting tags, links/media, and Scenestream entity references.
@@ -195,15 +229,15 @@ function renderTag(node: Extract<Node, { type: "tag" }>, key: string): ReactNode
     case "song": {
       const id = text();
       const href = songUrl(id);
-      return href ? <ExtA key={key} href={href}>♪ song #{id}</ExtA> : <span key={key}>{id}</span>;
+      return href ? (
+        <EntityLink key={key} kind="song" id={id} href={href} fallback={`song #${id}`} />
+      ) : <span key={key}>{id}</span>;
     }
     case "queue": {
       const id = text();
       const href = songUrl(id);
       return href ? (
-        <ExtA key={key} href={href} className="text-primary hover:underline border border-border rounded-sm px-1 text-xs">
-          ▶ queue #{id}
-        </ExtA>
+        <EntityLink key={key} kind="song" id={id} href={href} fallback={`▶ queue #${id}`} />
       ) : <span key={key}>{id}</span>;
     }
     case "user": {
@@ -214,7 +248,9 @@ function renderTag(node: Extract<Node, { type: "tag" }>, key: string): ReactNode
     case "artist": {
       const id = text();
       const href = artistUrl(id);
-      return href ? <ExtA key={key} href={href}>artist #{id}</ExtA> : <span key={key}>{id}</span>;
+      return href ? (
+        <EntityLink key={key} kind="artist" id={id} href={href} fallback={`artist #${id}`} />
+      ) : <span key={key}>{id}</span>;
     }
     case "group": {
       const id = text();
