@@ -14,7 +14,25 @@ import {
   threadUrl,
   forumUrl,
 } from "./nectarine";
-import { getCachedTitle, requestTitle, subscribe } from "./entityCache";
+import {
+  EntityKind,
+  EntityInfo,
+  getCachedInfo,
+  requestInfo,
+  subscribe,
+} from "./entityCache";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+
+const KIND_LABEL: Record<EntityKind, string> = {
+  song: "Song",
+  artist: "Artist",
+  group: "Group",
+  compilation: "Compilation",
+};
 
 function EntityLink({
   kind,
@@ -22,30 +40,48 @@ function EntityLink({
   href,
   fallback,
 }: {
-  kind: "song" | "artist";
+  kind: EntityKind;
   id: string;
   href: string;
   fallback: string;
 }) {
-  const [title, setTitle] = useState<string | undefined>(() => getCachedTitle(kind, id));
+  const [info, setInfo] = useState<EntityInfo | undefined>(() => getCachedInfo(kind, id));
   useEffect(() => {
     if (!id) return;
-    if (!title) requestTitle(kind, id);
+    if (!info?.title) requestInfo(kind, id);
     const unsub = subscribe(() => {
-      const t = getCachedTitle(kind, id);
-      if (t) setTitle(t);
+      const next = getCachedInfo(kind, id);
+      if (next?.title) setInfo(next);
     });
     return unsub;
-  }, [kind, id, title]);
-  return (
+  }, [kind, id, info?.title]);
+
+  const label = info?.title || fallback;
+  const link = (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
       className="text-primary hover:underline"
     >
-      {title || fallback}
+      {label}
     </a>
+  );
+
+  // Only render hover card when we actually have something extra to show.
+  if (!info?.title && !info?.meta) return link;
+
+  return (
+    <HoverCard openDelay={150} closeDelay={50}>
+      <HoverCardTrigger asChild>{link}</HoverCardTrigger>
+      <HoverCardContent className="w-auto max-w-xs p-2 text-xs">
+        <div className="font-semibold">{info?.title || fallback}</div>
+        <div className="text-muted-foreground">
+          {KIND_LABEL[kind]} #{id}
+          {info?.meta ? ` · ${info.meta}` : ""}
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 
