@@ -100,13 +100,11 @@ const Visualizer = ({ analyser, style }: Props) => {
       const h = canvas.height;
       const cx = w / 2;
       const cy = h / 2;
-      const { bass, mid, treble } = sampleAudio();
-      const fade = 0.15 + treble * 0.5;
-      ctx.fillStyle = `hsla(20, 25%, 6%, ${fade})`;
+      ctx.fillStyle = "hsla(20, 25%, 6%, 0.2)";
       ctx.fillRect(0, 0, w, h);
-      const speed = (1 + bass * 6) * dpr * 1.2;
-      const hue = 28 + mid * 80;
-      const light = 55 + treble * 20;
+      const speed = 1.4 * dpr;
+      const hue = 28;
+      const light = 60;
 
       for (const s of starsRef.current) {
         s.z -= speed * 2;
@@ -120,7 +118,7 @@ const Visualizer = ({ analyser, style }: Props) => {
         const py = cy + s.y * k * dpr;
         if (px < 0 || px >= w || py < 0 || py >= h) continue;
         const size = (1 - s.z / MAX_DEPTH) * 3 * dpr + 0.5;
-        const alpha = Math.min(1, (1 - s.z / MAX_DEPTH) * (0.5 + bass * 0.8));
+        const alpha = Math.min(1, (1 - s.z / MAX_DEPTH) * 0.7);
         ctx.fillStyle = `hsla(${hue}, 100%, ${light}%, ${alpha})`;
         ctx.fillRect(px, py, size, size);
       }
