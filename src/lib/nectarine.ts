@@ -134,12 +134,12 @@ export function parsePlaylist(doc: Document): PlaylistData {
 }
 
 export function parseOneliners(doc: Document): OnelinerEntry[] {
-  const items = Array.from(doc.getElementsByTagName("item"));
-  const source = items.length ? items : Array.from(doc.getElementsByTagName("entry"));
-  return source.slice(0, MAX_ONELINERS).map((el) => ({
-    username: txt(el, "user") || txt(el, "username") || txt(el, "nick") || "anon",
+  const entries = Array.from(doc.getElementsByTagName("entry"));
+  return entries.slice(0, MAX_ONELINERS).map((el) => ({
+    username:
+      txt(el, "author") || txt(el, "user") || txt(el, "username") || txt(el, "nick") || "anon",
     text: txt(el, "message") || txt(el, "text") || el.textContent?.trim() || "",
-    time: txt(el, "time") || txt(el, "timestamp") || el.getAttribute("time") || "",
+    time: el.getAttribute("time") || txt(el, "time") || txt(el, "timestamp") || "",
   }));
 }
 
@@ -148,19 +148,26 @@ export function parseOnline(doc: Document): { users: string[]; total: number } {
   const users = userEls
     .map((u) => u.textContent?.trim() || u.getAttribute("name") || "")
     .filter(Boolean);
+  const countEl = doc.getElementsByTagName("count")[0];
   const totalAttr = doc.documentElement.getAttribute("count");
-  const total = totalAttr ? Number.parseInt(totalAttr, 10) : users.length;
-  return { users, total: Number.isFinite(total) ? total : users.length };
+  const fromText = countEl ? Number.parseInt(countEl.textContent || "", 10) : NaN;
+  const fromAttr = totalAttr ? Number.parseInt(totalAttr, 10) : NaN;
+  const total = Number.isFinite(fromText) ? fromText : Number.isFinite(fromAttr) ? fromAttr : users.length;
+  return { users, total };
 }
 
 export function parseStreams(doc: Document): StreamSource[] {
   const streamEls = Array.from(doc.getElementsByTagName("stream"));
-  return streamEls.map((s) => ({
-    name: s.getAttribute("name") || txt(s, "name") || "Stream",
-    url: s.getAttribute("url") || txt(s, "url") || s.textContent?.trim() || "",
-    bitrate: s.getAttribute("bitrate") || txt(s, "bitrate") || "",
-    type: s.getAttribute("type") || txt(s, "type") || "",
-  }));
+  return streamEls.map((s) => {
+    const url = s.getAttribute("url") || txt(s, "url") || s.textContent?.trim() || "";
+    const typeEl = s.getElementsByTagName("type")[0];
+    return {
+      name: s.getAttribute("name") || txt(s, "name") || "Stream",
+      url,
+      bitrate: s.getAttribute("bitrate") || txt(s, "bitrate") || "",
+      type: typeEl?.textContent?.trim() || s.getAttribute("type") || "",
+    };
+  });
 }
 
 // ─── Display helpers ───────────────────────────────────────────────────────────
