@@ -52,8 +52,8 @@ const Visualizer = ({ analyser, style }: Props) => {
       let rms = 0;
 
       if (analyser && freq && time) {
-        analyser.getByteFrequencyData(freq);
-        analyser.getByteTimeDomainData(time);
+        analyser.getByteFrequencyData(freq as Uint8Array);
+        analyser.getByteTimeDomainData(time as Uint8Array);
 
         const n = freq.length;
         const bEnd = Math.max(1, Math.floor(n * 0.08));
