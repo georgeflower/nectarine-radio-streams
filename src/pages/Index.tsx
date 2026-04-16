@@ -19,6 +19,7 @@ import {
   type StreamSource,
 } from "@/lib/nectarine";
 import AudioPlayer from "@/components/AudioPlayer";
+import { renderWithSmileys } from "@/lib/smileys";
 
 type EndpointState = { content: string; ok: boolean };
 
@@ -200,7 +201,9 @@ const Index = () => {
                         ({formatOnelinerTime(entry.time)})
                       </span>
                     </div>
-                    <p className="text-sm leading-snug mt-0.5 break-words">{entry.text}</p>
+                    <p className="text-sm leading-snug mt-0.5 break-words">
+                      {renderWithSmileys(entry.text)}
+                    </p>
                   </article>
                 ))
               )}
