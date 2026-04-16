@@ -128,10 +128,15 @@ const Index = () => {
         </header>
 
         <div className="mb-4">
-          <AudioPlayer
-            src={streams[0]?.url ?? null}
-            label={streams[0] ? `${streams[0].name}${streams[0].bitrate ? ` · ${streams[0].bitrate}kbps` : ""}` : undefined}
-          />
+          {(() => {
+            const playable = streams.find((s) => s.url.startsWith("https://")) ?? streams[0];
+            return (
+              <AudioPlayer
+                src={playable?.url ?? null}
+                label={playable ? `${playable.name}${playable.bitrate ? ` · ${playable.bitrate}kbps` : ""}` : undefined}
+              />
+            );
+          })()}
         </div>
 
         <section className="grid gap-4 md:grid-cols-2" aria-label="Demovibes panels">
