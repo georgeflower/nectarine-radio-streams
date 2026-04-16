@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   AUTO_REFRESH_INTERVAL_MS,
   ENDPOINTS,
+  artistUrl,
   computeTimeLeft,
   fetchEndpoint,
   formatDuration,
@@ -11,6 +12,8 @@ import {
   parsePlaylist,
   parseStreams,
   parseXml,
+  songUrl,
+  userUrl,
   type Endpoint,
   type OnelinerEntry,
   type PlaylistData,
@@ -20,6 +23,25 @@ import AudioPlayer from "@/components/AudioPlayer";
 import Visualizer, { type VisualizerStyle } from "@/components/Visualizer";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
+
+type ExtLinkProps = {
+  href: string | null;
+  children: React.ReactNode;
+  className?: string;
+};
+const ExtLink = ({ href, children, className }: ExtLinkProps) => {
+  if (!href) return <span className={className}>{children}</span>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`${className ?? ""} hover:underline hover:text-primary transition-colors`}
+    >
+      {children}
+    </a>
+  );
+};
 
 const VIZ_STYLES: VisualizerStyle[] = ["off", "starfield", "bars", "plasma", "oscilloscope"];
 const VIZ_STORAGE_KEY = "nectarine-viz";
@@ -200,10 +222,17 @@ const Index = () => {
               <div className="mt-3">
                 {now ? (
                   <>
-                    <p className="text-lg font-bold neon break-words">{now.song}</p>
-                    <p className="text-sm text-muted-foreground mb-3">by {now.artist}</p>
+                    <p className="text-lg font-bold neon break-words">
+                      <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink>
+                    </p>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      by <ExtLink href={artistUrl(now.artistId)}>{now.artist}</ExtLink>
+                    </p>
                     <p className="text-sm">
-                      Requested By: <span className="text-foreground">{now.requester}</span>
+                      Requested By:{" "}
+                      <ExtLink href={userUrl(now.requester)} className="text-foreground">
+                        {now.requester}
+                      </ExtLink>
                     </p>
                     <p className="text-sm">
                       Length: <span className="text-foreground">{formatDuration(now.lengthSec)}</span>
@@ -235,9 +264,13 @@ const Index = () => {
                   <ol className="space-y-1 text-sm list-decimal list-inside">
                     {playlist.queue.map((q, i) => (
                       <li key={`q-${i}`} className="break-words">
-                        <span className="neon-accent">{q.artist}</span> — {q.song}{" "}
+                        <ExtLink href={artistUrl(q.artistId)} className="neon-accent">
+                          {q.artist}
+                        </ExtLink>{" "}
+                        — <ExtLink href={songUrl(q.songId)}>{q.song}</ExtLink>{" "}
                         <span className="text-xs text-muted-foreground">
-                          ({formatDuration(q.lengthSec)} · req {q.requester})
+                          ({formatDuration(q.lengthSec)} · req{" "}
+                          <ExtLink href={userUrl(q.requester)}>{q.requester}</ExtLink>)
                         </span>
                       </li>
                     ))}
@@ -263,7 +296,10 @@ const Index = () => {
                   <ul className="space-y-1 text-sm">
                     {playlist.history.map((h, i) => (
                       <li key={`h-${i}`} className="break-words">
-                        <span className="neon-accent">{h.artist}</span> — {h.song}
+                        <ExtLink href={artistUrl(h.artistId)} className="neon-accent">
+                          {h.artist}
+                        </ExtLink>{" "}
+                        — <ExtLink href={songUrl(h.songId)}>{h.song}</ExtLink>
                       </li>
                     ))}
                   </ul>
@@ -315,7 +351,7 @@ const Index = () => {
                         <div className="flex items-baseline gap-2 text-xs">
                           <span className="neon-accent font-bold">
                             <Flag code={entry.flag} />
-                            {entry.username}
+                            <ExtLink href={userUrl(entry.username)}>{entry.username}</ExtLink>
                           </span>
                           <span className="text-muted-foreground">({formatOnelinerTime(entry.time)})</span>
                         </div>
@@ -356,7 +392,7 @@ const Index = () => {
                     ? users.map((u, i) => (
                         <span key={`${u.name}-${i}`} className="inline-block mr-2">
                           <Flag code={u.flag} />
-                          {u.name}
+                          <ExtLink href={userUrl(u.name)}>{u.name}</ExtLink>
                           {i < users.length - 1 ? "," : ""}
                         </span>
                       ))
