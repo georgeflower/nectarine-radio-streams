@@ -149,7 +149,7 @@ function xmlNodeToObject(node: Element): unknown {
   const result: Record<string, unknown> = {};
   for (const child of Array.from(node.children)) {
     const parsed = xmlNodeToObject(child);
-    if (Object.hasOwn(result, child.tagName)) {
+    if (Object.prototype.hasOwnProperty.call(result, child.tagName)) {
       if (!Array.isArray(result[child.tagName])) result[child.tagName] = [result[child.tagName]];
       (result[child.tagName] as unknown[]).push(parsed);
     } else {
