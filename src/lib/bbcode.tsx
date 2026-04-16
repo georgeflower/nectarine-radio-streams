@@ -229,15 +229,15 @@ function renderTag(node: Extract<Node, { type: "tag" }>, key: string): ReactNode
     case "song": {
       const id = text();
       const href = songUrl(id);
-      return href ? <ExtA key={key} href={href}>♪ song #{id}</ExtA> : <span key={key}>{id}</span>;
+      return href ? (
+        <EntityLink key={key} kind="song" id={id} href={href} fallback={`song #${id}`} />
+      ) : <span key={key}>{id}</span>;
     }
     case "queue": {
       const id = text();
       const href = songUrl(id);
       return href ? (
-        <ExtA key={key} href={href} className="text-primary hover:underline border border-border rounded-sm px-1 text-xs">
-          ▶ queue #{id}
-        </ExtA>
+        <EntityLink key={key} kind="song" id={id} href={href} fallback={`▶ queue #${id}`} />
       ) : <span key={key}>{id}</span>;
     }
     case "user": {
@@ -248,7 +248,9 @@ function renderTag(node: Extract<Node, { type: "tag" }>, key: string): ReactNode
     case "artist": {
       const id = text();
       const href = artistUrl(id);
-      return href ? <ExtA key={key} href={href}>artist #{id}</ExtA> : <span key={key}>{id}</span>;
+      return href ? (
+        <EntityLink key={key} kind="artist" id={id} href={href} fallback={`artist #${id}`} />
+      ) : <span key={key}>{id}</span>;
     }
     case "group": {
       const id = text();
