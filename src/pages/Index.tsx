@@ -18,6 +18,7 @@ import {
   type PlaylistData,
   type StreamSource,
 } from "@/lib/nectarine";
+import AudioPlayer from "@/components/AudioPlayer";
 
 type EndpointState = { content: string; ok: boolean };
 
@@ -124,6 +125,13 @@ const Index = () => {
             Refresh
           </button>
         </header>
+
+        <div className="mb-4">
+          <AudioPlayer
+            src={streams[0]?.url ?? null}
+            label={streams[0] ? `${streams[0].name}${streams[0].bitrate ? ` · ${streams[0].bitrate}kbps` : ""}` : undefined}
+          />
+        </div>
 
         <section className="grid gap-4 md:grid-cols-2" aria-label="Demovibes panels">
           {/* LEFT: Now Playing + Up Next + History */}
