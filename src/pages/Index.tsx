@@ -18,6 +18,7 @@ import {
   type PlaylistData,
   type StreamSource,
 } from "@/lib/nectarine";
+import AudioPlayer from "@/components/AudioPlayer";
 
 type EndpointState = { content: string; ok: boolean };
 
