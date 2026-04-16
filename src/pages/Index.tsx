@@ -162,13 +162,35 @@ const Index = () => {
               Demoscene Radio · Compact viewer
             </p>
           </div>
-          <button
-            onClick={refreshAll}
-            className="px-4 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity"
-            style={{ boxShadow: "var(--glow-primary)" }}
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-1">
+            <div
+              className="flex items-center gap-1 border border-border rounded-sm p-0.5 bg-card/60"
+              role="group"
+              aria-label="Visualizer style"
+            >
+              {VIZ_STYLES.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setVizStyle(s)}
+                  className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm transition-opacity ${
+                    vizStyle === s
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={refreshAll}
+              className="px-4 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity"
+              style={{ boxShadow: "var(--glow-primary)" }}
+            >
+              Refresh
+            </button>
+          </div>
         </header>
 
         <div className="mb-4">
@@ -311,37 +333,6 @@ const Index = () => {
         >
           {status}
         </p>
-
-        <section className="mt-6 space-y-2" aria-label="All API sections">
-          <h2 className="panel-heading !border-0 !mb-2">▶ Raw XML Feeds (debug)</h2>
-          {Object.keys(sections).length === 0 && (
-            <p className="text-xs text-muted-foreground">No endpoints loaded yet.</p>
-          )}
-          {Object.entries(sections).map(([endpoint, s]) => {
-            const open = openSections[endpoint] ?? false;
-            return (
-              <div key={endpoint} className="panel !p-0 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOpenSections((p) => ({ ...p, [endpoint]: !open }))
-                  }
-                  className="w-full flex items-center justify-between px-4 py-2 text-left text-xs uppercase tracking-widest hover:bg-secondary/40"
-                >
-                  <span className={s.ok ? "text-primary" : "text-destructive"}>
-                    {open ? "▼" : "▶"} {toTitle(endpoint)}
-                  </span>
-                  <span className="text-muted-foreground">{endpoint}/</span>
-                </button>
-                {open && (
-                  <pre className="text-[11px] leading-snug px-4 py-3 border-t border-border bg-background/40 overflow-x-auto max-h-80">
-                    {s.content}
-                  </pre>
-                )}
-              </div>
-            );
-          })}
-        </section>
 
         <footer className="mt-10 text-center text-xs text-muted-foreground">
           Ported from{" "}

@@ -95,23 +95,26 @@ const Visualizer = ({ analyser, style }: Props) => {
 
     const renderBars = () => {
       const w = canvas.width, h = canvas.height;
-      ctx.fillStyle = "hsla(20, 25%, 6%, 1)";
+      ctx.fillStyle = "hsla(20, 25%, 6%, 0.4)";
       ctx.fillRect(0, 0, w, h);
-      if (!analyser || !freq) return;
-      const bins = Math.min(64, freq.length);
-      const step = Math.floor(freq.length / bins);
+      if (!analyser || !freq) {
+        return;
+      }
+      analyser.getByteFrequencyData(freq);
+      const bins = 64;
+      const step = Math.max(1, Math.floor(freq.length / bins));
       const barW = w / bins;
       for (let i = 0; i < bins; i++) {
         let sum = 0;
-        for (let j = 0; j < step; j++) sum += freq[i * step + j];
+        for (let j = 0; j < step; j++) sum += freq[i * step + j] ?? 0;
         const v = sum / step / 255;
-        const barH = v * h * 0.8;
+        const barH = Math.max(2 * dpr, v * h * 0.85);
         const hue = 28 + (i / bins) * 80;
         const grad = ctx.createLinearGradient(0, h, 0, h - barH);
-        grad.addColorStop(0, `hsla(${hue}, 100%, 50%, 0.9)`);
-        grad.addColorStop(1, `hsla(${hue + 40}, 100%, 70%, 0.9)`);
+        grad.addColorStop(0, `hsla(${hue}, 100%, 50%, 0.95)`);
+        grad.addColorStop(1, `hsla(${(hue + 40) % 360}, 100%, 70%, 0.95)`);
         ctx.fillStyle = grad;
-        ctx.fillRect(i * barW + 1, h - barH, barW - 2, barH);
+        ctx.fillRect(i * barW + 1, h - barH, Math.max(1, barW - 2), barH);
       }
     };
 
