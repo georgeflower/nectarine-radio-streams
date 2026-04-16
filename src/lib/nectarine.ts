@@ -101,16 +101,25 @@ export type OnelinerEntry = { username: string; text: string; time: string };
 export type StreamSource = { name: string; url: string; bitrate: string; type: string };
 
 // ─── Parsers ───────────────────────────────────────────────────────────────────
+function parseLength(raw: string | null | undefined): number {
+  if (!raw) return 0;
+  const v = raw.trim();
+  if (v.includes(":")) {
+    const parts = v.split(":").map((p) => Number.parseInt(p, 10) || 0);
+    return parts.reduce((acc, n) => acc * 60 + n, 0);
+  }
+  return Number.parseInt(v, 10) || 0;
+}
+
 function parseEntry(entry: Element): QueueEntry {
   const artistEl = entry.getElementsByTagName("artist")[0];
   const songEl = entry.getElementsByTagName("song")[0];
-  const lengthAttr = songEl?.getAttribute("length") ?? "0";
   return {
     artist: artistEl?.textContent?.trim() ?? "-",
     artistId: artistEl?.getAttribute("id") ?? "",
     song: songEl?.textContent?.trim() ?? "-",
     songId: songEl?.getAttribute("id") ?? "",
-    lengthSec: Number.parseInt(lengthAttr, 10) || 0,
+    lengthSec: parseLength(songEl?.getAttribute("length")),
     requester: txt(entry, "requester") || "-",
     playstart: txt(entry, "playstart"),
   };
