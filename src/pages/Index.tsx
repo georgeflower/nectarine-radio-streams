@@ -21,7 +21,7 @@ import Visualizer, { type VisualizerStyle } from "@/components/Visualizer";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 
-const VIZ_STYLES: VisualizerStyle[] = ["starfield", "bars", "plasma", "oscilloscope"];
+const VIZ_STYLES: VisualizerStyle[] = ["off", "starfield", "bars", "plasma", "oscilloscope"];
 const VIZ_STORAGE_KEY = "nectarine-viz";
 
 const EMPTY_PLAYLIST: PlaylistData = { now: null, queue: [], history: [] };
