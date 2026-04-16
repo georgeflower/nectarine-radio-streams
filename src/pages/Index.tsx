@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   AUTO_REFRESH_INTERVAL_MS,
   ENDPOINTS,
@@ -26,6 +26,27 @@ const VIZ_STORAGE_KEY = "nectarine-viz";
 
 const EMPTY_PLAYLIST: PlaylistData = { now: null, queue: [], history: [] };
 
+const usePersistedBool = (key: string, initial: boolean): [boolean, React.Dispatch<React.SetStateAction<boolean>>] => {
+  const [value, setValue] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem(key);
+      if (v === "1") return true;
+      if (v === "0") return false;
+    } catch {
+      // ignore
+    }
+    return initial;
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, value ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }, [key, value]);
+  return [value, setValue];
+};
+
 const Index = () => {
   const [playlist, setPlaylist] = useState<PlaylistData>(EMPTY_PLAYLIST);
   const [oneliners, setOneliners] = useState<OnelinerEntry[]>([]);
@@ -33,11 +54,13 @@ const Index = () => {
   const [usersTotal, setUsersTotal] = useState(0);
   const [streams, setStreams] = useState<StreamSource[]>([]);
   const [status, setStatus] = useState("Loading API data...");
-  const [streamsOpen, setStreamsOpen] = useState(false);
-  const [onelinerOpen, setOnelinerOpen] = useState(true);
-  const [onelinerExpanded, setOnelinerExpanded] = useState(false);
-  const [onlineOpen, setOnlineOpen] = useState(true);
-  const [historyOpen, setHistoryOpen] = useState(true);
+  const [streamsOpen, setStreamsOpen] = usePersistedBool("nectarine-streams-open", false);
+  const [onelinerOpen, setOnelinerOpen] = usePersistedBool("nectarine-oneliner-open", true);
+  const [onelinerExpanded, setOnelinerExpanded] = usePersistedBool("nectarine-oneliner-expanded", false);
+  const [onlineOpen, setOnlineOpen] = usePersistedBool("nectarine-online-open", true);
+  const [historyOpen, setHistoryOpen] = usePersistedBool("nectarine-history-open", true);
+  const [nowOpen, setNowOpen] = usePersistedBool("nectarine-now-open", true);
+  const [queueOpen, setQueueOpen] = usePersistedBool("nectarine-queue-open", true);
   const [tick, setTick] = useState(0);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [vizStyle, setVizStyle] = useState<VisualizerStyle>(() => {
@@ -165,39 +188,62 @@ const Index = () => {
 
         <section className="grid gap-4 md:grid-cols-2" aria-label="Demovibes panels">
           <article className="panel">
-            <h2 className="panel-heading">▶ Currently Playing</h2>
-            {now ? (
-              <>
-                <p className="text-lg font-bold neon break-words">{now.song}</p>
-                <p className="text-sm text-muted-foreground mb-3">by {now.artist}</p>
-                <p className="text-sm">
-                  Requested By: <span className="text-foreground">{now.requester}</span>
-                </p>
-                <p className="text-sm">
-                  Length: <span className="text-foreground">{formatDuration(now.lengthSec)}</span>
-                </p>
-                <p className="text-sm">
-                  Time Left: <span className="text-foreground">{timeLeft}</span>
-                </p>
-              </>
-            ) : (
-              <p className="text-muted-foreground text-sm">No track info yet…</p>
+            <button
+              type="button"
+              onClick={() => setNowOpen((o) => !o)}
+              className="panel-heading w-full !mb-0 flex items-center justify-between text-left hover:opacity-90"
+              aria-expanded={nowOpen}
+            >
+              <span>{nowOpen ? "▼" : "▶"} Currently Playing</span>
+            </button>
+            {nowOpen && (
+              <div className="mt-3">
+                {now ? (
+                  <>
+                    <p className="text-lg font-bold neon break-words">{now.song}</p>
+                    <p className="text-sm text-muted-foreground mb-3">by {now.artist}</p>
+                    <p className="text-sm">
+                      Requested By: <span className="text-foreground">{now.requester}</span>
+                    </p>
+                    <p className="text-sm">
+                      Length: <span className="text-foreground">{formatDuration(now.lengthSec)}</span>
+                    </p>
+                    <p className="text-sm">
+                      Time Left: <span className="text-foreground">{timeLeft}</span>
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-sm">No track info yet…</p>
+                )}
+              </div>
             )}
 
-            <h3 className="panel-heading mt-6">▶ Up Next</h3>
-            {playlist.queue.length === 0 ? (
-              <p className="text-muted-foreground text-sm">Queue is empty.</p>
-            ) : (
-              <ol className="space-y-1 text-sm list-decimal list-inside">
-                {playlist.queue.map((q, i) => (
-                  <li key={`q-${i}`} className="break-words">
-                    <span className="neon-accent">{q.artist}</span> — {q.song}{" "}
-                    <span className="text-xs text-muted-foreground">
-                      ({formatDuration(q.lengthSec)} · req {q.requester})
-                    </span>
-                  </li>
-                ))}
-              </ol>
+            <button
+              type="button"
+              onClick={() => setQueueOpen((o) => !o)}
+              className="panel-heading mt-6 w-full !mb-0 flex items-center justify-between text-left hover:opacity-90"
+              aria-expanded={queueOpen}
+            >
+              <span>{queueOpen ? "▼" : "▶"} Up Next</span>
+              <span className="text-muted-foreground text-[10px]">{playlist.queue.length}</span>
+            </button>
+            {queueOpen && (
+              <div className="mt-3">
+                {playlist.queue.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">Queue is empty.</p>
+                ) : (
+                  <ol className="space-y-1 text-sm list-decimal list-inside">
+                    {playlist.queue.map((q, i) => (
+                      <li key={`q-${i}`} className="break-words">
+                        <span className="neon-accent">{q.artist}</span> — {q.song}{" "}
+                        <span className="text-xs text-muted-foreground">
+                          ({formatDuration(q.lengthSec)} · req {q.requester})
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
             )}
 
             <button
