@@ -19,6 +19,7 @@ import {
   type StreamSource,
 } from "@/lib/nectarine";
 import AudioPlayer from "@/components/AudioPlayer";
+import Visualizer from "@/components/Visualizer";
 import { renderWithSmileys } from "@/lib/smileys";
 
 type EndpointState = { content: string; ok: boolean };
@@ -35,6 +36,7 @@ const Index = () => {
   const [status, setStatus] = useState("Loading API data...");
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [tick, setTick] = useState(0);
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const inFlight = useRef(false);
 
   const loadEndpoint = useCallback(async (endpoint: Endpoint) => {
@@ -107,8 +109,9 @@ const Index = () => {
   void tick;
 
   return (
-    <div className="crt min-h-screen">
-      <main className="mx-auto max-w-5xl px-4 py-6 md:py-10">
+    <div className="crt min-h-screen relative">
+      <Visualizer analyser={analyser} />
+      <main className="mx-auto max-w-5xl px-4 py-6 md:py-10 relative" style={{ zIndex: 1 }}>
         <header className="flex items-center justify-between mb-6 border-b border-border pb-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold neon tracking-widest uppercase">
@@ -128,15 +131,7 @@ const Index = () => {
         </header>
 
         <div className="mb-4">
-          {(() => {
-            const playable = streams.find((s) => s.url.startsWith("https://")) ?? streams[0];
-            return (
-              <AudioPlayer
-                src={playable?.url ?? null}
-                label={playable ? `${playable.name}${playable.bitrate ? ` · ${playable.bitrate}kbps` : ""}` : undefined}
-              />
-            );
-          })()}
+          <AudioPlayer streams={streams} onAnalyserReady={setAnalyser} />
         </div>
 
         <section className="grid gap-4 md:grid-cols-2" aria-label="Demovibes panels">
