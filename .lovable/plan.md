@@ -1,22 +1,36 @@
 
-The user wants to swap the visual order of the two columns on desktop (md+) so the **Oneliner / Online / Streams** panel appears on the LEFT and **Currently Playing / Queue / History** appears on the RIGHT. On mobile (single column), the order must stay as-is: Currently Playing first, then Oneliner.
+The user wants the audio player to be more resilient: when a stream drops, automatically recover (reconnect or fail over to another stream), and prefer highest-bitrate streams.
 
-Current structure in `src/pages/Index.tsx`:
-- A `<section className="grid gap-4 md:grid-cols-2">` contains two `<article className="panel">` children, in DOM order: (1) Now Playing/Queue/History, (2) Oneliner/Online/Streams.
+## Current behavior
+`AudioPlayer.tsx` uses a plain `<audio>` element via the `audio-proxy` edge function. On error or `onEnded`, it just sets `playing=false` — no retry, no failover. Stream selection is whatever the user picked first; the auto-select picks `playable[0]` (no bitrate sort).
 
-Wait — the user says "keep streaming above oneliner" on single column. "Streaming" here likely refers to the Currently Playing / playback section (top of page) which is already above everything via the `AudioPlayer`. But within the grid, on mobile they want the Now Playing panel to remain above the Oneliner panel. So mobile order is unchanged.
+## Proposed improvements
 
-### Plan
+### 1. Sort streams by bitrate (highest first)
+In the `playable` memo, sort by `bitrate` descending so the default selection is the highest-quality HTTPS stream.
 
-Use Tailwind's `order` utilities to swap columns only at `md+`:
-- Now Playing article: add `md:order-2`
-- Oneliner article: add `md:order-1`
+### 2. Auto-reconnect on drop
+On `onError` or `onEnded` while the user intended to be playing (`shouldPlayRef`), attempt:
+- **Retry up to 3 times** on the same stream with exponential backoff (1s, 2s, 4s).
+- If retries fail, **fail over** to the next stream in the bitrate-sorted list, marking the failed one temporarily skipped (cooldown ~60s).
+- Track `shouldPlayRef` (set true on play, false on user-pause) so reconnect only happens when the user wants playback.
 
-This keeps DOM/mobile order intact (Now Playing first, Oneliner second) while flipping the visual order on desktop so Oneliner is on the left.
+### 3. Stall detection
+Listen for `stalled` and `waiting` events. If audio stays in a waiting state for >10s while `shouldPlayRef` is true, treat as a drop and trigger the same retry/failover logic.
 
-### File to change
-- `src/pages/Index.tsx` — add `md:order-2` to the first `<article className="panel">` and `md:order-1` to the second one.
+### 4. Buffer hint
+Set `audio.preload = "auto"` once playing and add `Cache-Control` already exists. Browsers control buffer size for live streams, but we can keep MediaSession state correct and reset `src` cleanly on reconnect (cache-bust with `&t=Date.now()` to force a fresh upstream connection through the proxy).
 
-### Acceptance
-- Desktop (≥768px): Oneliner/Online/Streams column on left, Now Playing/Queue/History on right.
-- Mobile (<768px): Now Playing panel appears first, Oneliner panel below it (unchanged).
+### 5. UI feedback
+Show "Reconnecting…" state and which stream is now active when failover happens (toast or inline status).
+
+## Files to change
+- `src/components/AudioPlayer.tsx` — add bitrate sort, reconnect/failover logic, stall detection, status UI.
+
+No edge function or DB changes needed. The existing `audio-proxy` already streams with `no-store` and supports range.
+
+## Acceptance
+- Highest-bitrate HTTPS stream is selected by default.
+- If stream drops, player retries silently up to 3 times, then switches to next best stream.
+- If all streams fail, shows clear error.
+- User pausing stops the recovery loop.
