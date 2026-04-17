@@ -107,6 +107,7 @@ export type StreamSource = {
   type: string;
   nowPlayingUrl?: string;
   nowPlayingFormat?: string;
+  nowPlayingIntervalMs?: number;
   artworkUrl?: string;
 };
 
@@ -208,6 +209,13 @@ export function parseStreams(doc: Document): StreamSource[] {
       txt(s, "nowPlayingFormat") ||
       txt(s, "nowplaying_format") ||
       "";
+    const nowPlayingIntervalRaw =
+      s.getAttribute("nowPlayingIntervalMs") ||
+      s.getAttribute("nowplaying_interval_ms") ||
+      txt(s, "nowPlayingIntervalMs") ||
+      txt(s, "nowplaying_interval_ms") ||
+      "";
+    const nowPlayingIntervalMs = Number.parseInt(nowPlayingIntervalRaw, 10);
     const artworkUrl =
       s.getAttribute("artworkUrl") ||
       s.getAttribute("logo") ||
@@ -221,6 +229,9 @@ export function parseStreams(doc: Document): StreamSource[] {
       type: typeEl?.textContent?.trim() || s.getAttribute("type") || "",
       ...(nowPlayingUrl ? { nowPlayingUrl } : {}),
       ...(nowPlayingFormat ? { nowPlayingFormat } : {}),
+      ...(Number.isFinite(nowPlayingIntervalMs) && nowPlayingIntervalMs > 0
+        ? { nowPlayingIntervalMs }
+        : {}),
       ...(artworkUrl ? { artworkUrl } : {}),
     };
   });

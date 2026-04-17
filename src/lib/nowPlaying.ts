@@ -3,22 +3,27 @@ export type NowPlayingTrack = {
   title: string;
 };
 
+export const DEFAULT_NOW_PLAYING_FORMAT = "azuracast";
+export const NOW_PLAYING_FALLBACK_ARTIST = "Nectarine Radio";
+export const NOW_PLAYING_FALLBACK_TITLE = "Live Stream";
+const ARTIST_TITLE_SEPARATOR_RE = /^(.+?)\s*[-–—]\s*(.+)$/;
+
 function toTrack(artist?: string, title?: string): NowPlayingTrack | null {
   const cleanArtist = (artist ?? "").trim();
   const cleanTitle = (title ?? "").trim();
   if (!cleanArtist && !cleanTitle) return null;
   return {
-    artist: cleanArtist || "Nectarine Radio",
-    title: cleanTitle || "Live Stream",
+    artist: cleanArtist || NOW_PLAYING_FALLBACK_ARTIST,
+    title: cleanTitle || NOW_PLAYING_FALLBACK_TITLE,
   };
 }
 
 export function splitArtistTitle(raw: string): NowPlayingTrack | null {
   const value = raw.trim();
   if (!value) return null;
-  const parts = value.split(" - ");
-  if (parts.length >= 2) {
-    return toTrack(parts[0], parts.slice(1).join(" - "));
+  const match = value.match(ARTIST_TITLE_SEPARATOR_RE);
+  if (match) {
+    return toTrack(match[1], match[2]);
   }
   return toTrack("", value);
 }
@@ -37,6 +42,6 @@ export function parseAzuracastNowPlaying(payload: unknown): NowPlayingTrack | nu
 }
 
 export function parseNowPlayingPayload(format: string | undefined, payload: unknown): NowPlayingTrack | null {
-  if (!format || format === "azuracast") return parseAzuracastNowPlaying(payload);
+  if (!format || format === DEFAULT_NOW_PLAYING_FORMAT) return parseAzuracastNowPlaying(payload);
   return null;
 }

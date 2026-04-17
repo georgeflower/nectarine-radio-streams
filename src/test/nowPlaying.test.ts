@@ -32,9 +32,20 @@ describe("now playing parsing", () => {
       artist: "Jogeir Liljedahl",
       title: "Leaving Teramis 10",
     });
+    expect(splitArtistTitle("Skaven–Lizardking")).toEqual({
+      artist: "Skaven",
+      title: "Lizardking",
+    });
     expect(splitArtistTitle("Ambient Interlude")).toEqual({
       artist: "Nectarine Radio",
       title: "Ambient Interlude",
     });
+  });
+
+  it("returns null for malformed or unsupported payloads", () => {
+    expect(parseAzuracastNowPlaying(null)).toBeNull();
+    expect(parseAzuracastNowPlaying({ now_playing: {} })).toBeNull();
+    expect(parseNowPlayingPayload("unsupported", { now_playing: { song: { text: "A - B" } } })).toBeNull();
+    expect(parseNowPlayingPayload(undefined, {})).toBeNull();
   });
 });

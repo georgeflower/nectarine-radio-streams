@@ -8,6 +8,7 @@ If your stream XML includes station metadata, add optional fields on each `<stre
 
 - `nowPlayingUrl` (or `nowplaying_url`)
 - `nowPlayingFormat` (currently supports `azuracast`)
+- `nowPlayingIntervalMs` (optional polling interval, defaults to 20000)
 - `artworkUrl` (or `logo`)
 
 Example:

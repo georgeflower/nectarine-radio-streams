@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import type { StreamSource } from "@/lib/nectarine";
-import { parseNowPlayingPayload, type NowPlayingTrack } from "@/lib/nowPlaying";
+import {
+  DEFAULT_NOW_PLAYING_FORMAT,
+  NOW_PLAYING_FALLBACK_ARTIST,
+  NOW_PLAYING_FALLBACK_TITLE,
+  parseNowPlayingPayload,
+  type NowPlayingTrack,
+} from "@/lib/nowPlaying";
 
 type Props = {
   streams: StreamSource[];
@@ -16,12 +22,34 @@ const proxiedUrl = (url: string) =>
 type StationNowPlayingConfig = {
   nowPlayingUrl: string;
   nowPlayingFormat?: string;
+  nowPlayingIntervalMs?: number;
   artworkUrl?: string;
 };
 
 const STATION_NOW_PLAYING_BY_URL: Record<string, StationNowPlayingConfig> = {};
 
-const NOW_PLAYING_REFRESH_MS = 20_000;
+const DEFAULT_NOW_PLAYING_REFRESH_MS = 20_000;
+const FALLBACK_ARTWORK = "/placeholder.svg";
+const MEDIA_ARTWORK_SIZES = [96, 192, 256, 384, 512];
+
+const inferArtworkType = (url: string): string => {
+  const cleanUrl = url.split("?")[0].toLowerCase();
+  if (cleanUrl.endsWith(".png")) return "image/png";
+  if (cleanUrl.endsWith(".jpg") || cleanUrl.endsWith(".jpeg")) return "image/jpeg";
+  if (cleanUrl.endsWith(".webp")) return "image/webp";
+  if (cleanUrl.endsWith(".gif")) return "image/gif";
+  if (cleanUrl.endsWith(".svg")) return "image/svg+xml";
+  return "image/png";
+};
+
+const resolveArtworkUrl = (rawUrl: string | undefined, fallbackArtwork: string): string => {
+  if (!rawUrl) return fallbackArtwork;
+  try {
+    return new URL(rawUrl, window.location.href).toString();
+  } catch {
+    return fallbackArtwork;
+  }
+};
 
 const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -71,7 +99,8 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
     const fromStream = selectedStream.nowPlayingUrl
       ? {
           nowPlayingUrl: selectedStream.nowPlayingUrl,
-          nowPlayingFormat: selectedStream.nowPlayingFormat || "azuracast",
+          nowPlayingFormat: selectedStream.nowPlayingFormat || DEFAULT_NOW_PLAYING_FORMAT,
+          nowPlayingIntervalMs: selectedStream.nowPlayingIntervalMs,
           artworkUrl: selectedStream.artworkUrl,
         }
       : null;
@@ -81,8 +110,8 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   useEffect(() => {
     if (currentTrack?.song || currentTrack?.artist) {
       setNowPlaying({
-        artist: (currentTrack.artist || "Nectarine Radio").trim(),
-        title: (currentTrack.song || selectedStream?.name || "Live Stream").trim(),
+        artist: (currentTrack.artist || NOW_PLAYING_FALLBACK_ARTIST).trim(),
+        title: (currentTrack.song || selectedStream?.name || NOW_PLAYING_FALLBACK_TITLE).trim(),
       });
     }
   }, [currentTrack, selectedStream?.name]);
@@ -196,7 +225,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
     let mounted = true;
     const fetchNowPlaying = async () => {
       try {
-        const response = await fetch(stationConfig.nowPlayingUrl, { cache: "no-store" });
+        const response = await fetch(stationConfig.nowPlayingUrl, { cache: "no-cache" });
         if (!response.ok) return;
         const payload = await response.json();
         const parsed = parseNowPlayingPayload(stationConfig.nowPlayingFormat, payload);
@@ -206,31 +235,31 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
       }
     };
     void fetchNowPlaying();
-    const id = window.setInterval(fetchNowPlaying, NOW_PLAYING_REFRESH_MS);
+    const intervalMs = stationConfig.nowPlayingIntervalMs || DEFAULT_NOW_PLAYING_REFRESH_MS;
+    const id = window.setInterval(fetchNowPlaying, intervalMs);
     return () => {
       mounted = false;
       window.clearInterval(id);
     };
   }, [playing, stationConfig]);
 
-  const mediaTitle = nowPlaying?.title || selectedStream?.name || "Nectarine Radio";
-  const mediaArtist = nowPlaying?.artist || "Nectarine Radio";
+  const mediaTitle = nowPlaying?.title || selectedStream?.name || NOW_PLAYING_FALLBACK_TITLE;
+  const mediaArtist = nowPlaying?.artist || NOW_PLAYING_FALLBACK_ARTIST;
 
   useEffect(() => {
     if (!("mediaSession" in navigator) || !("MediaMetadata" in window)) return;
     const mediaSession = navigator.mediaSession;
-    const fallbackArtwork = new URL("/placeholder.svg", window.location.origin).toString();
-    const artworkSrc = selectedStream?.artworkUrl
-      ? new URL(selectedStream.artworkUrl, window.location.href).toString()
-      : fallbackArtwork;
+    const fallbackArtwork = new URL(FALLBACK_ARTWORK, window.location.origin).toString();
+    const artworkSrc = resolveArtworkUrl(selectedStream?.artworkUrl, fallbackArtwork);
+    const artworkType = inferArtworkType(artworkSrc);
     mediaSession.metadata = new MediaMetadata({
       title: mediaTitle,
       artist: mediaArtist,
-      album: selectedStream?.name || "Nectarine Radio",
-      artwork: [96, 192, 256, 384, 512].map((size) => ({
+      album: selectedStream?.name || NOW_PLAYING_FALLBACK_ARTIST,
+      artwork: MEDIA_ARTWORK_SIZES.map((size) => ({
         src: artworkSrc,
         sizes: `${size}x${size}`,
-        type: "image/svg+xml",
+        type: artworkType,
       })),
     });
     mediaSession.playbackState = playing ? "playing" : "paused";
