@@ -3,21 +3,34 @@
   "short_name": "Nectarine",
   "description": "Compact viewer for the Nectarine demoscene radio",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#1e1307",
   "theme_color": "#1e1307",
   "icons": [
     {
+      "src": "/icon-192-any.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-any.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     }
   ]
 }
