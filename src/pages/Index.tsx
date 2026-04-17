@@ -73,8 +73,8 @@ const VIZ_STORAGE_KEY = "nectarine-viz";
 
 type ThemeId = "legacy" | "nectalift" | "nostalgia";
 const THEMES: { id: ThemeId; label: string; attr: string | null }[] = [
-  { id: "legacy", label: "Legacy", attr: null },
-  { id: "nectalift", label: "Nectalift", attr: "gem" },
+  { id: "legacy", label: "CRT Default", attr: null },
+  { id: "nectalift", label: "B & W", attr: "gem" },
   { id: "nostalgia", label: "Nostalgia Mod", attr: "workbench" },
 ];
 const THEME_STORAGE_KEY = "nectarine-theme";
