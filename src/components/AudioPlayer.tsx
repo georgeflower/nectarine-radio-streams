@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import type { StreamSource } from "@/lib/nectarine";
@@ -306,35 +307,46 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
     return `${s.name}${s.bitrate ? ` · ${s.bitrate}kbps` : ""}`;
   })();
 
-  return (
-    <div className="panel !p-3 flex items-center gap-3 flex-wrap overflow-hidden">
-      <button
-        type="button"
-        onClick={toggle}
-        disabled={disabled}
-        aria-label={playing ? "Pause stream" : "Play stream"}
-        className="h-12 w-12 shrink-0 flex items-center justify-center bg-primary text-primary-foreground rounded-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
-        style={{ boxShadow: disabled ? undefined : "var(--glow-primary)" }}
-      >
-        {loading ? (
-          <span className="text-xs">…</span>
-        ) : playing ? (
-          <Pause className="h-4 w-4" />
-        ) : (
-          <Play className="h-4 w-4" />
-        )}
-      </button>
+  const [volumeOpen, setVolumeOpen] = useState(false);
+  const volumeRef = useRef<HTMLDivElement | null>(null);
 
-      <div className="flex-1 min-w-[220px]">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">
-          {playing ? "● Live" : "Stream"}
-        </p>
+  useEffect(() => {
+    if (!volumeOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (volumeRef.current && !volumeRef.current.contains(e.target as Node)) {
+        setVolumeOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [volumeOpen]);
+
+  return (
+    <div className="panel !p-2">
+      <div className="flex items-center gap-2 w-full">
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={disabled}
+          aria-label={playing ? "Pause stream" : "Play stream"}
+          className="h-10 w-10 shrink-0 flex items-center justify-center bg-primary text-primary-foreground rounded-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+          style={{ boxShadow: disabled ? undefined : "var(--glow-primary)" }}
+        >
+          {loading ? (
+            <span className="text-xs">…</span>
+          ) : playing ? (
+            <Pause className="h-4 w-4" />
+          ) : (
+            <Play className="h-4 w-4" />
+          )}
+        </button>
+
         <select
           value={selectedUrl ?? ""}
           onChange={(e) => handleSelect(e.target.value)}
           disabled={playable.length === 0}
           aria-label="Select stream"
-          className="w-full min-h-11 bg-background/60 border border-border text-foreground text-base px-3 py-2 rounded-sm focus:outline-none focus:border-primary mt-0.5 touch-manipulation"
+          className="flex-1 min-w-0 h-10 bg-background/60 border border-border text-foreground text-xs px-2 rounded-sm focus:outline-none focus:border-primary touch-manipulation"
           title={currentLabel}
         >
           {playable.length === 0 && <option value="">No streams</option>}
@@ -342,46 +354,64 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
             <option key={s.url} value={s.url}>
               {s.name}
               {s.bitrate ? ` · ${s.bitrate}kbps` : ""}
-              {s.type ? ` · ${s.type}` : ""}
             </option>
           ))}
         </select>
-        <p className="text-sm mt-2 break-words">
-          <span className="text-muted-foreground">Now: </span>
-          <span className="font-semibold">{mediaTitle}</span>
-          <span className="text-muted-foreground"> — {mediaArtist}</span>
-        </p>
-        {error && <p className="text-xs text-destructive mt-0.5">{error}</p>}
+
+        <div ref={volumeRef} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setVolumeOpen((o) => !o)}
+            aria-label="Volume"
+            aria-expanded={volumeOpen}
+            className="h-10 w-10 flex items-center justify-center border border-border rounded-sm hover:border-primary transition-colors touch-manipulation"
+          >
+            {muted || volume === 0 ? (
+              <VolumeX className="h-4 w-4" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
+          </button>
+          {volumeOpen && (
+            <div className="absolute right-0 top-full mt-1 z-20 bg-card border border-border rounded-sm p-2 flex flex-col items-center gap-2 shadow-lg">
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={muted ? 0 : volume}
+                onChange={(e) => {
+                  const v = Number.parseFloat(e.target.value);
+                  setVolume(v);
+                  if (v > 0 && muted) setMuted(false);
+                }}
+                aria-label="Volume"
+                className="accent-primary touch-manipulation"
+                style={{
+                  writingMode: "vertical-lr" as CSSProperties["writingMode"],
+                  WebkitAppearance: "slider-vertical",
+                  width: "1.5rem",
+                  height: "8rem",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setMuted((m) => !m)}
+                className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+              >
+                {muted ? "Unmute" : "Mute"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center gap-2 min-w-[132px]">
-        <button
-          type="button"
-          onClick={() => setMuted((m) => !m)}
-          aria-label={muted ? "Unmute" : "Mute"}
-          className="h-11 w-11 flex items-center justify-center border border-border rounded-sm hover:border-primary transition-colors touch-manipulation"
-        >
-          {muted || volume === 0 ? (
-            <VolumeX className="h-4 w-4" />
-          ) : (
-            <Volume2 className="h-4 w-4" />
-          )}
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={muted ? 0 : volume}
-          onChange={(e) => {
-            const v = Number.parseFloat(e.target.value);
-            setVolume(v);
-            if (v > 0 && muted) setMuted(false);
-          }}
-          aria-label="Volume"
-          className="w-24 h-11 accent-primary touch-manipulation"
-        />
-      </div>
+      <p className="text-xs mt-1.5 break-words px-1">
+        <span className="text-muted-foreground">{playing ? "● " : ""}Now: </span>
+        <span className="font-semibold">{mediaTitle}</span>
+        <span className="text-muted-foreground"> — {mediaArtist}</span>
+      </p>
+      {error && <p className="text-xs text-destructive mt-0.5 px-1">{error}</p>}
 
       <audio
         ref={audioRef}
