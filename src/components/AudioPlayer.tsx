@@ -504,7 +504,9 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
       </div>
 
       <p className="text-xs mt-1.5 break-words px-1">
-        <span className="text-muted-foreground">{playing ? "● " : ""}Now: </span>
+        <span className="text-muted-foreground">
+          {reconnecting ? "↻ Reconnecting… " : playing ? "● " : ""}Now:{" "}
+        </span>
         <span className="font-semibold">{mediaTitle}</span>
         <span className="text-muted-foreground"> — {mediaArtist}</span>
       </p>
@@ -514,13 +516,50 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
         ref={audioRef}
         preload="none"
         crossOrigin="anonymous"
-        onPlay={() => setPlaying(true)}
+        onPlay={() => {
+          setPlaying(true);
+          setReconnecting(false);
+          retryCountRef.current = 0;
+          if (stallTimerRef.current !== null) {
+            window.clearTimeout(stallTimerRef.current);
+            stallTimerRef.current = null;
+          }
+        }}
         onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)}
+        onEnded={() => {
+          setPlaying(false);
+          if (shouldPlayRef.current) attemptRecovery();
+        }}
         onError={() => {
-          setError("Stream error");
           setPlaying(false);
           setLoading(false);
+          if (shouldPlayRef.current) {
+            attemptRecovery();
+          } else {
+            setError("Stream error");
+          }
+        }}
+        onWaiting={() => {
+          if (!shouldPlayRef.current) return;
+          if (stallTimerRef.current !== null) return;
+          stallTimerRef.current = window.setTimeout(() => {
+            stallTimerRef.current = null;
+            if (shouldPlayRef.current) attemptRecovery();
+          }, STALL_TIMEOUT_MS);
+        }}
+        onStalled={() => {
+          if (!shouldPlayRef.current) return;
+          if (stallTimerRef.current !== null) return;
+          stallTimerRef.current = window.setTimeout(() => {
+            stallTimerRef.current = null;
+            if (shouldPlayRef.current) attemptRecovery();
+          }, STALL_TIMEOUT_MS);
+        }}
+        onPlaying={() => {
+          if (stallTimerRef.current !== null) {
+            window.clearTimeout(stallTimerRef.current);
+            stallTimerRef.current = null;
+          }
         }}
       />
     </div>
