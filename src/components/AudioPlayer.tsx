@@ -18,8 +18,13 @@ type Props = {
 };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const proxiedUrl = (url: string) =>
-  `${SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(url)}`;
+const proxiedUrl = (url: string, cacheBust = false) =>
+  `${SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(url)}${cacheBust ? `&t=${Date.now()}` : ""}`;
+
+const MAX_RETRIES = 3;
+const RETRY_DELAYS_MS = [1000, 2000, 4000];
+const STALL_TIMEOUT_MS = 10_000;
+const FAILOVER_COOLDOWN_MS = 60_000;
 
 type StationNowPlayingConfig = {
   nowPlayingUrl: string;
