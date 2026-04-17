@@ -63,7 +63,10 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   const analyserRef = useRef<AnalyserNode | null>(null);
 
   const playable = useMemo(
-    () => streams.filter((s) => s.url.startsWith("https://")),
+    () =>
+      streams
+        .filter((s) => s.url.startsWith("https://"))
+        .sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0)),
     [streams],
   );
 
@@ -71,9 +74,16 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<NowPlayingTrack | null>(null);
+
+  const shouldPlayRef = useRef(false);
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<number | null>(null);
+  const stallTimerRef = useRef<number | null>(null);
+  const failedStreamsRef = useRef<Map<string, number>>(new Map());
 
   // Auto-pick first playable stream when list arrives or selection becomes invalid
   useEffect(() => {
