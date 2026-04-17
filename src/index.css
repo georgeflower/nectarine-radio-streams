@@ -163,13 +163,14 @@
     @apply text-primary uppercase tracking-widest text-xs mb-3 pb-2 border-b border-border;
     text-shadow: var(--glow-primary);
   }
-  [data-theme="gem"] .panel-heading {
-    @apply bg-primary text-primary-foreground px-2 py-1 -mx-2 -mt-2 mb-3 border-0;
+  [data-theme="gem"] .panel-heading,
+  [data-theme="workbench"] .panel-heading {
+    @apply bg-primary text-primary-foreground px-2 py-1 -mx-2 mb-3 border-0;
     text-shadow: none;
   }
-  [data-theme="workbench"] .panel-heading {
-    @apply bg-primary text-primary-foreground px-2 py-1 -mx-2 -mt-2 mb-3 border-0;
-    text-shadow: none;
+  [data-theme="gem"] .panel > .panel-heading:first-child,
+  [data-theme="workbench"] .panel > .panel-heading:first-child {
+    @apply -mt-2;
   }
   .neon {
     text-shadow: var(--glow-primary);
