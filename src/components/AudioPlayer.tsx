@@ -281,17 +281,20 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   // Switch stream while playing
   const handleSelect = useCallback(
     async (url: string, autoplay = playing) => {
+      clearTimers();
+      retryCountRef.current = 0;
       setSelectedUrl(url);
       setError(null);
+      setReconnecting(false);
       const a = audioRef.current;
       if (!a) return;
       setNowPlaying(null);
       if (autoplay) {
         try {
           setLoading(true);
+          shouldPlayRef.current = true;
           if (!a.paused) a.pause();
-          a.src = proxiedUrl(url);
-          await a.play();
+          await playUrl(url);
         } catch (e) {
           setError(e instanceof Error ? e.message : "Stream switch failed");
         } finally {
@@ -299,7 +302,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
         }
       }
     },
-    [playing],
+    [clearTimers, playUrl, playing],
   );
 
   const switchTrack = useCallback(
