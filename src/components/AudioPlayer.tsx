@@ -66,7 +66,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
     () =>
       streams
         .filter((s) => s.url.startsWith("https://"))
-        .sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0)),
+        .sort((a, b) => (Number(b.bitrate) || 0) - (Number(a.bitrate) || 0)),
     [streams],
   );
 
