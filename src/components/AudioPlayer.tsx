@@ -159,37 +159,116 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
     if (ctx.state === "suspended") void ctx.resume();
   }, [onAnalyserReady]);
 
+  const clearTimers = useCallback(() => {
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    if (stallTimerRef.current !== null) {
+      window.clearTimeout(stallTimerRef.current);
+      stallTimerRef.current = null;
+    }
+  }, []);
+
+  const playUrl = useCallback(
+    async (url: string, cacheBust = false) => {
+      const a = audioRef.current;
+      if (!a) return;
+      ensureAudioGraph();
+      a.crossOrigin = "anonymous";
+      a.preload = "auto";
+      const target = proxiedUrl(url, cacheBust);
+      if (a.src !== target) a.src = target;
+      await a.play();
+    },
+    [ensureAudioGraph],
+  );
+
   const playSelected = useCallback(async () => {
-    const a = audioRef.current;
-    if (!a || !selectedUrl) return;
+    if (!selectedUrl) return;
     try {
       setError(null);
       setLoading(true);
-      ensureAudioGraph();
-      a.crossOrigin = "anonymous";
-      const target = proxiedUrl(selectedUrl);
-      if (a.src !== target) a.src = target;
-      await a.play();
+      setReconnecting(false);
+      shouldPlayRef.current = true;
+      retryCountRef.current = 0;
+      await playUrl(selectedUrl);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Playback failed");
     } finally {
       setLoading(false);
     }
-  }, [ensureAudioGraph, selectedUrl]);
+  }, [playUrl, selectedUrl]);
+
+  const pickNextStream = useCallback(
+    (currentUrl: string | null): string | null => {
+      if (!playable.length) return null;
+      const now = Date.now();
+      const available = playable.filter((s) => {
+        const failedAt = failedStreamsRef.current.get(s.url);
+        return !failedAt || now - failedAt > FAILOVER_COOLDOWN_MS;
+      });
+      const pool = available.length > 0 ? available : playable;
+      const idx = pool.findIndex((s) => s.url === currentUrl);
+      const next = pool[(idx + 1) % pool.length];
+      return next?.url ?? null;
+    },
+    [playable],
+  );
+
+  const attemptRecovery = useCallback(() => {
+    if (!shouldPlayRef.current) return;
+    clearTimers();
+    const currentUrl = selectedUrl;
+    if (!currentUrl) return;
+
+    if (retryCountRef.current < MAX_RETRIES) {
+      const delay = RETRY_DELAYS_MS[retryCountRef.current] ?? 4000;
+      retryCountRef.current += 1;
+      setReconnecting(true);
+      setError(null);
+      retryTimerRef.current = window.setTimeout(() => {
+        playUrl(currentUrl, true).catch(() => attemptRecovery());
+      }, delay);
+      return;
+    }
+
+    failedStreamsRef.current.set(currentUrl, Date.now());
+    const nextUrl = pickNextStream(currentUrl);
+    if (!nextUrl || nextUrl === currentUrl) {
+      setReconnecting(false);
+      setError("All streams unavailable");
+      shouldPlayRef.current = false;
+      return;
+    }
+    retryCountRef.current = 0;
+    setSelectedUrl(nextUrl);
+    setNowPlaying(null);
+    setReconnecting(true);
+    retryTimerRef.current = window.setTimeout(() => {
+      playUrl(nextUrl, true).catch(() => attemptRecovery());
+    }, 500);
+  }, [clearTimers, pickNextStream, playUrl, selectedUrl]);
 
   const pausePlayback = useCallback(() => {
+    shouldPlayRef.current = false;
+    clearTimers();
+    setReconnecting(false);
     const a = audioRef.current;
     if (!a) return;
     a.pause();
-  }, []);
+  }, [clearTimers]);
 
   const stopPlayback = useCallback(() => {
+    shouldPlayRef.current = false;
+    clearTimers();
+    setReconnecting(false);
     const a = audioRef.current;
     if (!a) return;
     a.pause();
     a.removeAttribute("src");
     a.load();
-  }, []);
+  }, [clearTimers]);
 
   const toggle = useCallback(async () => {
     if (playing) {
