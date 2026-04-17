@@ -275,7 +275,7 @@ const Index = () => {
         </div>
 
         <section className="grid gap-4 md:grid-cols-2" aria-label="Demovibes panels">
-          <article className="panel">
+          <article className="panel md:order-2">
             <button
               type="button"
               onClick={() => setNowOpen((o) => !o)}
@@ -377,7 +377,7 @@ const Index = () => {
             )}
           </article>
 
-          <article className="panel">
+          <article className="panel md:order-1">
             <button
               type="button"
               onClick={() => setOnelinerOpen((o) => !o)}
