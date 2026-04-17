@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseAzuracastNowPlaying, parseNowPlayingPayload, splitArtistTitle } from "@/lib/nowPlaying";
+import {
+  normalizeNowPlayingValue,
+  parseAzuracastNowPlaying,
+  parseNowPlayingPayload,
+  splitArtistTitle,
+} from "@/lib/nowPlaying";
 
 describe("now playing parsing", () => {
   it("parses azuracast now_playing.song fields", () => {
@@ -47,5 +52,12 @@ describe("now playing parsing", () => {
     expect(parseAzuracastNowPlaying({ now_playing: {} })).toBeNull();
     expect(parseNowPlayingPayload("unsupported", { now_playing: { song: { text: "A - B" } } })).toBeNull();
     expect(parseNowPlayingPayload(undefined, {})).toBeNull();
+  });
+
+  it("normalizes placeholder values", () => {
+    expect(normalizeNowPlayingValue("-")).toBe("");
+    expect(normalizeNowPlayingValue(" - ")).toBe("");
+    expect(normalizeNowPlayingValue("Skaven")).toBe("Skaven");
+    expect(normalizeNowPlayingValue(undefined)).toBe("");
   });
 });

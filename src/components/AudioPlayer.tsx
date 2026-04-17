@@ -5,6 +5,7 @@ import {
   DEFAULT_NOW_PLAYING_FORMAT,
   NOW_PLAYING_FALLBACK_ARTIST,
   NOW_PLAYING_FALLBACK_TITLE,
+  normalizeNowPlayingValue,
   parseNowPlayingPayload,
   type NowPlayingTrack,
 } from "@/lib/nowPlaying";
@@ -25,8 +26,6 @@ type StationNowPlayingConfig = {
   nowPlayingIntervalMs?: number;
   artworkUrl?: string;
 };
-
-const STATION_NOW_PLAYING_BY_URL: Record<string, StationNowPlayingConfig> = {};
 
 const DEFAULT_NOW_PLAYING_REFRESH_MS = 20_000;
 const FALLBACK_ARTWORK = "/placeholder.svg";
@@ -95,23 +94,22 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   );
 
   const stationConfig = useMemo(() => {
-    if (!selectedStream?.url) return null;
-    const fromStream = selectedStream.nowPlayingUrl
-      ? {
-          nowPlayingUrl: selectedStream.nowPlayingUrl,
-          nowPlayingFormat: selectedStream.nowPlayingFormat || DEFAULT_NOW_PLAYING_FORMAT,
-          nowPlayingIntervalMs: selectedStream.nowPlayingIntervalMs,
-          artworkUrl: selectedStream.artworkUrl,
-        }
-      : null;
-    return fromStream ?? STATION_NOW_PLAYING_BY_URL[selectedStream.url] ?? null;
+    if (!selectedStream?.url || !selectedStream.nowPlayingUrl) return null;
+    return {
+      nowPlayingUrl: selectedStream.nowPlayingUrl,
+      nowPlayingFormat: selectedStream.nowPlayingFormat || DEFAULT_NOW_PLAYING_FORMAT,
+      nowPlayingIntervalMs: selectedStream.nowPlayingIntervalMs,
+      artworkUrl: selectedStream.artworkUrl,
+    };
   }, [selectedStream]);
 
   useEffect(() => {
-    if (currentTrack?.song || currentTrack?.artist) {
+    const artist = normalizeNowPlayingValue(currentTrack?.artist);
+    const song = normalizeNowPlayingValue(currentTrack?.song);
+    if (artist || song) {
       setNowPlaying({
-        artist: (currentTrack.artist || NOW_PLAYING_FALLBACK_ARTIST).trim(),
-        title: (currentTrack.song || selectedStream?.name || NOW_PLAYING_FALLBACK_TITLE).trim(),
+        artist: artist || NOW_PLAYING_FALLBACK_ARTIST,
+        title: song || selectedStream?.name || NOW_PLAYING_FALLBACK_TITLE,
       });
     }
   }, [currentTrack, selectedStream?.name]);
@@ -250,7 +248,10 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
     if (!("mediaSession" in navigator) || !("MediaMetadata" in window)) return;
     const mediaSession = navigator.mediaSession;
     const fallbackArtwork = new URL(FALLBACK_ARTWORK, window.location.origin).toString();
-    const artworkSrc = resolveArtworkUrl(selectedStream?.artworkUrl, fallbackArtwork);
+    const artworkSrc = resolveArtworkUrl(
+      stationConfig?.artworkUrl || selectedStream?.artworkUrl,
+      fallbackArtwork,
+    );
     const artworkType = inferArtworkType(artworkSrc);
     mediaSession.metadata = new MediaMetadata({
       title: mediaTitle,
@@ -263,7 +264,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
       })),
     });
     mediaSession.playbackState = playing ? "playing" : "paused";
-  }, [mediaArtist, mediaTitle, playing, selectedStream]);
+  }, [mediaArtist, mediaTitle, playing, selectedStream, stationConfig?.artworkUrl]);
 
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;

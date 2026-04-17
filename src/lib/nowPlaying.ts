@@ -8,9 +8,14 @@ export const NOW_PLAYING_FALLBACK_ARTIST = "Nectarine Radio";
 export const NOW_PLAYING_FALLBACK_TITLE = "Live Stream";
 const ARTIST_TITLE_SEPARATOR_RE = /^(.+?)\s*[-–—]\s*(.+)$/;
 
+export function normalizeNowPlayingValue(value: string | null | undefined): string {
+  const normalized = (value ?? "").trim();
+  return normalized === "-" ? "" : normalized;
+}
+
 function toTrack(artist?: string, title?: string): NowPlayingTrack | null {
-  const cleanArtist = (artist ?? "").trim();
-  const cleanTitle = (title ?? "").trim();
+  const cleanArtist = normalizeNowPlayingValue(artist);
+  const cleanTitle = normalizeNowPlayingValue(title);
   if (!cleanArtist && !cleanTitle) return null;
   return {
     artist: cleanArtist || NOW_PLAYING_FALLBACK_ARTIST,
