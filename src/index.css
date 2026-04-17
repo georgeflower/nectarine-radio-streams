@@ -103,25 +103,27 @@
   --gradient-scanlines: none;
 }
 
-/* ─── Amiga Workbench 1.3 theme ──────────────────────────────────────────── */
+/* ─── Amiga Workbench / Scenemus theme ───────────────────────────────────── */
 [data-theme="workbench"] {
-  --background: 210 100% 33%;           /* medium blue desktop */
-  --foreground: 0 0% 0%;
-  --card: 0 0% 100%;                    /* white windows */
-  --card-foreground: 0 0% 0%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 0%;
-  --primary: 28 100% 50%;               /* orange */
-  --primary-foreground: 0 0% 0%;
-  --secondary: 28 100% 50%;
-  --secondary-foreground: 0 0% 0%;
-  --muted: 0 0% 92%;
-  --muted-foreground: 0 0% 25%;
-  --accent: 28 100% 50%;
-  --accent-foreground: 0 0% 0%;
-  --border: 0 0% 0%;
-  --input: 0 0% 0%;
-  --ring: 28 100% 50%;
+  --background: 212 55% 42%;            /* medium blue desktop */
+  --foreground: 215 60% 18%;            /* dark navy text */
+  --card: 212 40% 70%;                  /* light blue panels */
+  --card-foreground: 215 60% 18%;
+  --popover: 212 40% 78%;
+  --popover-foreground: 215 60% 18%;
+  --primary: 215 65% 22%;               /* dark navy headings */
+  --primary-foreground: 212 40% 88%;    /* light blue text on heading */
+  --secondary: 212 35% 78%;
+  --secondary-foreground: 215 60% 18%;
+  --muted: 212 30% 62%;
+  --muted-foreground: 215 40% 28%;
+  --accent: 28 95% 52%;                 /* orange accent for links/actions */
+  --accent-foreground: 215 60% 18%;
+  --destructive: 0 70% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 215 50% 28%;
+  --input: 215 50% 28%;
+  --ring: 28 95% 52%;
   --radius: 0;
   --glow-primary: none;
   --glow-accent: none;
