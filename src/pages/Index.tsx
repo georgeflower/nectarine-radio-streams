@@ -217,24 +217,33 @@ const Index = () => {
   void tick;
 
   return (
-    <div className="crt min-h-screen relative">
+    <div className="crt min-h-screen relative overflow-x-hidden">
       <Visualizer analyser={analyser} style={vizStyle} />
-      <main className="mx-auto max-w-5xl px-4 py-6 md:py-10 relative" style={{ zIndex: 1 }}>
-        <header className="flex flex-col gap-3 mb-6 border-b border-border pb-4 md:flex-row md:items-center md:justify-between">
+      <main
+        className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"
+        style={{
+          zIndex: 1,
+          paddingTop: "max(1rem, var(--safe-top))",
+          paddingBottom: "max(1rem, var(--safe-bottom))",
+          paddingLeft: "max(0.75rem, var(--safe-left))",
+          paddingRight: "max(0.75rem, var(--safe-right))",
+        }}
+      >
+        <header className="flex flex-col gap-3 mb-5 border-b border-border pb-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold neon tracking-widest uppercase">
               ▌Nectarine API
             </h1>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Demoscene Radio · Compact viewer
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
+          <div className="flex flex-wrap items-center gap-2 md:justify-end">
             <select
               value={theme}
               onChange={(e) => setTheme(e.target.value as ThemeId)}
               aria-label="Theme"
-              className="px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90"
+              className="min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation"
             >
               {THEMES.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -247,24 +256,24 @@ const Index = () => {
               role="group"
               aria-label="Visualizer style"
             >
-              {VIZ_STYLES.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setVizStyle(s)}
-                  className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm transition-opacity ${
-                    vizStyle === s
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
+                {VIZ_STYLES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setVizStyle(s)}
+                    className={`min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm transition-opacity touch-manipulation ${
+                      vizStyle === s
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
                   {s}
                 </button>
               ))}
             </div>
             <button
               onClick={refreshAll}
-              className="px-4 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity"
+              className="min-h-11 px-4 py-2 bg-primary text-primary-foreground uppercase text-sm tracking-widest rounded-sm hover:opacity-90 transition-opacity touch-manipulation"
               style={{ boxShadow: "var(--glow-primary)" }}
             >
               Refresh
@@ -273,7 +282,7 @@ const Index = () => {
         </header>
 
         <div className="mb-4">
-          <AudioPlayer streams={streams} onAnalyserReady={setAnalyser} />
+          <AudioPlayer streams={streams} currentTrack={now} onAnalyserReady={setAnalyser} />
         </div>
 
         <section className="grid gap-4 md:grid-cols-2" aria-label="Demovibes panels">

@@ -100,7 +100,15 @@ export type OnelinerEntry = { username: string; text: string; time: string; flag
 
 export type OnlineUser = { name: string; flag: string };
 
-export type StreamSource = { name: string; url: string; bitrate: string; type: string };
+export type StreamSource = {
+  name: string;
+  url: string;
+  bitrate: string;
+  type: string;
+  nowPlayingUrl?: string;
+  nowPlayingFormat?: string;
+  artworkUrl?: string;
+};
 
 // ─── Parsers ───────────────────────────────────────────────────────────────────
 function parseLength(raw: string | null | undefined): number {
@@ -187,11 +195,33 @@ export function parseStreams(doc: Document): StreamSource[] {
   return streamEls.map((s) => {
     const url = s.getAttribute("url") || txt(s, "url") || s.textContent?.trim() || "";
     const typeEl = s.getElementsByTagName("type")[0];
+    const nowPlayingUrl =
+      s.getAttribute("nowPlayingUrl") ||
+      s.getAttribute("nowplaying_url") ||
+      txt(s, "nowPlayingUrl") ||
+      txt(s, "nowplaying_url") ||
+      txt(s, "nowplaying") ||
+      "";
+    const nowPlayingFormat =
+      s.getAttribute("nowPlayingFormat") ||
+      s.getAttribute("nowplaying_format") ||
+      txt(s, "nowPlayingFormat") ||
+      txt(s, "nowplaying_format") ||
+      "";
+    const artworkUrl =
+      s.getAttribute("artworkUrl") ||
+      s.getAttribute("logo") ||
+      txt(s, "artworkUrl") ||
+      txt(s, "logo") ||
+      "";
     return {
       name: s.getAttribute("name") || txt(s, "name") || "Stream",
       url,
       bitrate: s.getAttribute("bitrate") || txt(s, "bitrate") || "",
       type: typeEl?.textContent?.trim() || s.getAttribute("type") || "",
+      ...(nowPlayingUrl ? { nowPlayingUrl } : {}),
+      ...(nowPlayingFormat ? { nowPlayingFormat } : {}),
+      ...(artworkUrl ? { artworkUrl } : {}),
     };
   });
 }

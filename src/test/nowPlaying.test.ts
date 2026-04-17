@@ -1,0 +1,40 @@
+import { describe, expect, it } from "vitest";
+import { parseAzuracastNowPlaying, parseNowPlayingPayload, splitArtistTitle } from "@/lib/nowPlaying";
+
+describe("now playing parsing", () => {
+  it("parses azuracast now_playing.song fields", () => {
+    expect(
+      parseAzuracastNowPlaying({
+        now_playing: {
+          song: {
+            artist: "Purple Motion",
+            title: "Satellite One",
+          },
+        },
+      }),
+    ).toEqual({ artist: "Purple Motion", title: "Satellite One" });
+  });
+
+  it("parses text fallback from azuracast payload", () => {
+    expect(
+      parseNowPlayingPayload("azuracast", {
+        now_playing: {
+          song: {
+            text: "Skaven - Catch That Goblin",
+          },
+        },
+      }),
+    ).toEqual({ artist: "Skaven", title: "Catch That Goblin" });
+  });
+
+  it("splits artist-title strings and handles title-only", () => {
+    expect(splitArtistTitle("Jogeir Liljedahl - Leaving Teramis 10")).toEqual({
+      artist: "Jogeir Liljedahl",
+      title: "Leaving Teramis 10",
+    });
+    expect(splitArtistTitle("Ambient Interlude")).toEqual({
+      artist: "Nectarine Radio",
+      title: "Ambient Interlude",
+    });
+  });
+});

@@ -53,6 +53,10 @@
     --sidebar-accent-foreground: 35 90% 78%;
     --sidebar-border: 28 60% 25%;
     --sidebar-ring: 28 100% 60%;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
   }
 
   .dark {
@@ -137,10 +141,22 @@
   html, body, #root {
     @apply bg-background text-foreground;
     min-height: 100%;
+    max-width: 100%;
+  }
+  html {
+    overscroll-behavior-y: none;
   }
   body {
     font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
     background-image: var(--gradient-scanlines);
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
+  }
+  button,
+  select,
+  input[type="range"] {
+    touch-action: manipulation;
   }
   [data-theme="gem"] body,
   [data-theme="workbench"] body {
