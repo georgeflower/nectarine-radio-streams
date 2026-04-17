@@ -232,11 +232,8 @@ const Index = () => {
         <header className="flex flex-col gap-3 mb-5 border-b border-border pb-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold neon tracking-widest uppercase">
-              ▌Nectarine API
+              ▌Nectarine Compact Viewer
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Demoscene Radio · Compact viewer
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 md:justify-end">
             <select
@@ -525,16 +522,15 @@ const Index = () => {
         </p>
 
         <footer className="mt-10 text-center text-xs text-muted-foreground">
-          Ported from{" "}
+          this is a compact viewer of the amazing Nectarine Demoscene Radio -{" "}
           <a
             className="text-primary hover:underline"
-            href="https://github.com/georgeflower/nectarine-demoscene-radio"
+            href="https://scenestream.net/"
             target="_blank"
             rel="noopener noreferrer"
           >
-            nectarine-demoscene-radio
+            https://scenestream.net/
           </a>
-          . Data: scenestream.net/demovibes
         </footer>
       </main>
     </div>
