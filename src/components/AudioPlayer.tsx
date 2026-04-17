@@ -18,8 +18,13 @@ type Props = {
 };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const proxiedUrl = (url: string) =>
-  `${SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(url)}`;
+const proxiedUrl = (url: string, cacheBust = false) =>
+  `${SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(url)}${cacheBust ? `&t=${Date.now()}` : ""}`;
+
+const MAX_RETRIES = 3;
+const RETRY_DELAYS_MS = [1000, 2000, 4000];
+const STALL_TIMEOUT_MS = 10_000;
+const FAILOVER_COOLDOWN_MS = 60_000;
 
 type StationNowPlayingConfig = {
   nowPlayingUrl: string;
@@ -58,7 +63,10 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   const analyserRef = useRef<AnalyserNode | null>(null);
 
   const playable = useMemo(
-    () => streams.filter((s) => s.url.startsWith("https://")),
+    () =>
+      streams
+        .filter((s) => s.url.startsWith("https://"))
+        .sort((a, b) => (Number(b.bitrate) || 0) - (Number(a.bitrate) || 0)),
     [streams],
   );
 
@@ -66,9 +74,16 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<NowPlayingTrack | null>(null);
+
+  const shouldPlayRef = useRef(false);
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<number | null>(null);
+  const stallTimerRef = useRef<number | null>(null);
+  const failedStreamsRef = useRef<Map<string, number>>(new Map());
 
   // Auto-pick first playable stream when list arrives or selection becomes invalid
   useEffect(() => {
@@ -88,6 +103,13 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
     a.volume = volume;
     a.muted = muted;
   }, [volume, muted]);
+
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current);
+      if (stallTimerRef.current !== null) window.clearTimeout(stallTimerRef.current);
+    };
+  }, []);
 
   const selectedStream = useMemo(
     () => playable.find((x) => x.url === selectedUrl) ?? null,
@@ -144,37 +166,116 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
     if (ctx.state === "suspended") void ctx.resume();
   }, [onAnalyserReady]);
 
+  const clearTimers = useCallback(() => {
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    if (stallTimerRef.current !== null) {
+      window.clearTimeout(stallTimerRef.current);
+      stallTimerRef.current = null;
+    }
+  }, []);
+
+  const playUrl = useCallback(
+    async (url: string, cacheBust = false) => {
+      const a = audioRef.current;
+      if (!a) return;
+      ensureAudioGraph();
+      a.crossOrigin = "anonymous";
+      a.preload = "auto";
+      const target = proxiedUrl(url, cacheBust);
+      if (a.src !== target) a.src = target;
+      await a.play();
+    },
+    [ensureAudioGraph],
+  );
+
   const playSelected = useCallback(async () => {
-    const a = audioRef.current;
-    if (!a || !selectedUrl) return;
+    if (!selectedUrl) return;
     try {
       setError(null);
       setLoading(true);
-      ensureAudioGraph();
-      a.crossOrigin = "anonymous";
-      const target = proxiedUrl(selectedUrl);
-      if (a.src !== target) a.src = target;
-      await a.play();
+      setReconnecting(false);
+      shouldPlayRef.current = true;
+      retryCountRef.current = 0;
+      await playUrl(selectedUrl);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Playback failed");
     } finally {
       setLoading(false);
     }
-  }, [ensureAudioGraph, selectedUrl]);
+  }, [playUrl, selectedUrl]);
+
+  const pickNextStream = useCallback(
+    (currentUrl: string | null): string | null => {
+      if (!playable.length) return null;
+      const now = Date.now();
+      const available = playable.filter((s) => {
+        const failedAt = failedStreamsRef.current.get(s.url);
+        return !failedAt || now - failedAt > FAILOVER_COOLDOWN_MS;
+      });
+      const pool = available.length > 0 ? available : playable;
+      const idx = pool.findIndex((s) => s.url === currentUrl);
+      const next = pool[(idx + 1) % pool.length];
+      return next?.url ?? null;
+    },
+    [playable],
+  );
+
+  const attemptRecovery = useCallback(() => {
+    if (!shouldPlayRef.current) return;
+    clearTimers();
+    const currentUrl = selectedUrl;
+    if (!currentUrl) return;
+
+    if (retryCountRef.current < MAX_RETRIES) {
+      const delay = RETRY_DELAYS_MS[retryCountRef.current] ?? 4000;
+      retryCountRef.current += 1;
+      setReconnecting(true);
+      setError(null);
+      retryTimerRef.current = window.setTimeout(() => {
+        playUrl(currentUrl, true).catch(() => attemptRecovery());
+      }, delay);
+      return;
+    }
+
+    failedStreamsRef.current.set(currentUrl, Date.now());
+    const nextUrl = pickNextStream(currentUrl);
+    if (!nextUrl || nextUrl === currentUrl) {
+      setReconnecting(false);
+      setError("All streams unavailable");
+      shouldPlayRef.current = false;
+      return;
+    }
+    retryCountRef.current = 0;
+    setSelectedUrl(nextUrl);
+    setNowPlaying(null);
+    setReconnecting(true);
+    retryTimerRef.current = window.setTimeout(() => {
+      playUrl(nextUrl, true).catch(() => attemptRecovery());
+    }, 500);
+  }, [clearTimers, pickNextStream, playUrl, selectedUrl]);
 
   const pausePlayback = useCallback(() => {
+    shouldPlayRef.current = false;
+    clearTimers();
+    setReconnecting(false);
     const a = audioRef.current;
     if (!a) return;
     a.pause();
-  }, []);
+  }, [clearTimers]);
 
   const stopPlayback = useCallback(() => {
+    shouldPlayRef.current = false;
+    clearTimers();
+    setReconnecting(false);
     const a = audioRef.current;
     if (!a) return;
     a.pause();
     a.removeAttribute("src");
     a.load();
-  }, []);
+  }, [clearTimers]);
 
   const toggle = useCallback(async () => {
     if (playing) {
@@ -187,17 +288,20 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   // Switch stream while playing
   const handleSelect = useCallback(
     async (url: string, autoplay = playing) => {
+      clearTimers();
+      retryCountRef.current = 0;
       setSelectedUrl(url);
       setError(null);
+      setReconnecting(false);
       const a = audioRef.current;
       if (!a) return;
       setNowPlaying(null);
       if (autoplay) {
         try {
           setLoading(true);
+          shouldPlayRef.current = true;
           if (!a.paused) a.pause();
-          a.src = proxiedUrl(url);
-          await a.play();
+          await playUrl(url);
         } catch (e) {
           setError(e instanceof Error ? e.message : "Stream switch failed");
         } finally {
@@ -205,7 +309,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
         }
       }
     },
-    [playing],
+    [clearTimers, playUrl, playing],
   );
 
   const switchTrack = useCallback(
@@ -407,7 +511,9 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
       </div>
 
       <p className="text-xs mt-1.5 break-words px-1">
-        <span className="text-muted-foreground">{playing ? "● " : ""}Now: </span>
+        <span className="text-muted-foreground">
+          {reconnecting ? "↻ Reconnecting… " : playing ? "● " : ""}Now:{" "}
+        </span>
         <span className="font-semibold">{mediaTitle}</span>
         <span className="text-muted-foreground"> — {mediaArtist}</span>
       </p>
@@ -417,13 +523,50 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
         ref={audioRef}
         preload="none"
         crossOrigin="anonymous"
-        onPlay={() => setPlaying(true)}
+        onPlay={() => {
+          setPlaying(true);
+          setReconnecting(false);
+          retryCountRef.current = 0;
+          if (stallTimerRef.current !== null) {
+            window.clearTimeout(stallTimerRef.current);
+            stallTimerRef.current = null;
+          }
+        }}
         onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)}
+        onEnded={() => {
+          setPlaying(false);
+          if (shouldPlayRef.current) attemptRecovery();
+        }}
         onError={() => {
-          setError("Stream error");
           setPlaying(false);
           setLoading(false);
+          if (shouldPlayRef.current) {
+            attemptRecovery();
+          } else {
+            setError("Stream error");
+          }
+        }}
+        onWaiting={() => {
+          if (!shouldPlayRef.current) return;
+          if (stallTimerRef.current !== null) return;
+          stallTimerRef.current = window.setTimeout(() => {
+            stallTimerRef.current = null;
+            if (shouldPlayRef.current) attemptRecovery();
+          }, STALL_TIMEOUT_MS);
+        }}
+        onStalled={() => {
+          if (!shouldPlayRef.current) return;
+          if (stallTimerRef.current !== null) return;
+          stallTimerRef.current = window.setTimeout(() => {
+            stallTimerRef.current = null;
+            if (shouldPlayRef.current) attemptRecovery();
+          }, STALL_TIMEOUT_MS);
+        }}
+        onPlaying={() => {
+          if (stallTimerRef.current !== null) {
+            window.clearTimeout(stallTimerRef.current);
+            stallTimerRef.current = null;
+          }
         }}
       />
     </div>
