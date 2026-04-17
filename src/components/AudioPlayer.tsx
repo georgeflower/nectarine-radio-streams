@@ -388,7 +388,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
                 aria-label="Volume"
                 className="accent-primary touch-manipulation"
                 style={{
-                  writingMode: "vertical-lr" as React.CSSProperties["writingMode"],
+                  writingMode: "vertical-lr" as CSSProperties["writingMode"],
                   WebkitAppearance: "slider-vertical",
                   width: "1.5rem",
                   height: "8rem",
