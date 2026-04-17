@@ -71,6 +71,14 @@ const ExtLink = ({ href, children, className }: ExtLinkProps) => {
 const VIZ_STYLES: VisualizerStyle[] = ["off", "starfield", "bars", "plasma", "oscilloscope"];
 const VIZ_STORAGE_KEY = "nectarine-viz";
 
+type ThemeId = "legacy" | "nectalift" | "nostalgia";
+const THEMES: { id: ThemeId; label: string; attr: string | null }[] = [
+  { id: "legacy", label: "Legacy", attr: null },
+  { id: "nectalift", label: "Nectalift", attr: "gem" },
+  { id: "nostalgia", label: "Nostalgia Mod", attr: "workbench" },
+];
+const THEME_STORAGE_KEY = "nectarine-theme";
+
 const EMPTY_PLAYLIST: PlaylistData = { now: null, queue: [], history: [] };
 
 const usePersistedBool = (key: string, initial: boolean): [boolean, React.Dispatch<React.SetStateAction<boolean>>] => {
@@ -128,6 +136,27 @@ const Index = () => {
       // ignore
     }
   }, [vizStyle]);
+
+  const [theme, setTheme] = useState<ThemeId>(() => {
+    try {
+      const v = localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null;
+      if (v && THEMES.some((t) => t.id === v)) return v;
+    } catch {
+      // ignore
+    }
+    return "legacy";
+  });
+
+  useEffect(() => {
+    const def = THEMES.find((t) => t.id === theme);
+    if (def?.attr) document.documentElement.setAttribute("data-theme", def.attr);
+    else document.documentElement.removeAttribute("data-theme");
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // ignore
+    }
+  }, [theme]);
 
   const loadEndpoint = useCallback(async (endpoint: Endpoint) => {
     try {
@@ -199,6 +228,18 @@ const Index = () => {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
+            <select
+              value={theme}
+              onChange={(e) => setTheme(e.target.value as ThemeId)}
+              aria-label="Theme"
+              className="px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90"
+            >
+              {THEMES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
             <div
               className="flex items-center gap-1 border border-border rounded-sm p-0.5 bg-card/60"
               role="group"
