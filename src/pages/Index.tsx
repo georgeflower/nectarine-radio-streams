@@ -71,6 +71,14 @@ const ExtLink = ({ href, children, className }: ExtLinkProps) => {
 const VIZ_STYLES: VisualizerStyle[] = ["off", "starfield", "bars", "plasma", "oscilloscope"];
 const VIZ_STORAGE_KEY = "nectarine-viz";
 
+type ThemeId = "legacy" | "nectalift" | "nostalgia";
+const THEMES: { id: ThemeId; label: string; attr: string | null }[] = [
+  { id: "legacy", label: "Legacy", attr: null },
+  { id: "nectalift", label: "Nectalift", attr: "gem" },
+  { id: "nostalgia", label: "Nostalgia Mod", attr: "workbench" },
+];
+const THEME_STORAGE_KEY = "nectarine-theme";
+
 const EMPTY_PLAYLIST: PlaylistData = { now: null, queue: [], history: [] };
 
 const usePersistedBool = (key: string, initial: boolean): [boolean, React.Dispatch<React.SetStateAction<boolean>>] => {
