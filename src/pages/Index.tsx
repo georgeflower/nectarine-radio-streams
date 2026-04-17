@@ -228,6 +228,18 @@ const Index = () => {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
+            <select
+              value={theme}
+              onChange={(e) => setTheme(e.target.value as ThemeId)}
+              aria-label="Theme"
+              className="px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90"
+            >
+              {THEMES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
             <div
               className="flex items-center gap-1 border border-border rounded-sm p-0.5 bg-card/60"
               role="group"
