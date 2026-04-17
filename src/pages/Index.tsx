@@ -137,6 +137,27 @@ const Index = () => {
     }
   }, [vizStyle]);
 
+  const [theme, setTheme] = useState<ThemeId>(() => {
+    try {
+      const v = localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null;
+      if (v && THEMES.some((t) => t.id === v)) return v;
+    } catch {
+      // ignore
+    }
+    return "legacy";
+  });
+
+  useEffect(() => {
+    const def = THEMES.find((t) => t.id === theme);
+    if (def?.attr) document.documentElement.setAttribute("data-theme", def.attr);
+    else document.documentElement.removeAttribute("data-theme");
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // ignore
+    }
+  }, [theme]);
+
   const loadEndpoint = useCallback(async (endpoint: Endpoint) => {
     try {
       const text = await fetchEndpoint(endpoint);
