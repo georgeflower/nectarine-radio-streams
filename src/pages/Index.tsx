@@ -232,7 +232,7 @@ const Index = () => {
         <header className="flex flex-col gap-3 mb-5 border-b border-border pb-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold neon tracking-widest uppercase">
-              ▌Nectarine Compact Viewer
+              ▌Necta Compact View
             </h1>
           </div>
           <div className="flex flex-nowrap items-center gap-2 md:justify-end w-full md:w-auto">
