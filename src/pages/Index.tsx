@@ -75,7 +75,7 @@ type ThemeId = "legacy" | "nectalift" | "nostalgia";
 const THEMES: { id: ThemeId; label: string; attr: string | null }[] = [
   { id: "legacy", label: "CRT Default", attr: null },
   { id: "nectalift", label: "B & W", attr: "gem" },
-  { id: "nostalgia", label: "Nostalgia Mod", attr: "workbench" },
+  { id: "nostalgia", label: "Blue blue", attr: "workbench" },
 ];
 const THEME_STORAGE_KEY = "nectarine-theme";
 
