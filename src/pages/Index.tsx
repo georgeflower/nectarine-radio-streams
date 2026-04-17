@@ -156,6 +156,8 @@ const Index = () => {
     } catch {
       // ignore
     }
+    if (theme === "nostalgia") setVizStyle("off");
+    else if (theme === "nectalift") setVizStyle("starfield");
   }, [theme]);
 
   const loadEndpoint = useCallback(async (endpoint: Endpoint) => {
