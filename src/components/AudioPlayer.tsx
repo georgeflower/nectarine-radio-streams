@@ -104,6 +104,13 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
     a.muted = muted;
   }, [volume, muted]);
 
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current);
+      if (stallTimerRef.current !== null) window.clearTimeout(stallTimerRef.current);
+    };
+  }, []);
+
   const selectedStream = useMemo(
     () => playable.find((x) => x.url === selectedUrl) ?? null,
     [playable, selectedUrl],
