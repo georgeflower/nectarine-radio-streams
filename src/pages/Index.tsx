@@ -235,12 +235,12 @@ const Index = () => {
               ▌Nectarine Compact Viewer
             </h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2 md:justify-end">
+          <div className="flex flex-nowrap items-center gap-2 md:justify-end w-full md:w-auto">
             <select
               value={theme}
               onChange={(e) => setTheme(e.target.value as ThemeId)}
               aria-label="Theme"
-              className="min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation"
+              className="min-h-11 px-2 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation flex-1 min-w-0 md:flex-none"
             >
               {THEMES.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -248,29 +248,21 @@ const Index = () => {
                 </option>
               ))}
             </select>
-            <div
-              className="flex items-center gap-1 border border-border rounded-sm p-0.5 bg-card/60"
-              role="group"
+            <select
+              value={vizStyle}
+              onChange={(e) => setVizStyle(e.target.value as VisualizerStyle)}
               aria-label="Visualizer style"
+              className="min-h-11 px-2 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation flex-1 min-w-0 md:flex-none"
             >
-                {VIZ_STYLES.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setVizStyle(s)}
-                    className={`min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm transition-opacity touch-manipulation ${
-                      vizStyle === s
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
+              {VIZ_STYLES.map((s) => (
+                <option key={s} value={s}>
                   {s}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
             <button
               onClick={refreshAll}
-              className="min-h-11 px-4 py-2 bg-primary text-primary-foreground uppercase text-sm tracking-widest rounded-sm hover:opacity-90 transition-opacity touch-manipulation"
+              className="min-h-11 px-3 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity touch-manipulation shrink-0"
               style={{ boxShadow: "var(--glow-primary)" }}
             >
               Refresh
