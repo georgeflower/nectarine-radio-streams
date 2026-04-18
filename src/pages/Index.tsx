@@ -50,6 +50,34 @@ function SongRating({ songId }: { songId: string }) {
   );
 }
 
+function SongPlatform({ songId }: { songId: string }) {
+  const [info, setInfo] = useState(() => getCachedInfo("song", songId));
+  useEffect(() => {
+    if (!songId) return;
+    if (!info?.platformId) requestInfo("song", songId);
+    const unsub = subscribeEntities(() => {
+      const next = getCachedInfo("song", songId);
+      if (next) setInfo(next);
+    });
+    return unsub;
+  }, [songId, info?.platformId]);
+  if (!info?.platformId || !info?.platformName) return null;
+  const href = platformUrl(info.platformId);
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      title={`All songs on ${info.platformName}`}
+      className="inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 border border-border rounded-sm hover:border-primary hover:text-primary transition-colors align-middle"
+    >
+      {info.platformName}
+    </a>
+  );
+}
+
 type ExtLinkProps = {
   href: string | null;
   children: React.ReactNode;
