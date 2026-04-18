@@ -488,17 +488,17 @@ const Index = () => {
                 <p className="text-sm">
                   There are a total of <span className="neon-accent font-bold">{usersTotal}</span> users online now:
                 </p>
-                <p className="text-sm mt-2 text-muted-foreground break-words">
+                <div className="text-sm mt-2 text-muted-foreground flex flex-wrap gap-x-2 gap-y-1 break-words">
                   {users.length > 0
                     ? users.map((u, i) => (
-                        <span key={`${u.name}-${i}`} className="inline-block mr-2">
+                        <span key={`${u.name}-${i}`} className="inline-flex items-center max-w-full break-all">
                           <Flag code={u.flag} />
                           <ExtLink href={userUrl(u.name)}>{u.name}</ExtLink>
                           {i < users.length - 1 ? "," : ""}
                         </span>
                       ))
                     : "-"}
-                </p>
+                </div>
               </div>
             )}
 
