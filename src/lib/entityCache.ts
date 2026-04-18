@@ -9,6 +9,8 @@ export interface EntityInfo {
   meta?: string; // e.g. "by Foo Artist", "23 songs", etc.
   rating?: number; // 0–5 average (songs only)
   votes?: number;  // vote count (songs only)
+  platformId?: string;   // songs only
+  platformName?: string; // songs only
 }
 
 type CacheMap = Record<string, EntityInfo>;
@@ -94,11 +96,16 @@ function extractInfo(kind: EntityKind, xml: Document): EntityInfo {
       if (Number.isFinite(ratingNum)) {
         parts.push(`★ ${ratingNum.toFixed(2)}${Number.isFinite(votesNum) ? ` (${votesNum})` : ""}`);
       }
+      const platformEl = root.getElementsByTagName("platform")[0];
+      const platformId = platformEl?.getAttribute("id") || "";
+      const platformName = platformEl?.textContent?.trim() || "";
       return {
         title,
         meta: parts.join(" · ") || undefined,
         rating: Number.isFinite(ratingNum) ? ratingNum : undefined,
         votes: Number.isFinite(votesNum) ? votesNum : undefined,
+        platformId: platformId || undefined,
+        platformName: platformName || undefined,
       };
     }
     case "artist": {

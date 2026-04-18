@@ -13,6 +13,7 @@ import {
   parseStreams,
   parseXml,
   songUrl,
+  platformUrl,
   userUrl,
   type Endpoint,
   type OnelinerEntry,
@@ -46,6 +47,34 @@ function SongRating({ songId }: { songId: string }) {
       ★ {info.rating.toFixed(2)}
       {info.votes !== undefined ? ` (${info.votes})` : ""}
     </span>
+  );
+}
+
+function SongPlatform({ songId }: { songId: string }) {
+  const [info, setInfo] = useState(() => getCachedInfo("song", songId));
+  useEffect(() => {
+    if (!songId) return;
+    if (!info?.platformId) requestInfo("song", songId);
+    const unsub = subscribeEntities(() => {
+      const next = getCachedInfo("song", songId);
+      if (next) setInfo(next);
+    });
+    return unsub;
+  }, [songId, info?.platformId]);
+  if (!info?.platformId || !info?.platformName) return null;
+  const href = platformUrl(info.platformId);
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      title={`All songs on ${info.platformName}`}
+      className="inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 border border-border rounded-sm hover:border-primary hover:text-primary transition-colors align-middle"
+    >
+      {info.platformName}
+    </a>
   );
 }
 
@@ -290,6 +319,7 @@ const Index = () => {
                   <>
                     <p className="text-lg font-bold neon break-words">
                       <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink>{" "}
+                      <SongPlatform songId={now.songId} />{" "}
                       <SongRating songId={now.songId} />
                     </p>
                     <p className="text-sm text-muted-foreground mb-3">
@@ -335,6 +365,7 @@ const Index = () => {
                           {q.artist}
                         </ExtLink>{" "}
                         — <ExtLink href={songUrl(q.songId)}>{q.song}</ExtLink>{" "}
+                        <SongPlatform songId={q.songId} />{" "}
                         <SongRating songId={q.songId} />{" "}
                         <span className="text-xs text-muted-foreground">
                           ({formatDuration(q.lengthSec)} · req{" "}
@@ -368,6 +399,7 @@ const Index = () => {
                           {h.artist}
                         </ExtLink>{" "}
                         — <ExtLink href={songUrl(h.songId)}>{h.song}</ExtLink>{" "}
+                        <SongPlatform songId={h.songId} />{" "}
                         <SongRating songId={h.songId} />
                       </li>
                     ))}
