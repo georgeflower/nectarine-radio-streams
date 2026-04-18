@@ -433,7 +433,7 @@ const Index = () => {
                         setOnelinerExpanded((x) => !x);
                       }
                     }}
-                    className="text-primary-foreground text-[10px] uppercase tracking-widest hover:underline"
+                    className="text-primary text-[10px] uppercase tracking-widest hover:underline"
                   >
                     {onelinerExpanded ? "Collapse" : "Expand"}
                   </span>
