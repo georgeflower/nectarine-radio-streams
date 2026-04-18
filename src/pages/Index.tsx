@@ -365,6 +365,7 @@ const Index = () => {
                           {q.artist}
                         </ExtLink>{" "}
                         — <ExtLink href={songUrl(q.songId)}>{q.song}</ExtLink>{" "}
+                        <SongPlatform songId={q.songId} />{" "}
                         <SongRating songId={q.songId} />{" "}
                         <span className="text-xs text-muted-foreground">
                           ({formatDuration(q.lengthSec)} · req{" "}
