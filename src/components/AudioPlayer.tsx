@@ -312,6 +312,10 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
     shouldPlayRef.current = false;
     clearTimers();
     setReconnecting(false);
+    if (bufferedStreamRef.current) {
+      bufferedStreamRef.current.cleanup();
+      bufferedStreamRef.current = null;
+    }
     const a = audioRef.current;
     if (!a) return;
     a.pause();
