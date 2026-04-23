@@ -115,7 +115,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
 
   // Poll buffered-ahead while playing for UX visibility
   useEffect(() => {
-    if (!playing) {
+    if (!playing || reconnecting || error) {
       setBufferedAhead(0);
       return;
     }
