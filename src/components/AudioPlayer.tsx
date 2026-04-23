@@ -63,6 +63,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const bufferedStreamRef = useRef<BufferedStreamHandle | null>(null);
 
   const playable = useMemo(
     () =>
