@@ -23,8 +23,9 @@ const proxiedUrl = (url: string, cacheBust = false) =>
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 2000, 4000];
-const STALL_TIMEOUT_MS = 10_000;
+const STALL_TIMEOUT_MS = 30_000;
 const FAILOVER_COOLDOWN_MS = 60_000;
+const BUFFER_POLL_MS = 2000;
 
 type StationNowPlayingConfig = {
   nowPlayingUrl: string;
@@ -65,7 +66,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   const playable = useMemo(
     () =>
       streams
-        .filter((s) => s.url.startsWith("https://"))
+        .filter((s) => /^https?:\/\//i.test(s.url))
         .sort((a, b) => (Number(b.bitrate) || 0) - (Number(a.bitrate) || 0)),
     [streams],
   );
@@ -78,6 +79,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<NowPlayingTrack | null>(null);
+  const [bufferedAhead, setBufferedAhead] = useState(0);
 
   const shouldPlayRef = useRef(false);
   const retryCountRef = useRef(0);
