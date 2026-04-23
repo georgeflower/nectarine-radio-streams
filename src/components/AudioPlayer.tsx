@@ -216,7 +216,18 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
       a.crossOrigin = "anonymous";
       a.preload = "auto";
       const target = proxiedUrl(url, cacheBust);
-      if (a.src !== target) a.src = target;
+
+      // Tear down any prior buffered stream before switching
+      if (bufferedStreamRef.current) {
+        bufferedStreamRef.current.cleanup();
+        bufferedStreamRef.current = null;
+      }
+
+      if (isMseAudioSupported()) {
+        bufferedStreamRef.current = attachBufferedStream(a, target, { targetBufferSec: 30 });
+      } else {
+        if (a.src !== target) a.src = target;
+      }
       await a.play();
     },
     [ensureAudioGraph],
