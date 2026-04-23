@@ -1,56 +1,41 @@
 
 
 ## Goal
-Show a small platform indicator (e.g. "AMIGA-MOD") next to each song name and make it a clickable link to the Scenestream platform listing page (all songs on that platform).
-
-## Where platform data comes from
-The song detail XML (already fetched lazily by `entityCache.ts` for ratings) contains:
-```xml
-<platform id="6">AMIGA-MOD</platform>
-```
-Platform URL on Scenestream uses the **id**: `https://scenestream.net/demovibes/platform/6/` (verified — name slug returns 404, id returns 200).
+1. Make every stream listed under "Live Streams" selectable in the player (not just HTTPS).
+2. Improve resilience by pre-buffering ~30 seconds of audio while playback continues, so brief network drops don't interrupt playback.
 
 ## Changes
 
-### 1. `src/lib/entityCache.ts`
-Extend `EntityInfo` for songs to include platform data:
-- `platformId?: string`
-- `platformName?: string`
+### 1. `src/components/AudioPlayer.tsx` — accept all streams
+- Remove the `s.url.startsWith("https://")` filter in the `playable` memo. Since the audio-proxy edge function already accepts both `http:` and `https:` (and the request to the proxy itself is HTTPS), HTTP streams work fine via the proxy without mixed-content issues.
+- Keep the bitrate-descending sort so the highest-bitrate stream is still picked first.
+- Result: the dropdown now contains every stream that appears in the "Live Streams" section.
 
-In `extractInfo` for the `song` case, read:
-```ts
-const platformEl = root.getElementsByTagName("platform")[0];
-const platformId = platformEl?.getAttribute("id") || "";
-const platformName = platformEl?.textContent?.trim() || "";
-```
-and include them in the returned info.
+### 2. `src/components/AudioPlayer.tsx` — 30-second buffer strategy
+HTML `<audio>` doesn't expose a direct "buffer size" knob, but we can influence behavior:
+- Set `audio.preload = "auto"` (already set on play) to let the browser fetch ahead aggressively.
+- Add a periodic check (every 2s while playing) that inspects `audio.buffered`:
+  - Compute `bufferedAhead = bufferedEnd - currentTime`.
+  - Target ~30s ahead. The browser controls actual fetch, but for a live ICY/Shoutcast stream, `buffered` grows as bytes arrive faster than playback consumes them.
+  - If `bufferedAhead < 5s` while playing, surface a small "Low buffer" hint (optional indicator) but don't act yet.
+  - If a stall occurs and `bufferedAhead > 0`, the audio element will naturally keep playing from the buffer — no change needed; this just improves UX visibility.
+- Increase `STALL_TIMEOUT_MS` from 10s → 30s so we tolerate longer interruptions before failing over (matches the buffer goal — reconnect only when the buffer is truly exhausted).
+- Display current buffer-ahead seconds in the status line (small text, e.g. `buf: 27s`) so the user can see it's healthy.
 
-### 2. `src/lib/nectarine.ts`
-Update `platformUrl` to accept an id (it already does — just keep it; we'll pass the id). No code change needed; the helper already builds `/demovibes/platform/{value}/`.
+### 3. Quick playback start
+- Already starts as soon as the browser has enough data (default behavior). No change needed; the 30s target is approached *during* playback, not before.
+- Confirm `preload="auto"` is set when `playUrl` runs (it is).
 
-### 3. `src/pages/Index.tsx`
-Create a small `SongPlatform` component (mirroring the existing `SongRating` pattern):
-- Subscribes to entity cache for the given `songId`.
-- Triggers `requestInfo("song", songId)` if not loaded (already done by `SongRating`, but safe to call again — it's idempotent).
-- When `info.platformId` & `info.platformName` are present, render a compact pill/link:
-  ```tsx
-  <a href={platformUrl(info.platformId)} target="_blank" rel="noopener noreferrer"
-     className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 border border-border rounded-sm hover:border-primary hover:text-primary transition-colors"
-     title={`All songs on ${info.platformName}`}
-     onClick={(e) => e.stopPropagation()}>
-    {info.platformName}
-  </a>
-  ```
+## Technical notes
+- The audio-proxy `ALLOWED_HOSTS` already includes the Nectarine relay hostnames; HTTP streams from those hosts will work through the proxy. If a stream is from a host outside the allowlist, the proxy returns 403 and the existing failover will skip it after retries — acceptable behavior.
+- We can't force a specific buffer size in browsers; we can only observe `audio.buffered`. The "30s buffer" is achieved by tolerating stalls longer (since the buffer naturally fills) rather than blocking playback start.
 
-Place `<SongPlatform songId={...} />` right after the song name link in three spots:
-- Currently Playing (`now.song`)
-- Up Next queue items
-- Recently Played history items
-
-(Order: song name → platform pill → rating.)
+## Files touched
+- `src/components/AudioPlayer.tsx` (only)
 
 ## Acceptance
-- A small platform tag (e.g. "AMIGA-MOD") appears next to song titles in Now Playing, Queue, and History as soon as song details load.
-- Clicking the tag opens `https://scenestream.net/demovibes/platform/{id}/` in a new tab.
-- No tag is rendered for songs without a platform field or while details are still loading.
+- Dropdown shows every stream listed in the Live Streams section.
+- Playback starts within ~1–2s of pressing play.
+- Status line shows a buffer indicator (e.g. `buf: 28s`) once buffer fills.
+- Brief 10–25s network interruptions no longer cause a reconnect; only sustained drops trigger failover.
 
