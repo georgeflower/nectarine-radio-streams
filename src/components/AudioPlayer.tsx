@@ -10,6 +10,7 @@ import {
   parseNowPlayingPayload,
   type NowPlayingTrack,
 } from "@/lib/nowPlaying";
+import { attachBufferedStream, isMseAudioSupported, type BufferedStreamHandle } from "@/lib/bufferedStream";
 
 type Props = {
   streams: StreamSource[];
