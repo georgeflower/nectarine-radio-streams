@@ -88,7 +88,7 @@ export const attachBufferedStream = (
     const chunk = pendingChunks.shift()!;
     appending = true;
     try {
-      sourceBuffer.appendBuffer(chunk);
+      sourceBuffer.appendBuffer(chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer);
     } catch (err) {
       appending = false;
       // QuotaExceededError: drop the oldest buffered range and retry next tick
