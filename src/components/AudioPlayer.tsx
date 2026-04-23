@@ -113,6 +113,33 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
     };
   }, []);
 
+  // Poll buffered-ahead while playing for UX visibility
+  useEffect(() => {
+    if (!playing) {
+      setBufferedAhead(0);
+      return;
+    }
+    const computeBuffered = () => {
+      const a = audioRef.current;
+      if (!a) return;
+      try {
+        const b = a.buffered;
+        if (b.length === 0) {
+          setBufferedAhead(0);
+          return;
+        }
+        const end = b.end(b.length - 1);
+        const ahead = Math.max(0, end - a.currentTime);
+        setBufferedAhead(ahead);
+      } catch {
+        // ignore
+      }
+    };
+    computeBuffered();
+    const id = window.setInterval(computeBuffered, BUFFER_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [playing]);
+
   const selectedStream = useMemo(
     () => playable.find((x) => x.url === selectedUrl) ?? null,
     [playable, selectedUrl],
@@ -518,6 +545,9 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
         </span>
         <span className="font-semibold">{mediaTitle}</span>
         <span className="text-muted-foreground"> — {mediaArtist}</span>
+        {playing && bufferedAhead > 0 && (
+          <span className="text-muted-foreground"> · buf: {Math.round(bufferedAhead)}s</span>
+        )}
       </p>
       {error && <p className="text-xs text-destructive mt-0.5 px-1">{error}</p>}
 
