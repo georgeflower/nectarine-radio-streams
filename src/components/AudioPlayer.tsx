@@ -23,8 +23,9 @@ const proxiedUrl = (url: string, cacheBust = false) =>
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 2000, 4000];
-const STALL_TIMEOUT_MS = 10_000;
+const STALL_TIMEOUT_MS = 30_000;
 const FAILOVER_COOLDOWN_MS = 60_000;
+const BUFFER_POLL_MS = 2000;
 
 type StationNowPlayingConfig = {
   nowPlayingUrl: string;
@@ -65,7 +66,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   const playable = useMemo(
     () =>
       streams
-        .filter((s) => s.url.startsWith("https://"))
+        .filter((s) => /^https?:\/\//i.test(s.url))
         .sort((a, b) => (Number(b.bitrate) || 0) - (Number(a.bitrate) || 0)),
     [streams],
   );
@@ -78,6 +79,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<NowPlayingTrack | null>(null);
+  const [bufferedAhead, setBufferedAhead] = useState(0);
 
   const shouldPlayRef = useRef(false);
   const retryCountRef = useRef(0);
@@ -110,6 +112,33 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
       if (stallTimerRef.current !== null) window.clearTimeout(stallTimerRef.current);
     };
   }, []);
+
+  // Poll buffered-ahead while playing for UX visibility
+  useEffect(() => {
+    if (!playing) {
+      setBufferedAhead(0);
+      return;
+    }
+    const computeBuffered = () => {
+      const a = audioRef.current;
+      if (!a) return;
+      try {
+        const b = a.buffered;
+        if (b.length === 0) {
+          setBufferedAhead(0);
+          return;
+        }
+        const end = b.end(b.length - 1);
+        const ahead = Math.max(0, end - a.currentTime);
+        setBufferedAhead(ahead);
+      } catch {
+        // ignore
+      }
+    };
+    computeBuffered();
+    const id = window.setInterval(computeBuffered, BUFFER_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [playing]);
 
   const selectedStream = useMemo(
     () => playable.find((x) => x.url === selectedUrl) ?? null,
@@ -516,6 +545,9 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
         </span>
         <span className="font-semibold">{mediaTitle}</span>
         <span className="text-muted-foreground"> — {mediaArtist}</span>
+        {playing && bufferedAhead > 0 && (
+          <span className="text-muted-foreground"> · buf: {Math.round(bufferedAhead)}s</span>
+        )}
       </p>
       {error && <p className="text-xs text-destructive mt-0.5 px-1">{error}</p>}
 
