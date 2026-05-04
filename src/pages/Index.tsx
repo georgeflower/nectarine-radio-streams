@@ -166,6 +166,31 @@ const Index = () => {
     }
   }, [vizStyle]);
 
+  const [fontScale, setFontScale] = useState<number>(() => {
+    try {
+      const v = parseFloat(localStorage.getItem("nectarine-font-scale") || "");
+      if (!isNaN(v) && v >= 0.7 && v <= 1.6) return v;
+    } catch {
+      // ignore
+    }
+    return 1;
+  });
+
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${Math.round(fontScale * 16)}px`;
+    try {
+      localStorage.setItem("nectarine-font-scale", String(fontScale));
+    } catch {
+      // ignore
+    }
+    return () => {
+      document.documentElement.style.fontSize = "";
+    };
+  }, [fontScale]);
+
+  const adjustFont = (delta: number) =>
+    setFontScale((s) => Math.min(1.6, Math.max(0.7, Math.round((s + delta) * 10) / 10)));
+
   const [theme, setTheme] = useState<ThemeId>(() => {
     try {
       const v = localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null;
@@ -262,7 +287,7 @@ const Index = () => {
               ▌Necta Compact View
             </h1>
           </div>
-          <div className="flex flex-nowrap items-center gap-2 md:justify-end w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 md:justify-end w-full md:w-auto">
             <select
               value={theme}
               onChange={(e) => setTheme(e.target.value as ThemeId)}
@@ -287,6 +312,29 @@ const Index = () => {
                 </option>
               ))}
             </select>
+            <div className="flex items-center rounded-sm border border-border bg-card/60 shrink-0" role="group" aria-label="Text size">
+              <button
+                type="button"
+                onClick={() => adjustFont(-0.1)}
+                disabled={fontScale <= 0.7}
+                aria-label="Decrease text size"
+                className="min-h-11 w-10 text-sm font-bold hover:opacity-90 disabled:opacity-40 touch-manipulation"
+              >
+                A−
+              </button>
+              <span className="px-2 text-[10px] uppercase tracking-widest text-muted-foreground tabular-nums">
+                {Math.round(fontScale * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() => adjustFont(0.1)}
+                disabled={fontScale >= 1.6}
+                aria-label="Increase text size"
+                className="min-h-11 w-10 text-sm font-bold hover:opacity-90 disabled:opacity-40 touch-manipulation"
+              >
+                A+
+              </button>
+            </div>
             <button
               onClick={refreshAll}
               className="min-h-11 px-3 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity touch-manipulation shrink-0"
