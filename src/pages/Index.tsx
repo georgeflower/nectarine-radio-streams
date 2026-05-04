@@ -166,6 +166,31 @@ const Index = () => {
     }
   }, [vizStyle]);
 
+  const [fontScale, setFontScale] = useState<number>(() => {
+    try {
+      const v = parseFloat(localStorage.getItem("nectarine-font-scale") || "");
+      if (!isNaN(v) && v >= 0.7 && v <= 1.6) return v;
+    } catch {
+      // ignore
+    }
+    return 1;
+  });
+
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${Math.round(fontScale * 16)}px`;
+    try {
+      localStorage.setItem("nectarine-font-scale", String(fontScale));
+    } catch {
+      // ignore
+    }
+    return () => {
+      document.documentElement.style.fontSize = "";
+    };
+  }, [fontScale]);
+
+  const adjustFont = (delta: number) =>
+    setFontScale((s) => Math.min(1.6, Math.max(0.7, Math.round((s + delta) * 10) / 10)));
+
   const [theme, setTheme] = useState<ThemeId>(() => {
     try {
       const v = localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null;
