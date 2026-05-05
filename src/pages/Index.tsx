@@ -356,7 +356,7 @@ const Index = () => {
           <AudioPlayer streams={streams} currentTrack={now} onAnalyserReady={setAnalyser} />
         </div>
 
-        <section className="grid gap-4 md:grid-cols-2" aria-label="Demovibes panels">
+        <section className="grid gap-4 md:grid-cols-2 min-w-0" aria-label="Demovibes panels">
           <article className="panel md:order-2 min-w-0 overflow-hidden">
             <button
               type="button"
