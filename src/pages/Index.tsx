@@ -462,7 +462,7 @@ const Index = () => {
             )}
           </article>
 
-          <article className="panel md:order-1">
+          <article className="panel md:order-1 min-w-0 overflow-hidden">
             <button
               type="button"
               onClick={() => setOnelinerOpen((o) => !o)}
