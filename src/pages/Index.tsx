@@ -56,13 +56,15 @@ function SongPlatform({ songId }: { songId: string }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
   useEffect(() => {
     if (!songId) return;
-    if (!info?.platformId) requestInfo("song", songId);
+    const cached = getCachedInfo("song", songId);
+    setInfo(cached);
+    if (!cached?.platformId) requestInfo("song", songId);
     const unsub = subscribeEntities(() => {
       const next = getCachedInfo("song", songId);
       if (next) setInfo(next);
     });
     return unsub;
-  }, [songId, info?.platformId]);
+  }, [songId]);
   if (!info?.platformId || !info?.platformName) return null;
   const href = platformUrl(info.platformId);
   if (!href) return null;
