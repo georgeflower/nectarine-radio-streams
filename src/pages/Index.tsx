@@ -181,7 +181,10 @@ const Index = () => {
   });
 
   useEffect(() => {
-    document.documentElement.style.fontSize = `${Math.round(fontScale * 16)}px`;
+    const target = fontScale * 16;
+    // Cap font-size so frames never exceed viewport width on small screens.
+    // ~22 root-em units of width keeps panels readable without horizontal overflow.
+    document.documentElement.style.fontSize = `min(${target}px, calc(100vw / 22))`;
     try {
       localStorage.setItem("nectarine-font-scale", String(fontScale));
     } catch {
