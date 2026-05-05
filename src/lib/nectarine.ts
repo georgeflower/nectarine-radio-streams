@@ -257,10 +257,34 @@ export function computeTimeLeft(playstart: string, lengthSec: number): string {
 export function formatOnelinerTime(raw?: string) {
   const v = raw?.trim();
   if (!v) return "--:--:--";
-  const m = v.match(/(\d{2}:\d{2}:\d{2})/);
-  if (m) return m[1];
-  const t = Date.parse(v);
-  if (Number.isFinite(t)) return new Date(t).toLocaleTimeString();
+
+  // Try full date parse first (ISO, RFC, etc.) — already absolute, just localize.
+  const direct = Date.parse(v);
+  if (Number.isFinite(direct)) {
+    return new Date(direct).toLocaleTimeString();
+  }
+
+  // Upstream often returns a bare HH:MM:SS in UTC. Anchor it to today (UTC) and
+  // convert to the viewer's local time. Handle day-rollover: if the resulting
+  // UTC moment is more than ~12h in the future, assume it was from yesterday.
+  const m = v.match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (m) {
+    const [, hh, mm, ss] = m;
+    const now = new Date();
+    let utcMs = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      Number(hh),
+      Number(mm),
+      Number(ss ?? "0"),
+    );
+    const diffH = (utcMs - now.getTime()) / 3_600_000;
+    if (diffH > 12) utcMs -= 24 * 3_600_000;
+    else if (diffH < -12) utcMs += 24 * 3_600_000;
+    return new Date(utcMs).toLocaleTimeString();
+  }
+
   return v;
 }
 
