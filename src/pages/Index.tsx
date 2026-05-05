@@ -357,7 +357,7 @@ const Index = () => {
         </div>
 
         <section className="grid gap-4 md:grid-cols-2" aria-label="Demovibes panels">
-          <article className="panel md:order-2">
+          <article className="panel md:order-2 min-w-0 overflow-hidden">
             <button
               type="button"
               onClick={() => setNowOpen((o) => !o)}
