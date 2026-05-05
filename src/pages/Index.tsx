@@ -31,9 +31,8 @@ function SongRating({ songId }: { songId: string }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
   useEffect(() => {
     if (!songId) return;
-    const cached = getCachedInfo("song", songId);
-    setInfo(cached);
-    if (cached?.rating === undefined) requestInfo("song", songId);
+    setInfo(getCachedInfo("song", songId));
+    requestInfo("song", songId);
     const unsub = subscribeEntities(() => {
       const next = getCachedInfo("song", songId);
       if (next) setInfo(next);
@@ -56,9 +55,8 @@ function SongPlatform({ songId }: { songId: string }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
   useEffect(() => {
     if (!songId) return;
-    const cached = getCachedInfo("song", songId);
-    setInfo(cached);
-    if (!cached?.platformId) requestInfo("song", songId);
+    setInfo(getCachedInfo("song", songId));
+    requestInfo("song", songId);
     const unsub = subscribeEntities(() => {
       const next = getCachedInfo("song", songId);
       if (next) setInfo(next);
