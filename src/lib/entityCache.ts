@@ -13,10 +13,24 @@ export interface EntityInfo {
   platformName?: string; // songs only
 }
 
-type CacheMap = Record<string, EntityInfo>;
+type CacheEntry = { info: EntityInfo; fetchedAt: number };
+type CacheMap = Record<string, CacheEntry>;
 
-const STORAGE_PREFIX = "nectarine-entity-cache-v2-";
+const STORAGE_PREFIX = "nectarine-entity-cache-v3-";
 const KINDS: EntityKind[] = ["song", "artist", "group", "compilation"];
+
+// Stale-while-revalidate TTLs. Cached info is shown immediately; a background
+// refetch is triggered if the entry is older than this.
+const TTL_MS: Record<EntityKind, number> = {
+  song: 2 * 60 * 1000,           // ratings/votes change frequently
+  artist: 24 * 60 * 60 * 1000,
+  group: 24 * 60 * 60 * 1000,
+  compilation: 24 * 60 * 60 * 1000,
+};
+
+function isStale(kind: EntityKind, fetchedAt: number): boolean {
+  return Date.now() - fetchedAt > TTL_MS[kind];
+}
 
 const memCache: Record<EntityKind, CacheMap> = {
   song: {}, artist: {}, group: {}, compilation: {},
@@ -140,7 +154,6 @@ function extractInfo(kind: EntityKind, xml: Document): EntityInfo {
 
 async function resolveOne(kind: EntityKind, id: string): Promise<EntityInfo> {
   load();
-  if (memCache[kind][id]) return memCache[kind][id];
   if (inflight[kind][id]) return inflight[kind][id];
   const p = (async () => {
     try {
@@ -148,7 +161,7 @@ async function resolveOne(kind: EntityKind, id: string): Promise<EntityInfo> {
       const doc = parseXml(text);
       const info = extractInfo(kind, doc);
       if (info.title) {
-        memCache[kind][id] = info;
+        memCache[kind][id] = { info, fetchedAt: Date.now() };
         persist(kind);
         notify();
       }
@@ -165,7 +178,7 @@ async function resolveOne(kind: EntityKind, id: string): Promise<EntityInfo> {
 
 export function getCachedInfo(kind: EntityKind, id: string): EntityInfo | undefined {
   load();
-  return memCache[kind][id];
+  return memCache[kind][id]?.info;
 }
 
 export function getCachedTitle(kind: EntityKind, id: string): string | undefined {
@@ -175,7 +188,9 @@ export function getCachedTitle(kind: EntityKind, id: string): string | undefined
 export function requestInfo(kind: EntityKind, id: string): void {
   if (!id) return;
   load();
-  if (memCache[kind][id] || inflight[kind][id]) return;
+  if (inflight[kind][id]) return;
+  const entry = memCache[kind][id];
+  if (entry && !isStale(kind, entry.fetchedAt)) return;
   void resolveOne(kind, id);
 }
 
