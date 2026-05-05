@@ -31,13 +31,15 @@ function SongRating({ songId }: { songId: string }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
   useEffect(() => {
     if (!songId) return;
-    if (info?.rating === undefined) requestInfo("song", songId);
+    const cached = getCachedInfo("song", songId);
+    setInfo(cached);
+    if (cached?.rating === undefined) requestInfo("song", songId);
     const unsub = subscribeEntities(() => {
       const next = getCachedInfo("song", songId);
       if (next) setInfo(next);
     });
     return unsub;
-  }, [songId, info?.rating]);
+  }, [songId]);
   if (!info || info.rating === undefined) return null;
   return (
     <span
