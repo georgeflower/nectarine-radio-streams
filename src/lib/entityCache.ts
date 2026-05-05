@@ -13,10 +13,24 @@ export interface EntityInfo {
   platformName?: string; // songs only
 }
 
-type CacheMap = Record<string, EntityInfo>;
+type CacheEntry = { info: EntityInfo; fetchedAt: number };
+type CacheMap = Record<string, CacheEntry>;
 
-const STORAGE_PREFIX = "nectarine-entity-cache-v2-";
+const STORAGE_PREFIX = "nectarine-entity-cache-v3-";
 const KINDS: EntityKind[] = ["song", "artist", "group", "compilation"];
+
+// Stale-while-revalidate TTLs. Cached info is shown immediately; a background
+// refetch is triggered if the entry is older than this.
+const TTL_MS: Record<EntityKind, number> = {
+  song: 2 * 60 * 1000,           // ratings/votes change frequently
+  artist: 24 * 60 * 60 * 1000,
+  group: 24 * 60 * 60 * 1000,
+  compilation: 24 * 60 * 60 * 1000,
+};
+
+function isStale(kind: EntityKind, fetchedAt: number): boolean {
+  return Date.now() - fetchedAt > TTL_MS[kind];
+}
 
 const memCache: Record<EntityKind, CacheMap> = {
   song: {}, artist: {}, group: {}, compilation: {},
