@@ -181,7 +181,7 @@ function ExtA({ href, children, className }: { href: string; children: ReactNode
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className={className ?? "text-primary hover:underline"}
+      className={className ?? "text-primary hover:underline [overflow-wrap:anywhere] break-all"}
     >
       {children}
     </a>

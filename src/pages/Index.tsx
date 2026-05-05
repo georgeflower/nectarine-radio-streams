@@ -356,8 +356,8 @@ const Index = () => {
           <AudioPlayer streams={streams} currentTrack={now} onAnalyserReady={setAnalyser} />
         </div>
 
-        <section className="grid gap-4 md:grid-cols-2" aria-label="Demovibes panels">
-          <article className="panel md:order-2">
+        <section className="grid gap-4 md:grid-cols-2 min-w-0" aria-label="Demovibes panels">
+          <article className="panel md:order-2 min-w-0 overflow-hidden">
             <button
               type="button"
               onClick={() => setNowOpen((o) => !o)}
@@ -462,7 +462,7 @@ const Index = () => {
             )}
           </article>
 
-          <article className="panel md:order-1">
+          <article className="panel md:order-1 min-w-0 overflow-hidden">
             <button
               type="button"
               onClick={() => setOnelinerOpen((o) => !o)}
@@ -509,7 +509,7 @@ const Index = () => {
                           </span>
                           <span className="text-muted-foreground">({formatOnelinerTime(entry.time)})</span>
                         </div>
-                        <p className="text-sm leading-snug mt-0.5 break-words">{renderBBCode(entry.text)}</p>
+                        <p className="text-sm leading-snug mt-0.5 [overflow-wrap:anywhere] break-words">{renderBBCode(entry.text)}</p>
                       </article>
                     ))
                   )}
