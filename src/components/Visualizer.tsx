@@ -37,6 +37,7 @@ const Visualizer = ({ analyser, style }: Props) => {
   const starsRef = useRef<Star[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const rafRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number>(0);
   const plasmaTRef = useRef(0);
   const idleTRef = useRef(0);
   const tunnelTRef = useRef(0);
@@ -130,14 +131,15 @@ const Visualizer = ({ analyser, style }: Props) => {
       hue: 28 + Math.random() * 40,
     }));
 
-    const renderStarfield = () => {
+    const renderStarfield = (dt: number) => {
       const w = canvas.width;
       const h = canvas.height;
       const cx = w / 2;
       const cy = h / 2;
       ctx.fillStyle = "hsla(20, 25%, 6%, 0.2)";
       ctx.fillRect(0, 0, w, h);
-      const speed = 1.4 * dpr;
+      const baseSpeed = 1.4 * dpr; // units per frame at 60fps
+      const speed = baseSpeed * (dt / (1000 / 60)); // scale by actual frame time
       const hue = 28;
       const light = 60;
 
@@ -468,12 +470,16 @@ const Visualizer = ({ analyser, style }: Props) => {
       ctx.shadowBlur = 0;
     };
 
-    const render = () => {
+    const render = (now: number) => {
+      if (!lastTimeRef.current) lastTimeRef.current = now;
+      const dt = Math.min(now - lastTimeRef.current, 50); // cap at 50ms to avoid huge jumps
+      lastTimeRef.current = now;
+
       switch (style) {
         case "bars": renderBars(); break;
         case "plasma": renderPlasma(); break;
         case "oscilloscope": renderOscilloscope(); break;
-        case "starfield": renderStarfield(); break;
+        case "starfield": renderStarfield(dt); break;
         case "tunnel": renderTunnel(); break;
         case "rings": renderRings(); break;
         case "particles": renderParticles(); break;
@@ -484,6 +490,7 @@ const Visualizer = ({ analyser, style }: Props) => {
     if (style === "off") {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     } else {
+      lastTimeRef.current = 0;
       rafRef.current = requestAnimationFrame(render);
     }
 
