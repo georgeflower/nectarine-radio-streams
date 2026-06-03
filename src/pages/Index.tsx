@@ -376,7 +376,16 @@ const Index = () => {
               <div className="mt-3">
                 {now ? (
                   <>
-                    <p className="text-lg font-bold neon break-words">
+                    <p
+                      className="text-lg font-bold neon break-words"
+                      style={
+                        audioLevel > 0
+                          ? {
+                              textShadow: `0 0 ${4 + audioLevel * 24}px hsl(var(--primary) / ${0.5 + audioLevel * 0.5}), 0 0 ${2 + audioLevel * 8}px hsl(var(--primary) / 0.8)`,
+                            }
+                          : undefined
+                      }
+                    >
                       <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink>{" "}
                       <SongPlatform songId={now.songId} />{" "}
                       <SongRating songId={now.songId} />
