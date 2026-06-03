@@ -101,27 +101,30 @@ const FRAMES: string[][] = [
     "........................",
     "........................",
   ],
-  // 4 — STANDING (long S-neck, plump body, two orange legs)
+  // 4 — STANDING (long S-neck, plump body, two orange legs).
+  // Body re-centered around col ~11.5 (sprite center=12) so a scaleX flip
+  // for "look left/right" only swaps the head silhouette — the body stays put.
   [
-    "............KKKK........",
-    "...........KWWWWK.......",
-    "...........KWEWWWKKDO...",
-    "...........KWWWWWKD.....",
-    "............KWWWK.......",
-    "............KWWK........",
-    "............KWWK........",
-    ".............KWWK.......",
-    ".............KWWK.......",
-    "..............KWWK......",
-    "..............KWWWK.....",
-    ".............KWWWWWK....",
-    "............KWLLLLLWK...",
-    "...........KWLLLLLLLWK..",
-    "...........KWLLLLLLLWK..",
-    "............KGGGGGGGK...",
-    ".............KKKKKKK....",
-    "............O.....O.....",
+    "........KKKK............",
+    ".......KWWWWK...........",
+    ".......KWEWWWKKDO.......",
+    ".......KWWWWWKD.........",
+    "........KWWWK...........",
+    "........KWWK............",
+    "........KWWK............",
+    ".........KWWK...........",
+    ".........KWWK...........",
+    "..........KWWK..........",
+    "..........KWWWK.........",
+    ".........KWWWWWK........",
+    "........KWLLLLLWK.......",
+    ".......KWLLLLLLLWK......",
+    ".......KWLLLLLLLWK......",
+    "........KGGGGGGGK.......",
+    ".........KKKKKKK........",
+    "........O.....O.........",
   ],
+
 ];
 
 const COLORS: Record<string, string> = {
