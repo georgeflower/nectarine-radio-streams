@@ -713,9 +713,10 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
             position: "absolute",
             inset: 0,
             opacity: 0,
-            // Pivot at the neck base (cols 10-13 centerline ⇒ 11.5, row 7)
-            // so flips & rotation stay anchored to the body's neck collar.
-            transformOrigin: `${11.5 * PIXEL}px ${7 * PIXEL}px`,
+            // Pivot at the neck base where it meets the body (col 11.5,
+            // row 10) so the entire head+neck swings as one piece and the
+            // body stays still with no white pixels exposed behind it.
+            transformOrigin: `${11.5 * PIXEL}px ${10 * PIXEL}px`,
 
 
             transition: "opacity 260ms ease-out",
