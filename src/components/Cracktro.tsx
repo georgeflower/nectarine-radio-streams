@@ -207,9 +207,9 @@ const Cracktro = ({
     if (p.includes("amiga")) return "amiga";
     if (p.includes("atari")) return "atari";
     if (p.includes("c64") || p.includes("commodore 64")) return "c64";
-    if (p.includes("xm") || p.includes("fasttracker") || p.includes("extended module") || t.endsWith(".xm")) return "xm";
-    return "default";
+    return "xm";
   }, [platform, title]);
+
 
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
   useEffect(() => {
