@@ -622,6 +622,9 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady, onSeek }: Props) 
             stallTimerRef.current = null;
           }
         }}
+        onSeeked={() => {
+          onSeek?.();
+        }}
       />
     </div>
   );
