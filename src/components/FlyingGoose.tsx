@@ -270,7 +270,9 @@ type Props = {
 const FlyingGoose = ({ oneliners = [] }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
-  const imgStandRef = useRef<HTMLImageElement | null>(null);
+  const imgStandBodyRef = useRef<HTMLImageElement | null>(null);
+  const imgStandHeadRef = useRef<HTMLImageElement | null>(null);
+
   const bubbleRef = useRef<HTMLDivElement | null>(null);
 
   // Imperative reaction state shared between effects.
