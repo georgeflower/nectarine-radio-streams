@@ -164,6 +164,7 @@ const Index = () => {
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
   const [bpmDebugOpen, setBpmDebugOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
+  const [seekCount, setSeekCount] = useState(0);
 
 
   useEffect(() => {
@@ -277,7 +278,7 @@ const Index = () => {
 
   const now = playlist.now;
   const timeLeft = now ? computeTimeLeft(now.playstart, now.lengthSec) : "-";
-  const trackKey = now ? `${now.artist ?? ""}||${now.song ?? ""}||${now.playstart ?? ""}` : "";
+  const trackKey = now ? `${now.artist ?? ""}||${now.song ?? ""}||${now.playstart ?? ""}||${seekCount}` : `seek-${seekCount}`;
   const { bpm, beatIndex, beatCount, status: bpmStatus, beatTimes, windowMs, lastComputeAt, lastBass, period, phaseErrorMs, confidence } = useBpm(analyser, true, trackKey);
   void tick;
 
@@ -379,7 +380,7 @@ const Index = () => {
         </header>
 
         <div className="mb-4">
-          <AudioPlayer streams={streams} currentTrack={now} onAnalyserReady={setAnalyser} />
+          <AudioPlayer streams={streams} currentTrack={now} onAnalyserReady={setAnalyser} onSeek={() => setSeekCount((c) => c + 1)} />
         </div>
 
         <section className="grid gap-4 md:grid-cols-2 min-w-0" aria-label="Demovibes panels">

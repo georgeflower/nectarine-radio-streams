@@ -16,6 +16,7 @@ type Props = {
   streams: StreamSource[];
   currentTrack?: { artist: string; song: string } | null;
   onAnalyserReady?: (analyser: AnalyserNode) => void;
+  onSeek?: () => void;
 };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
@@ -58,7 +59,7 @@ const resolveArtworkUrl = (rawUrl: string | undefined, fallbackArtwork: string):
   }
 };
 
-const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
+const AudioPlayer = ({ streams, currentTrack, onAnalyserReady, onSeek }: Props) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -620,6 +621,9 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
             window.clearTimeout(stallTimerRef.current);
             stallTimerRef.current = null;
           }
+        }}
+        onSeeked={() => {
+          onSeek?.();
         }}
       />
     </div>

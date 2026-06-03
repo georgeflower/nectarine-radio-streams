@@ -29,8 +29,7 @@ type ScrollMode =
   | "zoomer"
   | "wobble"
   | "copper"
-  | "vector"
-  | "infobar";
+  | "vector";
 
 const MODES: { id: ScrollMode; label: string }[] = [
   { id: "sinus", label: "Sinus" },
@@ -39,11 +38,11 @@ const MODES: { id: ScrollMode; label: string }[] = [
   { id: "wobble", label: "Wobble" },
   { id: "copper", label: "Copper" },
   { id: "vector", label: "Vector" },
-  { id: "infobar", label: "Info Bar" },
 ];
 
 const STORAGE_MODE = "cracktro-scroll-mode";
 const STORAGE_ON = "cracktro-scroll-on";
+const STORAGE_INFOBAR = "cracktro-infobar-on";
 
 const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChange }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -69,12 +68,22 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
     }
     return "sinus";
   });
+  const [infobarOn, setInfobarOn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(STORAGE_INFOBAR) === "1";
+    } catch {
+      return false;
+    }
+  });
   useEffect(() => {
     try { localStorage.setItem(STORAGE_ON, scrollOn ? "1" : "0"); } catch { /* ignore */ }
   }, [scrollOn]);
   useEffect(() => {
     try { localStorage.setItem(STORAGE_MODE, mode); } catch { /* ignore */ }
   }, [mode]);
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_INFOBAR, infobarOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [infobarOn]);
 
   // Auto-hide UI (exit + controls) after 5s of no pointer activity.
   const [showControls, setShowControls] = useState(true);
@@ -165,7 +174,7 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
 
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
   useEffect(() => {
-    if (!scrollOn || mode === "infobar") return;
+    if (!scrollOn) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -413,7 +422,7 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
       <BeatOverlay analyser={analyser} enabled />
 
       {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
-      {scrollOn && mode !== "infobar" && (
+      {scrollOn && (
         <canvas
           ref={canvasRef}
           aria-hidden="true"
@@ -422,8 +431,8 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
         />
       )}
 
-      {/* Info-bar mode: big now-playing strip pinned to the bottom. */}
-      {scrollOn && mode === "infobar" && (
+      {/* Info bar: big now-playing strip pinned to the bottom. Independent of scroller. */}
+      {infobarOn && (
         <div
           className="absolute left-0 right-0 pointer-events-none"
           style={{
@@ -512,6 +521,19 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
               </button>
             ))}
           </div>
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Info Bar</span>
+          <button
+            type="button"
+            onClick={() => setInfobarOn((v) => !v)}
+            className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              infobarOn
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-pressed={infobarOn}
+          >
+            {infobarOn ? "ON" : "OFF"}
+          </button>
         </div>
 
         {/* Row 2: visualizer effect picker */}
