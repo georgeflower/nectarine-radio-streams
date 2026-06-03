@@ -10,7 +10,18 @@ type Props = {
   title: string;
   songId?: string;
   onExit: () => void;
+  onStyleChange?: (s: VisualizerStyle) => void;
 };
+
+const VIZ_STYLES: { id: VisualizerStyle; label: string }[] = [
+  { id: "starfield", label: "Starfield" },
+  { id: "bars", label: "Bars" },
+  { id: "plasma", label: "Plasma" },
+  { id: "oscilloscope", label: "Scope" },
+  { id: "tunnel", label: "Tunnel" },
+  { id: "rings", label: "Rings" },
+  { id: "particles", label: "Particles" },
+];
 
 type ScrollMode =
   | "sinus"
