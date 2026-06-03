@@ -422,7 +422,7 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
       <BeatOverlay analyser={analyser} enabled />
 
       {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
-      {scrollOn && mode !== "infobar" && (
+      {scrollOn && (
         <canvas
           ref={canvasRef}
           aria-hidden="true"
@@ -431,8 +431,8 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
         />
       )}
 
-      {/* Info-bar mode: big now-playing strip pinned to the bottom. */}
-      {scrollOn && mode === "infobar" && (
+      {/* Info bar: big now-playing strip pinned to the bottom. Independent of scroller. */}
+      {infobarOn && (
         <div
           className="absolute left-0 right-0 pointer-events-none"
           style={{
