@@ -101,9 +101,7 @@ const FRAMES: string[][] = [
     "........................",
     "........................",
   ],
-  // 4 — STANDING (long S-neck, plump body, two orange legs).
-  // Body re-centered around col ~11.5 (sprite center=12) so a scaleX flip
-  // for "look left/right" only swaps the head silhouette — the body stays put.
+  // 4 — STANDING (full sprite, kept for compatibility / fallback)
   [
     "........KKKK............",
     ".......KWWWWK...........",
@@ -124,8 +122,54 @@ const FRAMES: string[][] = [
     ".........KKKKKKK........",
     "........O.....O.........",
   ],
+  // 5 — STANDING BODY only (no head/neck). Rendered as a static layer
+  // beneath the head sprite while the goose is perched, so the body
+  // never flips when the head turns side-to-side.
+  [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "..........KWWK..........",
+    "..........KWWWK.........",
+    ".........KWWWWWK........",
+    "........KWLLLLLWK.......",
+    ".......KWLLLLLLLWK......",
+    ".......KWLLLLLLLWK......",
+    "........KGGGGGGGK.......",
+    ".........KKKKKKK........",
+    "........O.....O.........",
+  ],
+  // 6 — STANDING HEAD + NECK only. Drawn facing right; flipped via
+  // scaleX on its own <img> so only the head turns. Pivot is the
+  // base of the neck where it meets the body (col ~10, row ~10).
+  [
+    "........KKKK............",
+    ".......KWWWWK...........",
+    ".......KWEWWWKKDO.......",
+    ".......KWWWWWKD.........",
+    "........KWWWK...........",
+    "........KWWK............",
+    "........KWWK............",
+    ".........KWWK...........",
+    ".........KWWK...........",
+    "..........KWWK..........",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+  ],
+],
 
-];
 
 const COLORS: Record<string, string> = {
   K: "#1a1a1a",
