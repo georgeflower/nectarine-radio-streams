@@ -122,19 +122,19 @@ const FRAMES: string[][] = [
     ".........KKKKKKK........",
     "........O.....O.........",
   ],
-  // 5 — STANDING BODY only (no head/neck). Rendered as a static layer
-  // beneath the head sprite while the goose is perched, so the body
-  // never flips when the head turns side-to-side.
+  // 5 — STANDING BODY (static layer). Includes a short vertical neck
+  // "collar" centered on col 11.5 so the rotating head sprite always
+  // lands on a continuous neck regardless of which way it's turned.
   [
     "........................",
     "........................",
     "........................",
     "........................",
     "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
+    "..........KWWK..........",
+    "..........KWWK..........",
+    "..........KWWK..........",
+    "..........KWWK..........",
     "..........KWWK..........",
     "..........KWWWK.........",
     ".........KWWWWWK........",
@@ -145,9 +145,9 @@ const FRAMES: string[][] = [
     ".........KKKKKKK........",
     "........O.....O.........",
   ],
-  // 6 — STANDING HEAD + NECK only. Drawn facing right; flipped via
-  // scaleX on its own <img> so only the head turns. Pivot is the
-  // base of the neck where it meets the body (col ~10, row ~10).
+  // 6 — STANDING HEAD (rotates / flips). Head + a short upper-neck stub
+  // ending in a symmetric 2-pixel base at row 7 (cols 10-13) so the
+  // mirror around col 11.5 keeps the base exactly on the body's collar.
   [
     "........KKKK............",
     ".......KWWWWK...........",
@@ -155,8 +155,6 @@ const FRAMES: string[][] = [
     ".......KWWWWWKD.........",
     "........KWWWK...........",
     "........KWWK............",
-    "........KWWK............",
-    ".........KWWK...........",
     ".........KWWK...........",
     "..........KWWK..........",
     "........................",
@@ -167,7 +165,10 @@ const FRAMES: string[][] = [
     "........................",
     "........................",
     "........................",
+    "........................",
+    "........................",
   ],
+
 ];
 
 
