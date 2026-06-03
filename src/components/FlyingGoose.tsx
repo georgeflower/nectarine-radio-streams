@@ -376,7 +376,10 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     const setLanded = () => {
       const { cx, topY, sink } = perchTarget();
       lookDir = Math.random() < 0.5 ? -1 : 1;
-      img.src = frames[STAND_FRAME];
+      lookScale = lookDir; // snap on first land — no flip-through-zero on arrival
+      // Crossfade from flying sprite to standing sprite for a soft settle.
+      imgStand.style.opacity = "1";
+      img.style.opacity = "0";
       takeoffAt = elapsed + sitDuration();
       nextLookAt = elapsed + rand(700, 1600);
       x = cx;
@@ -386,7 +389,8 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     const startle = () => {
       mode = "startle";
       startleEnd = elapsed + 1400;
-      img.src = frames[STAND_FRAME];
+      imgStand.style.opacity = "1";
+      img.style.opacity = "0";
       showStartleBubble();
     };
 
@@ -400,7 +404,11 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
       nextPerchAt = elapsed + nextPerchDelay();
       frameIdx = 2;
       img.src = frames[frameIdx];
+      // Fade flying sprite back in, stand out.
+      img.style.opacity = "1";
+      imgStand.style.opacity = "0";
     };
+
 
     const tick = (now: number) => {
       const dtMs = Math.min(64, now - last);
