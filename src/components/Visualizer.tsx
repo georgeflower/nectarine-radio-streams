@@ -1091,7 +1091,7 @@ export const useBpm = (
       if (recomputeTimerRef.current) clearTimeout(recomputeTimerRef.current);
       analyser.smoothingTimeConstant = previousSmoothing;
     };
-  }, [analyser, enabled]);
+  }, [analyser, enabled, trackKey]);
 
   return state;
 };
