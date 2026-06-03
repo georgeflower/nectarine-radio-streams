@@ -236,6 +236,10 @@ const Cracktro = ({
     try { localStorage.setItem("cracktro-boing", boingOn ? "1" : "0"); } catch { /* ignore */ }
   }, [boingOn]);
 
+  // Geese can request the Boing ball to appear so they can play with it.
+  const [gooseWantsBall, setGooseWantsBall] = useState(false);
+
+
 
 
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
