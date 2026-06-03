@@ -304,9 +304,14 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
 
     const startBallMode = (now: number) => {
       ball.active = true;
-      ball.until = now + rand(45000, 120000);
+      ball.until = now + rand(18000, 32000);
       ball.catcherIndex = Math.random() < 0.5 ? 0 : 1;
       ball.cooldownUntil = now + 600;
+      // Wake any sitting geese so they can play.
+      geese.forEach((g) => {
+        g.isSitting = false;
+        g.sitUntil = 0;
+      });
       onBallModeChangeRef.current?.(true);
       showBubble(0, "Kickoff! ⚽", 1600);
       showBubble(1, "Pass!", 1600);
@@ -314,7 +319,7 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
 
     const stopBallMode = (now: number) => {
       ball.active = false;
-      nextBallModeAt = now + rand(90000, 200000);
+      nextBallModeAt = now + rand(140000, 260000);
       onBallModeChangeRef.current?.(false);
     };
 
