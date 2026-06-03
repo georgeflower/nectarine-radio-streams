@@ -1,6 +1,4 @@
 import { useEffect, useRef } from "react";
-import { boingBall } from "@/lib/boingBallState";
-
 
 /**
  * Classic Amiga "Boing" ball — checkered sphere bouncing across the screen.
@@ -140,23 +138,10 @@ const BoingBall = () => {
     };
 
     const tick = (now: number) => {
-      // Opt 3: pause physics and rendering while the tab is hidden.
-      if (document.hidden) {
-        last = now; // reset so dt doesn't spike on resume
-        raf = requestAnimationFrame(tick);
-        return;
-      }
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
 
       const r = R();
-
-      // Consume any pending external kick (e.g. from a goose head-butt).
-      if (boingBall.pendingKick) {
-        vx = boingBall.pendingKick.vx;
-        vy = boingBall.pendingKick.vy;
-        boingBall.pendingKick = null;
-      }
 
       // Physics
       vy += gravity * dt;
@@ -186,34 +171,24 @@ const BoingBall = () => {
       }
 
       // Squash decays
+      // (approximation: based on vy magnitude near floor)
       const distToFloor = floor - (y + r);
       const nearFloor = Math.max(0, 1 - distToFloor / (r * 0.6));
       squash = Math.max(squash, nearFloor * 0.35);
 
       spin += spinDir * 1.8 * dt;
 
-      // Publish state for other components.
-      boingBall.x = x;
-      boingBall.y = y;
-      boingBall.r = r;
-      boingBall.vx = vx;
-      boingBall.vy = vy;
-
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBall(x, y, r, squash);
 
       raf = requestAnimationFrame(tick);
     };
-    boingBall.mounted = true;
     raf = requestAnimationFrame(tick);
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
-      boingBall.mounted = false;
-      boingBall.pendingKick = null;
     };
-
   }, []);
 
   return (
