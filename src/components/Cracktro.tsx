@@ -513,10 +513,17 @@ const Cracktro = ({
         >
           <div className="mx-auto max-w-6xl px-6 text-center">
             <p
+              key={title || "unknown"}
               className="neon font-extrabold uppercase leading-tight tracking-wider"
               style={{ fontSize: "clamp(2rem, 5.5vw, 5rem)" }}
             >
-              {title || "Unknown Tune"}
+              {(title || "Unknown Tune").split("").map((ch, i) =>
+                ch === " " ? (
+                  <span key={i}>&nbsp;</span>
+                ) : (
+                  <span key={i} data-goose-letter={ch} className="inline-block">{ch}</span>
+                )
+              )}
             </p>
             <p
               className="neon-accent font-bold uppercase tracking-widest mt-2"
