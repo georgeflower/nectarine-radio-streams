@@ -21,8 +21,9 @@ import {
   type StreamSource,
 } from "@/lib/nectarine";
 import AudioPlayer from "@/components/AudioPlayer";
-import Visualizer, { useAudioLevel, type VisualizerStyle } from "@/components/Visualizer";
+import Visualizer, { useAudioLevel, useBpm, type VisualizerStyle } from "@/components/Visualizer";
 import BeatOverlay from "@/components/BeatOverlay";
+import Cracktro from "@/components/Cracktro";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
@@ -100,7 +101,7 @@ const ExtLink = ({ href, children, className }: ExtLinkProps) => {
   );
 };
 
-const VIZ_STYLES: VisualizerStyle[] = ["off", "starfield", "bars", "plasma", "oscilloscope", "tunnel", "rings", "particles", "mirror"];
+const VIZ_STYLES: VisualizerStyle[] = ["off", "starfield", "bars", "plasma", "oscilloscope", "tunnel", "rings", "particles"];
 const VIZ_STORAGE_KEY = "nectarine-viz";
 
 type ThemeId = "legacy" | "nectalift" | "nostalgia";
@@ -161,6 +162,8 @@ const Index = () => {
   });
   const inFlight = useRef(false);
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
+  const { bpm, beatIndex, beatCount } = useBpm(analyser, true);
+  const [cracktroOpen, setCracktroOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -279,6 +282,15 @@ const Index = () => {
     <div className="crt min-h-screen relative overflow-x-hidden">
       <Visualizer analyser={analyser} style={vizStyle} />
       <BeatOverlay analyser={analyser} enabled={vizStyle !== "off"} />
+      {cracktroOpen && (
+        <Cracktro
+          analyser={analyser}
+          style={vizStyle}
+          artist={now?.artist ?? ""}
+          title={now?.song ?? ""}
+          onExit={() => setCracktroOpen(false)}
+        />
+      )}
       <main
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"
         style={{
@@ -344,6 +356,14 @@ const Index = () => {
               </button>
             </div>
             <button
+              type="button"
+              onClick={() => setCracktroOpen(true)}
+              className="min-h-11 px-3 py-2 uppercase text-xs tracking-widest rounded-sm border border-primary/60 bg-card/60 text-primary hover:bg-primary hover:text-primary-foreground transition-colors touch-manipulation shrink-0"
+              title="Fullscreen cracktro with sinus scroller"
+            >
+              ▶ Cracktro
+            </button>
+            <button
               onClick={refreshAll}
               className="min-h-11 px-3 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity touch-manipulation shrink-0"
               style={{ boxShadow: "var(--glow-primary)" }}
@@ -407,6 +427,46 @@ const Index = () => {
                     <p className="text-sm">
                       Time Left: <span className="text-foreground">{timeLeft}</span>
                     </p>
+                    <div className="mt-3 flex items-center gap-3 flex-wrap">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        BPM
+                      </span>
+                      <span
+                        className="neon-accent font-bold tabular-nums text-sm min-w-[2.5ch] inline-block"
+                        title="Detected tempo from bass kicks"
+                      >
+                        {bpm > 0 ? bpm : "--"}
+                      </span>
+                      <div
+                        className="flex items-center gap-1"
+                        role="img"
+                        aria-label={`Beat grid, step ${beatIndex + 1} of 4`}
+                      >
+                        {[0, 1, 2, 3].map((i) => {
+                          const active = bpm > 0 && i === beatIndex;
+                          return (
+                            <span
+                              key={i}
+                              className="block rounded-sm border border-border transition-all duration-75"
+                              style={{
+                                width: "0.85rem",
+                                height: "0.85rem",
+                                background: active
+                                  ? "hsl(var(--primary))"
+                                  : "hsl(var(--muted) / 0.4)",
+                                boxShadow: active
+                                  ? `0 0 ${6 + audioLevel * 16}px hsl(var(--primary) / 0.9)`
+                                  : "none",
+                                transform: active ? "scale(1.15)" : "scale(1)",
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground tabular-nums">
+                        · {beatCount} kicks
+                      </span>
+                    </div>
                   </>
                 ) : (
                   <p className="text-muted-foreground text-sm">No track info yet…</p>
