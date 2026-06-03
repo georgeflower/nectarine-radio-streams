@@ -674,6 +674,21 @@ const Cracktro = ({
               </button>
             ))}
           </div>
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Font</span>
+          <select
+            value={skinOverride}
+            onChange={(e) => setSkinOverride(e.target.value as Skin | "auto")}
+            className="min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
+          >
+            <option value="auto">Auto ({autoSkin})</option>
+            <option value="xm">XM</option>
+            <option value="amiga">Amiga</option>
+            <option value="atari">Atari</option>
+            <option value="c64">C64</option>
+            <option value="default">Default</option>
+          </select>
+          <div className="hidden">
+
           <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Info Bar</span>
           <button
             type="button"
