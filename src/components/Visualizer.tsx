@@ -37,6 +37,7 @@ const Visualizer = ({ analyser, style }: Props) => {
   const starsRef = useRef<Star[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const rafRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number>(0);
   const plasmaTRef = useRef(0);
   const idleTRef = useRef(0);
   const tunnelTRef = useRef(0);
