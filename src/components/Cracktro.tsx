@@ -154,14 +154,6 @@ const Cracktro = ({ analyser, style, artist, title, onExit }: Props) => {
         className="absolute left-0 right-0 pointer-events-none"
         style={{ top: "50%", transform: "translateY(-50%)", zIndex: 5 }}
       />
-      <div
-        className="absolute top-4 left-0 right-0 text-center pointer-events-none"
-        style={{ zIndex: 6 }}
-      >
-        <p className="text-xs uppercase tracking-[0.4em] text-primary/80 neon">
-          A Qumran Cracktro · Nectarine Demoscene Radio
-        </p>
-      </div>
       <button
         type="button"
         onClick={onExit}
