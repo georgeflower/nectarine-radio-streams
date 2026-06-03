@@ -22,6 +22,7 @@ import {
 } from "@/lib/nectarine";
 import AudioPlayer from "@/components/AudioPlayer";
 import Visualizer, { useAudioLevel, type VisualizerStyle } from "@/components/Visualizer";
+import BeatOverlay from "@/components/BeatOverlay";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
