@@ -304,6 +304,12 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     };
 
     const tick = (now: number) => {
+      // Opt 3: pause physics and DOM updates while the tab is hidden.
+      if (document.hidden) {
+        last = now; // reset so dt doesn't spike on resume
+        raf = requestAnimationFrame(tick);
+        return;
+      }
       const dtMs = Math.min(64, now - last);
       const dt = dtMs / 1000;
       last = now;

@@ -21,7 +21,7 @@ import {
   type StreamSource,
 } from "@/lib/nectarine";
 import AudioPlayer from "@/components/AudioPlayer";
-import Visualizer, { useAudioLevel, useBpm, type VisualizerStyle } from "@/components/Visualizer";
+import Visualizer, { useBpm, type VisualizerStyle } from "@/components/Visualizer";
 import BeatOverlay from "@/components/BeatOverlay";
 import Cracktro from "@/components/Cracktro";
 import Flag from "@/components/Flag";
@@ -162,10 +162,40 @@ const Index = () => {
     return "starfield";
   });
   const inFlight = useRef(false);
-  const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
   const [bpmDebugOpen, setBpmDebugOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
   const [seekCount, setSeekCount] = useState(0);
+
+  // Opt 2: drive audio-reactive glow effects via a CSS custom property (--al)
+  // set directly on the now-playing article's DOM node.  This avoids calling
+  // setState 60 times/second and re-rendering the full page tree.
+  const nowPlayingRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = nowPlayingRef.current;
+    if (!el) return;
+    if (!analyser || vizStyle === "off" || cracktroOpen) {
+      el.style.setProperty("--al", "0");
+      return;
+    }
+    const buf = new Uint8Array(analyser.frequencyBinCount);
+    const bEnd = Math.max(1, Math.floor(buf.length * 0.08));
+    let smooth = 0;
+    let raf = 0;
+    const tick = () => {
+      if (document.hidden) { raf = requestAnimationFrame(tick); return; }
+      analyser.getByteFrequencyData(buf);
+      let sum = 0;
+      for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
+      smooth = smooth * 0.7 + (sum / bEnd / 255) * 0.3;
+      nowPlayingRef.current?.style.setProperty("--al", smooth.toFixed(4));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.style.setProperty("--al", "0");
+    };
+  }, [analyser, vizStyle, cracktroOpen]);
 
 
   useEffect(() => {
@@ -286,13 +316,14 @@ const Index = () => {
   const now = playlist.now;
   const timeLeft = now ? computeTimeLeft(now.playstart, now.lengthSec) : "-";
   const trackKey = now ? `${now.artist ?? ""}||${now.song ?? ""}||${now.playstart ?? ""}||${seekCount}` : `seek-${seekCount}`;
-  const { bpm, beatIndex, beatCount, status: bpmStatus, beatTimes, windowMs, lastComputeAt, lastBass, period, phaseErrorMs, confidence } = useBpm(analyser, true, trackKey);
+  const { bpm, beatIndex, beatCount, status: bpmStatus, beatTimes, windowMs, lastComputeAt, lastBass, period, phaseErrorMs, confidence } = useBpm(analyser, !cracktroOpen, trackKey);
   void tick;
 
   return (
     <div className="crt min-h-screen relative overflow-x-hidden">
-      <Visualizer analyser={analyser} style={vizStyle} />
-      <BeatOverlay analyser={analyser} enabled={vizStyle !== "off"} />
+      {/* Opt 1: unmount background visuals when cracktro is open to stop their rAF loops. */}
+      {!cracktroOpen && <Visualizer analyser={analyser} style={vizStyle} />}
+      {!cracktroOpen && <BeatOverlay analyser={analyser} enabled={vizStyle !== "off"} />}
       {cracktroOpen && (
         <Cracktro
           analyser={analyser}
@@ -407,11 +438,11 @@ const Index = () => {
 
         <section className="grid gap-4 md:grid-cols-2 min-w-0" aria-label="Demovibes panels">
           <article
+            ref={nowPlayingRef}
             className="panel md:order-2 min-w-0 overflow-hidden transition-shadow duration-100"
             style={{
-              boxShadow: audioLevel > 0
-                ? `0 0 ${8 + audioLevel * 40}px hsl(var(--primary) / ${0.25 + audioLevel * 0.6})`
-                : undefined,
+              // Opt 2: glow intensity driven by --al CSS variable updated outside React render.
+              boxShadow: "0 0 calc(8px + var(--al, 0) * 40px) hsl(var(--primary) / calc(0.25 + var(--al, 0) * 0.6))",
             }}
           >
             <button
@@ -428,13 +459,9 @@ const Index = () => {
                   <>
                     <p
                       className="text-lg font-bold neon break-words"
-                      style={
-                        audioLevel > 0
-                          ? {
-                              textShadow: `0 0 ${4 + audioLevel * 24}px hsl(var(--primary) / ${0.5 + audioLevel * 0.5}), 0 0 ${2 + audioLevel * 8}px hsl(var(--primary) / 0.8)`,
-                            }
-                          : undefined
-                      }
+                      style={{
+                        textShadow: "0 0 calc(4px + var(--al, 0) * 24px) hsl(var(--primary) / calc(0.5 + var(--al, 0) * 0.5)), 0 0 calc(2px + var(--al, 0) * 8px) hsl(var(--primary) / 0.8)",
+                      }}
                     >
                       <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink>{" "}
                       <SongPlatform songId={now.songId} />{" "}
@@ -483,7 +510,7 @@ const Index = () => {
                                   ? "hsl(var(--primary))"
                                   : "hsl(var(--muted) / 0.4)",
                                 boxShadow: active
-                                  ? `0 0 ${6 + audioLevel * 16}px hsl(var(--primary) / 0.9)`
+                                  ? "0 0 calc(6px + var(--al, 0) * 16px) hsl(var(--primary) / 0.9)"
                                   : "none",
                                 transform: active ? "scale(1.15)" : "scale(1)",
                               }}

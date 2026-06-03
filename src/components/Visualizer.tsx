@@ -1,5 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 
+// --- Shared per-analyser audio frame cache (Opt 5) ---
+// Calling getByteFrequencyData() once per animation frame and sharing the
+// result across all hooks that consume the same AnalyserNode significantly
+// reduces CPU cost when multiple hooks (useAudioLevel, useBeat) run in the
+// same frame against the same analyser.
+type FreqFrame = { ts: number; buf: Uint8Array; bass: number; bEnd: number };
+const freqFrameCache = new WeakMap<AnalyserNode, FreqFrame>();
+
+function getFreqFrame(analyser: AnalyserNode): FreqFrame {
+  const now = performance.now();
+  let f = freqFrameCache.get(analyser);
+  // Treat a frame as stale after 4 ms (covers 240 fps; well within one rAF).
+  if (!f || now - f.ts > 4) {
+    const bEnd = Math.max(1, Math.floor(analyser.frequencyBinCount * 0.08));
+    const buf = f?.buf ?? new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(buf);
+    let sum = 0;
+    for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
+    f = { ts: now, buf, bass: sum / bEnd / 255, bEnd };
+    freqFrameCache.set(analyser, f);
+  }
+  return f;
+}
+
 export type VisualizerStyle =
   | "off"
   | "starfield"
@@ -192,11 +216,17 @@ const Visualizer = ({ analyser, style }: Props) => {
         const shaped = Math.pow(Math.max(0, v), 0.65);
         const barH = Math.max(4 * dpr, shaped * h * 0.62);
         const hue = 24 + (i / bins) * 70 + treble * 20;
-        const grad = ctx.createLinearGradient(0, baseline, 0, baseline - barH);
-        grad.addColorStop(0, `hsla(${hue}, 100%, 48%, 0.98)`);
-        grad.addColorStop(0.6, `hsla(${(hue + 18) % 360}, 100%, 62%, 0.95)`);
-        grad.addColorStop(1, `hsla(${(hue + 38) % 360}, 100%, 78%, 0.9)`);
-        ctx.fillStyle = grad;
+        // Opt 7: skip the relatively expensive createLinearGradient for bars
+        // that are at or near minimum height — a flat fill is indistinguishable.
+        if (barH <= 8 * dpr) {
+          ctx.fillStyle = `hsla(${hue}, 100%, 55%, 0.85)`;
+        } else {
+          const grad = ctx.createLinearGradient(0, baseline, 0, baseline - barH);
+          grad.addColorStop(0, `hsla(${hue}, 100%, 48%, 0.98)`);
+          grad.addColorStop(0.6, `hsla(${(hue + 18) % 360}, 100%, 62%, 0.95)`);
+          grad.addColorStop(1, `hsla(${(hue + 38) % 360}, 100%, 78%, 0.9)`);
+          ctx.fillStyle = grad;
+        }
         ctx.fillRect(i * barW + 1.5 * dpr, baseline - barH, Math.max(2 * dpr, barW - 3 * dpr), barH);
       }
 
@@ -328,8 +358,14 @@ const Visualizer = ({ analyser, style }: Props) => {
         if (fade <= 0.02) continue;
         ctx.strokeStyle = `hsla(${a.hue}, 100%, ${48 + bass * 22}%, ${fade * 0.85})`;
         ctx.lineWidth = Math.max(0.5, (1.2 + bass * 1.8) * dpr * fade);
-        ctx.shadowBlur = 14 * dpr * fade;
-        ctx.shadowColor = `hsl(${a.hue}, 100%, 60%)`;
+        // Opt 7: skip expensive shadowBlur for far-away (low-fade) segments
+        // where the glow is nearly invisible.
+        if (fade > 0.15) {
+          ctx.shadowBlur = 14 * dpr * fade;
+          ctx.shadowColor = `hsl(${a.hue}, 100%, 60%)`;
+        } else {
+          ctx.shadowBlur = 0;
+        }
         ctx.beginPath();
         for (let k = 0; k < sides; k++) {
           const angA = (k / sides) * Math.PI * 2 + a.roll;
@@ -350,8 +386,13 @@ const Visualizer = ({ analyser, style }: Props) => {
         if (fade <= 0.05) continue;
         ctx.strokeStyle = `hsla(${s.hue}, 100%, ${60 + bass * 20}%, ${fade * 0.7})`;
         ctx.lineWidth = Math.max(0.5, (1 + bass * 2) * dpr * fade);
-        ctx.shadowBlur = 12 * dpr * fade;
-        ctx.shadowColor = `hsl(${s.hue}, 100%, 60%)`;
+        // Opt 7: skip shadow for rings that are nearly invisible anyway.
+        if (fade > 0.15) {
+          ctx.shadowBlur = 12 * dpr * fade;
+          ctx.shadowColor = `hsl(${s.hue}, 100%, 60%)`;
+        } else {
+          ctx.shadowBlur = 0;
+        }
         ctx.beginPath();
         for (let k = 0; k <= sides; k++) {
           const ang = (k / sides) * Math.PI * 2 + s.roll;
@@ -384,6 +425,11 @@ const Visualizer = ({ analyser, style }: Props) => {
 
       ctx.shadowBlur = 14 * dpr;
       ctx.lineCap = "round";
+      // Opt 7: set a representative shadow color once outside the loop rather
+      // than changing it 96 times per frame.  The per-ring hue variation is
+      // subtle and barely visible in the glow; the fillStyle still carries the
+      // precise color.
+      ctx.shadowColor = "hsl(58, 100%, 60%)";
 
       for (let i = 0; i < bins; i++) {
         let v = 0;
@@ -396,7 +442,6 @@ const Visualizer = ({ analyser, style }: Props) => {
         const angle = (i / bins) * Math.PI * 2 + t;
         const len = (10 + v * Math.min(w, h) * 0.32) * 1;
         const hue = (28 + (i / bins) * 120 + treble * 60) % 360;
-        ctx.shadowColor = `hsl(${hue}, 100%, 60%)`;
         ctx.strokeStyle = `hsla(${hue}, 100%, ${55 + mid * 25}%, 0.95)`;
         ctx.lineWidth = (2 + bass * 2) * dpr;
         const x1 = cx + Math.cos(angle) * baseR;
@@ -429,6 +474,10 @@ const Visualizer = ({ analyser, style }: Props) => {
       const cy = h / 2;
       const ps = particlesRef.current;
 
+      // Opt 7: set shadow once for all particles rather than per-particle (220×/frame).
+      // Fixed representative amber hue; the per-particle hue still controls fillStyle.
+      ctx.shadowBlur = 8 * dpr;
+      ctx.shadowColor = "hsl(50, 100%, 60%)";
       for (const p of ps) {
         if (beat) {
           const a = Math.random() * Math.PI * 2;
@@ -461,8 +510,7 @@ const Visualizer = ({ analyser, style }: Props) => {
 
         const size = (1.4 + mid * 3) * dpr * (0.4 + p.life);
         ctx.fillStyle = `hsla(${p.hue}, 100%, ${60 + bass * 20}%, ${p.life})`;
-        ctx.shadowBlur = 10 * dpr * p.life;
-        ctx.shadowColor = `hsl(${p.hue}, 100%, 60%)`;
+        // Opt 7: shadow set once before the loop (see below); skip per-particle.
         ctx.beginPath();
         ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
         ctx.fill();
@@ -471,6 +519,12 @@ const Visualizer = ({ analyser, style }: Props) => {
     };
 
     const render = (now: number) => {
+      // Opt 3: skip rendering while the tab is hidden to save GPU/CPU.
+      if (document.hidden) {
+        lastTimeRef.current = 0; // reset so dt doesn't spike on resume
+        rafRef.current = requestAnimationFrame(render);
+        return;
+      }
       if (!lastTimeRef.current) lastTimeRef.current = now;
       const dt = Math.min(now - lastTimeRef.current, 50); // cap at 50ms to avoid huge jumps
       lastTimeRef.current = now;
@@ -526,14 +580,15 @@ export const useAudioLevel = (analyser: AnalyserNode | null, enabled = true): nu
       setLevel(0);
       return;
     }
-    const buf = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>;
-    const bEnd = Math.max(1, Math.floor(buf.length * 0.08));
 
     const tick = () => {
-      analyser.getByteFrequencyData(buf);
-      let sum = 0;
-      for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
-      const bass = sum / bEnd / 255;
+      // Opt 3: skip processing while the tab is hidden.
+      if (document.hidden) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      // Opt 5: reuse the shared analyser frame (avoids a duplicate getByteFrequencyData call).
+      const { bass } = getFreqFrame(analyser);
       smoothRef.current = smoothRef.current * 0.7 + bass * 0.3;
       setLevel(smoothRef.current);
       rafRef.current = requestAnimationFrame(tick);
@@ -563,14 +618,15 @@ export const useBeat = (analyser: AnalyserNode | null, enabled = true): number =
       setPulse(0);
       return;
     }
-    const buf = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>;
-    const bEnd = Math.max(1, Math.floor(buf.length * 0.08));
 
     const tick = () => {
-      analyser.getByteFrequencyData(buf);
-      let sum = 0;
-      for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
-      const bass = sum / bEnd / 255;
+      // Opt 3: skip processing while the tab is hidden.
+      if (document.hidden) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      // Opt 5: reuse the shared analyser frame.
+      const { bass } = getFreqFrame(analyser);
       const avg = avgRef.current;
       avgRef.current = avg * 0.92 + bass * 0.08;
       if (cooldownRef.current > 0) cooldownRef.current -= 1;
@@ -762,6 +818,11 @@ export const useBpm = (
 
     // ---- rAF loop: build onset envelope + tick metronome ----
     const tick = () => {
+      // Opt 3: pause envelope sampling while the tab is hidden.
+      if (document.hidden) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
       analyser.getByteFrequencyData(buf);
       const now = performance.now();
 
