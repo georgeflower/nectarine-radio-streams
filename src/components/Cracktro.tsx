@@ -530,7 +530,7 @@ const Cracktro = ({
                   <span className="text-muted-foreground text-[10px] mr-1">{o.time}</span>
                   <span className="font-semibold text-primary">{o.username}</span>
                   <span className="text-muted-foreground">: </span>
-                  <span>{o.text}</span>
+                  <span>{renderWithSmileys(o.text)}</span>
                 </li>
               ))}
             </ul>
