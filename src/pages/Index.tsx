@@ -597,14 +597,14 @@ const Index = () => {
         </p>
 
         <footer className="mt-10 text-center text-xs text-muted-foreground">
-          this is a compact viewer of the amazing Nectarine Demoscene Radio -{" "}
+          this is a compact viewer made by Qumran of the amazing Nectarine Demoscene Radio -{" "}
           <a
             className="text-primary hover:underline"
-            href="https://scenestream.net/"
+            href="https://scenestam.net/"
             target="_blank"
             rel="noopener noreferrer"
           >
-            https://scenestream.net/
+            https://scenestam.net/
           </a>
         </footer>
       </main>
