@@ -470,12 +470,16 @@ const Visualizer = ({ analyser, style }: Props) => {
       ctx.shadowBlur = 0;
     };
 
-    const render = () => {
+    const render = (now: number) => {
+      if (!lastTimeRef.current) lastTimeRef.current = now;
+      const dt = Math.min(now - lastTimeRef.current, 50); // cap at 50ms to avoid huge jumps
+      lastTimeRef.current = now;
+
       switch (style) {
         case "bars": renderBars(); break;
         case "plasma": renderPlasma(); break;
         case "oscilloscope": renderOscilloscope(); break;
-        case "starfield": renderStarfield(); break;
+        case "starfield": renderStarfield(dt); break;
         case "tunnel": renderTunnel(); break;
         case "rings": renderRings(); break;
         case "particles": renderParticles(); break;
