@@ -73,14 +73,14 @@ const Cracktro = ({ analyser, style, artist, title, onExit }: Props) => {
 
     const resize = () => {
       canvas.width = Math.floor(window.innerWidth * dpr);
-      canvas.height = Math.floor(160 * dpr);
+      canvas.height = Math.floor(220 * dpr);
       canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `160px`;
+      canvas.style.height = `220px`;
     };
     resize();
     window.addEventListener("resize", resize);
 
-    const text = `   *** GREETINGS FROM QUMRAN ***   NOW SPINNING:  ${(artist || "UNKNOWN ARTIST").toUpperCase()}  ---  ${(title || "UNKNOWN TUNE").toUpperCase()}   ***   STAY TUNED TO NECTARINE DEMOSCENE RADIO   ***   PRESS ESC TO RETURN TO REALITY   ***   `;
+    const text = `   NOW SPINNING:  ${(artist || "UNKNOWN ARTIST").toUpperCase()}  ---  ${(title || "UNKNOWN TUNE").toUpperCase()}   ***   STAY TUNED TO NECTARINE DEMOSCENE RADIO   ***   PRESS ESC TO RETURN TO REALITY   ***   `;
     const fontSize = 64 * dpr;
     ctx.font = `900 ${fontSize}px "Impact","Arial Black","Helvetica Neue",sans-serif`;
     ctx.textBaseline = "middle";
@@ -93,41 +93,44 @@ const Cracktro = ({ analyser, style, artist, title, onExit }: Props) => {
     let raf = 0;
 
     const tick = () => {
-      // re-set the font in case dpr/font fallback changed.
       ctx.font = `900 ${fontSize}px "Impact","Arial Black","Helvetica Neue",sans-serif`;
       ctx.textBaseline = "middle";
       const w = canvas.width;
       const h = canvas.height;
       ctx.clearRect(0, 0, w, h);
-      // Light translucent band so text stays readable over the visualizer.
       ctx.fillStyle = "hsla(20, 25%, 6%, 0.45)";
       ctx.fillRect(0, 0, w, h);
 
       const cy = h / 2;
-      const amp = h * 0.22;
-      let x = w - (offset % totalW);
-      for (let i = 0; i < chars.length * 2; i++) {
-        const idx = i % chars.length;
-        const cw = widths[idx];
+      const amp = h * 0.38;
+      // Restart only once the whole string has cleared the left edge.
+      if (w - offset + totalW < 0) {
+        offset = 0;
+      }
+      let x = w - offset;
+      for (let i = 0; i < chars.length; i++) {
+        const cw = widths[i];
         if (x + cw < 0) {
           x += cw;
           continue;
         }
         if (x > w) break;
-        const y = cy + Math.sin(x * 0.012 + t) * amp;
+        // Travelling wave: the crest sweeps rightward through the letters
+        // instead of every glyph bobbing in lockstep.
+        const phase = x * 0.014 - t * 2.2;
+        const y = cy + Math.sin(phase) * amp;
         const hue = (x * 0.4 + t * 60) % 360;
         ctx.shadowColor = `hsl(${hue}, 100%, 55%)`;
         ctx.shadowBlur = 18 * dpr;
         ctx.fillStyle = `hsl(${hue}, 100%, 68%)`;
-        ctx.fillText(chars[idx], x, y);
-        // Inner highlight
+        ctx.fillText(chars[i], x, y);
         ctx.shadowBlur = 0;
         ctx.fillStyle = `hsl(${(hue + 30) % 360}, 100%, 88%)`;
-        ctx.fillText(chars[idx], x, y - 2 * dpr);
+        ctx.fillText(chars[i], x, y - 2 * dpr);
         x += cw;
       }
 
-      offset += 3 * dpr;
+      offset += 6 * dpr;
       t += 0.05;
       raf = requestAnimationFrame(tick);
     };
@@ -151,14 +154,6 @@ const Cracktro = ({ analyser, style, artist, title, onExit }: Props) => {
         className="absolute left-0 right-0 pointer-events-none"
         style={{ top: "50%", transform: "translateY(-50%)", zIndex: 5 }}
       />
-      <div
-        className="absolute top-4 left-0 right-0 text-center pointer-events-none"
-        style={{ zIndex: 6 }}
-      >
-        <p className="text-xs uppercase tracking-[0.4em] text-primary/80 neon">
-          A Qumran Cracktro · Nectarine Demoscene Radio
-        </p>
-      </div>
       <button
         type="button"
         onClick={onExit}
