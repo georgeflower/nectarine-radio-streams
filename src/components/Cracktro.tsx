@@ -149,7 +149,7 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
     `   NOW SPINNING:  ${(artist || "UNKNOWN ARTIST").toUpperCase()}  ---  ${(title || "UNKNOWN TUNE").toUpperCase()}` +
     `${platform ? `   ON  ${platform.toUpperCase()}` : ""}` +
     `${rating !== undefined ? `   ★ ${rating.toFixed(2)}` : ""}` +
-    `   ***   STAY TUNED TO NECTARINE DEMOSCENE RADIO   ***   GREETZ TO ALL THE SCENERS OUT THERE   ***   PRESS ESC TO RETURN TO REALITY   ***   `
+    `   ***   STAY TUNED TO NECTARINE DEMOSCENE RADIO   ***   GREETZ TO ALL THE SCENERS OUT THERE   ***   `
   ), [artist, title, platform, rating]);
 
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
