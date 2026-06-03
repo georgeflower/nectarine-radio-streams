@@ -701,9 +701,10 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
             position: "absolute",
             inset: 0,
             opacity: 0,
-            // Pivot at the base of the neck (col ~10, row ~10 in the 24x18 grid
-            // ⇒ 30px,30px at PIXEL=3) so scale/rotation feel anchored.
-            transformOrigin: `${10 * PIXEL}px ${10 * PIXEL}px`,
+            // Pivot at the CENTER of the neck base (cols 10-13 ⇒ centerline
+            // 11.5) so a horizontal flip keeps the neck attached to the body.
+            transformOrigin: `${11.5 * PIXEL}px ${10 * PIXEL}px`,
+
             transition: "opacity 260ms ease-out",
           }}
         />
