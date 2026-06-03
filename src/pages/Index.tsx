@@ -164,6 +164,7 @@ const Index = () => {
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
   const [bpmDebugOpen, setBpmDebugOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
+  const [seekCount, setSeekCount] = useState(0);
 
 
   useEffect(() => {
