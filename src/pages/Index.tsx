@@ -162,6 +162,8 @@ const Index = () => {
   });
   const inFlight = useRef(false);
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
+  const { bpm, beatIndex, beatCount } = useBpm(analyser, true);
+  const [cracktroOpen, setCracktroOpen] = useState(false);
 
   useEffect(() => {
     try {
