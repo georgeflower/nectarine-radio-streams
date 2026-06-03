@@ -21,7 +21,7 @@ import {
   type StreamSource,
 } from "@/lib/nectarine";
 import AudioPlayer from "@/components/AudioPlayer";
-import Visualizer, { type VisualizerStyle } from "@/components/Visualizer";
+import Visualizer, { useAudioLevel, type VisualizerStyle } from "@/components/Visualizer";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
