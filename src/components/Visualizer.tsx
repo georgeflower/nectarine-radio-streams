@@ -279,38 +279,85 @@ const Visualizer = ({ analyser, style }: Props) => {
     const renderTunnel = () => {
       const w = canvas.width;
       const h = canvas.height;
-      const { bass, mid, treble } = sampleAudio();
-      tunnelTRef.current += 0.02 + bass * 0.08;
+      const { bass, mid, treble, rms } = sampleAudio();
+      // Forward speed boosted by bass; minimum idle motion.
+      tunnelTRef.current += 0.04 + bass * 0.18 + rms * 0.08;
       const t = tunnelTRef.current;
 
-      ctx.fillStyle = "hsla(20, 25%, 6%, 0.28)";
+      // Motion-blur background trail.
+      ctx.fillStyle = "hsla(20, 25%, 6%, 0.32)";
       ctx.fillRect(0, 0, w, h);
 
       const cx = w / 2;
       const cy = h / 2;
-      const maxR = Math.hypot(w, h) * 0.6;
-      const ringCount = 22;
-      ctx.lineWidth = (2 + bass * 3) * dpr;
-      ctx.shadowBlur = 16 * dpr;
+      const slices = 36;
+      const baseR = Math.min(w, h) * 0.55;
+      // Tunnel curvature amplitude reacts to mid.
+      const curve = (60 + mid * 220) * dpr;
+      // Twist per unit z, reacts to treble.
+      const twist = 0.18 + treble * 0.5;
 
-      for (let i = 0; i < ringCount; i++) {
-        const phase = (i / ringCount + (t % 1)) % 1;
-        const r = phase * maxR;
-        const wobble = Math.sin(t * 1.5 + i * 0.7) * (10 + mid * 60) * dpr;
-        const hue = (28 + i * 12 + t * 30 + treble * 80) % 360;
-        const alpha = 1 - phase;
-        ctx.shadowColor = `hsla(${hue}, 100%, 60%, ${alpha})`;
-        ctx.strokeStyle = `hsla(${hue}, 100%, ${55 + bass * 20}%, ${alpha})`;
+      // Walk slices from far (z=slices) to near (z=0). Use phase offset so
+      // slices feel like they're flying toward camera continuously.
+      type Slice = { x: number; y: number; r: number; roll: number; hue: number; depth: number };
+      const sl: Slice[] = [];
+      for (let i = slices; i >= 1; i--) {
+        const phase = (i - (t % 1)) ;
+        const z = phase + 0.4; // avoid div by 0
+        const depth = z / slices; // 0..1 (near..far)
+        // Path through the tunnel: sin/cos in z create twisting bends.
+        const px = Math.sin(z * 0.35 + t * 0.6) * curve;
+        const py = Math.cos(z * 0.28 + t * 0.4) * curve * 0.8;
+        // Perspective shrink.
+        const persp = 1 / z;
+        const r = baseR * persp * (1 + bass * 0.25);
+        const roll = z * twist + t * 0.7;
+        const hue = (28 + z * 18 + t * 30 + treble * 60) % 360;
+        sl.push({ x: cx + px, y: cy + py, r, roll, hue, depth });
+      }
+
+      // Connecting wireframe between consecutive slices (12-gon segments).
+      const sides = 14;
+      ctx.lineCap = "round";
+      for (let i = 0; i < sl.length - 1; i++) {
+        const a = sl[i];
+        const b = sl[i + 1];
+        const fade = 1 - a.depth;
+        if (fade <= 0.02) continue;
+        ctx.strokeStyle = `hsla(${a.hue}, 100%, ${48 + bass * 22}%, ${fade * 0.85})`;
+        ctx.lineWidth = Math.max(0.5, (1.2 + bass * 1.8) * dpr * fade);
+        ctx.shadowBlur = 14 * dpr * fade;
+        ctx.shadowColor = `hsl(${a.hue}, 100%, 60%)`;
         ctx.beginPath();
-        ctx.ellipse(
-          cx + Math.cos(t + i * 0.3) * wobble,
-          cy + Math.sin(t * 0.8 + i * 0.4) * wobble,
-          Math.max(1, r),
-          Math.max(1, r * 0.85),
-          t * 0.5 + i,
-          0,
-          Math.PI * 2
-        );
+        for (let k = 0; k < sides; k++) {
+          const angA = (k / sides) * Math.PI * 2 + a.roll;
+          const angB = (k / sides) * Math.PI * 2 + b.roll;
+          const ax = a.x + Math.cos(angA) * a.r;
+          const ay = a.y + Math.sin(angA) * a.r;
+          const bx = b.x + Math.cos(angB) * b.r;
+          const by = b.y + Math.sin(angB) * b.r;
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(bx, by);
+        }
+        ctx.stroke();
+      }
+
+      // Ring outlines on each slice (subtle, foreground only).
+      for (const s of sl) {
+        const fade = Math.pow(1 - s.depth, 1.4);
+        if (fade <= 0.05) continue;
+        ctx.strokeStyle = `hsla(${s.hue}, 100%, ${60 + bass * 20}%, ${fade * 0.7})`;
+        ctx.lineWidth = Math.max(0.5, (1 + bass * 2) * dpr * fade);
+        ctx.shadowBlur = 12 * dpr * fade;
+        ctx.shadowColor = `hsl(${s.hue}, 100%, 60%)`;
+        ctx.beginPath();
+        for (let k = 0; k <= sides; k++) {
+          const ang = (k / sides) * Math.PI * 2 + s.roll;
+          const x = s.x + Math.cos(ang) * s.r;
+          const y = s.y + Math.sin(ang) * s.r;
+          if (k === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
         ctx.stroke();
       }
       ctx.shadowBlur = 0;
