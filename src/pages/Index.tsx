@@ -290,6 +290,7 @@ const Index = () => {
           style={vizStyle}
           artist={now?.artist ?? ""}
           title={now?.song ?? ""}
+          songId={now?.songId}
           onExit={() => setCracktroOpen(false)}
         />
       )}
