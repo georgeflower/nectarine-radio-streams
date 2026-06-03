@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Visualizer, { type VisualizerStyle } from "./Visualizer";
 import BeatOverlay from "./BeatOverlay";
 import FloatingWindow from "./FloatingWindow";
+import FlyingGoose from "./FlyingGoose";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 import type { OnelinerEntry, QueueEntry } from "@/lib/nectarine";
 import { renderWithSmileys } from "@/lib/smileys";
@@ -219,6 +220,13 @@ const Cracktro = ({
     try { localStorage.setItem("cracktro-skin-override", skinOverride); } catch { /* ignore */ }
   }, [skinOverride]);
   const skin: Skin = skinOverride === "auto" ? autoSkin : skinOverride;
+
+  const [gooseOn, setGooseOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("cracktro-goose") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("cracktro-goose", gooseOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [gooseOn]);
 
 
 
@@ -470,6 +478,7 @@ const Cracktro = ({
     >
       <Visualizer analyser={analyser} style={style === "off" ? "tunnel" : style} />
       <BeatOverlay analyser={analyser} enabled />
+      {gooseOn && <FlyingGoose />}
 
       {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
       {scrollOn && (
@@ -700,6 +709,21 @@ const Cracktro = ({
             aria-pressed={infobarOn}
           >
             {infobarOn ? "ON" : "OFF"}
+          </button>
+
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Goose</span>
+          <button
+            type="button"
+            onClick={() => setGooseOn((v) => !v)}
+            className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              gooseOn
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-pressed={gooseOn}
+            title="Toggle flying goose"
+          >
+            {gooseOn ? "ON" : "OFF"}
           </button>
         </div>
 

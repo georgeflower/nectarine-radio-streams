@@ -1,49 +1,38 @@
-# Platform-themed scroller skins
+## Animated Pixel Goose for Fullscreen Mode
 
-Add an automatic scroller "skin" that overrides the glyph rendering style based on the currently playing song's platform. The existing scroller motion modes (sinus / bouncy / zoomer / wobble / copper / vector / infobar) stay untouched — the **skin** only changes how each glyph is *painted* (colors, fill pattern, font feel), not how it moves.
+Add a lifelike flying goose, drawn entirely in code (no image asset), as a toggleable overlay in fullscreen mode.
 
-## Skins (from the reference images)
+### 1. New component: `src/components/FlyingGoose.tsx`
 
-1. **Amiga skin** — gold/bronze letters on black with a diagonal hatched/striped fill and a darker outline. Classic Amiga cracktro chunky look. Trigger: `platformName` contains "amiga".
-2. **Atari skin** — bold blocky letters split into horizontal color bands top→bottom: red / yellow / green / blue (the Atari rainbow logo palette). Trigger: `platformName` contains "atari".
-3. **C64 skin** — chunky letters with horizontal red / yellow / green bands (no blue), slight pixel feel. Trigger: `platformName` contains "commodore 64" or "c64".
-4. **XM / Fasttracker 2 skin** — white pixel-style font with a dark blue chrome/wave gradient overlay, evoking the FT2 logo. Trigger: `platformName` contains "xm" or the song title ends in `.xm`, or platform is "FastTracker"/"Extended Module".
-5. **Default skin** — current neon HSL rainbow (unchanged), used when no platform match.
+A self-contained full-viewport overlay (`fixed inset-0 pointer-events-none z-[60]`) containing a single goose that wanders the screen.
 
-## How the skin is applied
+**Goose rendering (code-built, pixel-art style inspired by the reference sprite):**
+- Render via inline SVG with `shape-rendering: crispEdges` using small rectangles to mimic the pixel sprite (white body, black outline, orange beak + feet, light-grey wing underside).
+- 4 wing-pose frames defined as pixel arrays: wings-up, mid-down, wings-down, mid-up. Cycle frames ~8 fps for a natural flap.
+- Goose drawn facing right by default; horizontal facing handled via `transform: scaleX(-1)` when flying leftward so the head always leads.
+- Rotate the sprite slightly (≈ velocity angle clamped to ±25°) so it banks/pitches into its direction — head stays first.
 
-In `src/components/Cracktro.tsx`'s scroller `tick()` loop, the per-glyph paint block (currently the `ctx.shadowColor` / `fillStyle` / `fillText` calls) is replaced with a `paintGlyph(ctx, char, x, y, w, h, dpr, t, skin)` dispatch that runs a skin-specific painter. Motion (`y`, `scale`, `rotation`, `skewY`) computed by the current `mode` switch is reused as-is.
+**Lifelike movement (requestAnimationFrame loop):**
+- Position (x, y) and velocity (vx, vy) in component refs.
+- A slowly drifting target heading (Perlin-ish: accumulate small random angle deltas every ~400–900 ms) plus gentle sinusoidal bobbing on the perpendicular axis for a flapping glide feel.
+- Soft speed variation (occasional glide vs. flap-burst — flap frame rate ties to current speed).
+- Edge handling: when nearing viewport bounds, steer the heading back inward (smooth turn, not teleport) so direction changes look intentional.
+- Occasional "banking turn" events that pick a new target heading 60–140° away.
 
-Each skin painter draws the glyph using `clip()` on the glyph path so band/stripe fills are confined to the letter shape:
+### 2. Toggle in fullscreen controls (`src/pages/Index.tsx`)
 
-- **Amiga**: gold gradient (`#3a1e08 → #d4a13a → #fff1c2 → #b8741c`) + a repeating 45° dark stripe pattern multiplied on top, dark outline stroke.
-- **Atari**: clip to glyph, fill 4 horizontal bands (red `#d8341c`, yellow `#f5c518`, green `#3aa84a`, blue `#1f5fd6`) across the glyph's vertical extent. Tiny gap between bands.
-- **C64**: same as Atari but 3 bands (red `#c44a3a`, yellow `#e8c352`, green `#5aa86a`), no blue.
-- **XM/FT2**: white base fill + dark-blue chrome gradient (`#0a1a3a → #2a6acc → #b8d0ff → #1a3a7a`) running vertically through the glyph, subtle horizontal scan-line shimmer (`t`-animated) to mimic the FT2 logo waves; use a chunky pixel-y font stack (`"VT323","Press Start 2P",monospace`) for these letters only.
+- Add `GOOSE_STORAGE_KEY` and a `usePersistedBool` `goose` state (default `false`).
+- Add a toggle button in the fullscreen controls bar (next to scanlines toggle) with a 🪿 / "Goose" label and `aria-pressed`.
+- Render `<FlyingGoose />` only when `isFullscreen && goose`.
 
-The hue-cycle / shadow-glow paint is kept only for the **Default** skin.
+### Technical notes
 
-## Platform detection
+- No new deps; pure React + SVG + rAF.
+- Cleanup rAF and resize listener on unmount/toggle-off.
+- Respects `prefers-reduced-motion`: if set, goose drifts more slowly and skips frame cycling.
+- Pointer-events disabled so it never intercepts clicks on floating windows.
 
-New helper `pickSkin(platformName, title): Skin` in `Cracktro.tsx`:
+### Files
 
-```text
-lower = platformName.toLowerCase()
-if "amiga" in lower            -> "amiga"
-if "atari" in lower            -> "atari"
-if "c64" in lower or "commodore 64" in lower -> "c64"
-if "xm" in lower or "fasttracker" in lower or title endsWith ".xm" -> "xm"
-otherwise                       -> "default"
-```
-
-The skin is recomputed (via `useMemo`) whenever `platform` or `title` changes, and added to the scroller `useEffect`'s deps so a track change immediately repaints in the new style.
-
-## Out of scope
-
-- No new user-facing toggle for skins — fully automatic from platform metadata.
-- No changes to motion modes, controls bar, info-bar mode, beat detection, or visualizer.
-- No image assets imported; all four skins are drawn procedurally on the existing 2D canvas.
-
-## Files touched
-
-- `src/components/Cracktro.tsx` — add `Skin` type, `pickSkin()`, four painter functions, swap the per-glyph paint block to dispatch by skin, extend scroller `useEffect` deps.
+- create `src/components/FlyingGoose.tsx`
+- edit `src/pages/Index.tsx` (state + toggle button + conditional render)
