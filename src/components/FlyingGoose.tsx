@@ -427,8 +427,10 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
         if (p) {
           perchEl = p.el;
           perchChar = p.char;
+          perchKind = p.kind;
+          perchOffset = p.offset;
           mode = "approach";
-          targetSpeed = 110; // normal cruise — do NOT sprint to the letter
+          targetSpeed = 110; // normal cruise — do NOT sprint to the perch
         } else {
           nextPerchAt = elapsed + rand(4000, 9000);
         }
@@ -439,12 +441,10 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
           mode = "fly";
           nextPerchAt = elapsed + nextPerchDelay();
         } else {
-          const r = perchEl!.getBoundingClientRect();
-          const tx = r.left + r.width / 2;
-          const ty = r.top - SPRITE_H / 2 + 2;
-          // Steer heading toward landing point, keep normal flight speed.
+          const { cx, topY, sink } = perchTarget();
+          const tx = cx;
+          const ty = topY - SPRITE_H + sink + SPRITE_H / 2;
           targetHeading = Math.atan2(ty - y, tx - x);
-          // Snap to land when close enough.
           if (Math.hypot(tx - x, ty - y) < 8) {
             x = tx;
             y = ty;
