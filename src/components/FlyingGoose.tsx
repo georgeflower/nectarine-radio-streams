@@ -454,9 +454,15 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
         const dy = g.targetY - g.y;
         const dist = Math.hypot(dx, dy) || 1;
         const isCatcher = ballReady && index === ball.catcherIndex;
-        const desiredSpeed = ballReady ? (isCatcher ? 185 : 130) : g.speed;
-        g.vx += ((dx / dist) * desiredSpeed - g.vx) * Math.min(1, dt * 2.3);
-        g.vy += ((dy / dist) * desiredSpeed - g.vy) * Math.min(1, dt * 2.3);
+        const sittingSettled = g.isSitting && dist < 6;
+        if (sittingSettled) {
+          g.vx = 0;
+          g.vy = 0;
+        } else {
+          const desiredSpeed = ballReady ? (isCatcher ? 185 : 130) : g.speed;
+          g.vx += ((dx / dist) * desiredSpeed - g.vx) * Math.min(1, dt * 2.3);
+          g.vy += ((dy / dist) * desiredSpeed - g.vy) * Math.min(1, dt * 2.3);
+        }
 
         // Soft repulsion: never let geese overlap, especially during ball play.
         if (ballReady) {
