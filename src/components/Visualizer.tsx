@@ -51,10 +51,10 @@ const Visualizer = ({ analyser, style }: Props) => {
     if (!ctx) return;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    let freq: Uint8Array<ArrayBuffer> | null = analyser
+    const freq: Uint8Array<ArrayBuffer> | null = analyser
       ? (new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>)
       : null;
-    let time: Uint8Array<ArrayBuffer> | null = analyser
+    const time: Uint8Array<ArrayBuffer> | null = analyser
       ? (new Uint8Array(new ArrayBuffer(analyser.fftSize)) as Uint8Array<ArrayBuffer>)
       : null;
 
@@ -604,6 +604,90 @@ export type BpmDebug = {
   lastBass: number; // 0..1 current short-term bass envelope
 };
 
+type BpmSample = { t: number; bass: number; onset: number };
+
+const clampTempo = (tempo: number) => {
+  let bpm = tempo;
+  while (bpm < 60) bpm *= 2;
+  while (bpm > 180) bpm /= 2;
+  return Math.round(bpm);
+};
+
+const estimateBpmFromSamples = (samples: BpmSample[]) => {
+  if (samples.length < 90) return { bpm: 0, beatTimes: [] as number[], confidence: 0 };
+
+  const span = samples[samples.length - 1].t - samples[0].t;
+  const avgDt = span / Math.max(1, samples.length - 1);
+  if (!Number.isFinite(avgDt) || avgDt <= 0) return { bpm: 0, beatTimes: [] as number[], confidence: 0 };
+
+  const bassMean = samples.reduce((sum, s) => sum + s.bass, 0) / samples.length;
+  const onsetMean = samples.reduce((sum, s) => sum + s.onset, 0) / samples.length;
+  const bassStd = Math.sqrt(samples.reduce((sum, s) => sum + (s.bass - bassMean) ** 2, 0) / samples.length);
+  const onsetStd = Math.sqrt(samples.reduce((sum, s) => sum + (s.onset - onsetMean) ** 2, 0) / samples.length);
+  if (bassStd < 0.002 && onsetStd < 0.001) return { bpm: 0, beatTimes: [] as number[], confidence: 0 };
+
+  const signal = samples.map((s) => {
+    const energyPeak = bassStd > 0 ? Math.max(0, (s.bass - bassMean) / bassStd) : 0;
+    const onsetPeak = onsetStd > 0 ? Math.max(0, (s.onset - onsetMean) / onsetStd) : 0;
+    return energyPeak * 0.45 + onsetPeak * 0.9;
+  });
+
+  let bestBpm = 0;
+  let bestScore = 0;
+  for (let bpm = 60; bpm <= 180; bpm += 1) {
+    const lag = Math.round((60000 / bpm) / avgDt);
+    if (lag < 2 || lag >= signal.length * 0.75) continue;
+    let sum = 0;
+    let a = 0;
+    let b = 0;
+    for (let i = lag; i < signal.length; i++) {
+      const x = signal[i];
+      const y = signal[i - lag];
+      sum += x * y;
+      a += x * x;
+      b += y * y;
+    }
+    const score = a > 0 && b > 0 ? sum / Math.sqrt(a * b) : 0;
+    if (score > bestScore) {
+      bestScore = score;
+      bestBpm = bpm;
+    }
+  }
+
+  if (bestBpm === 0) return { bpm: 0, beatTimes: [] as number[], confidence: 0 };
+
+  const period = 60000 / bestBpm;
+  const signalMean = signal.reduce((sum, v) => sum + v, 0) / signal.length;
+  const signalStd = Math.sqrt(signal.reduce((sum, v) => sum + (v - signalMean) ** 2, 0) / signal.length);
+  const peakThreshold = signalMean + signalStd * 0.15;
+  const minGap = Math.max(220, period * 0.42);
+  const peakTimes: number[] = [];
+  for (let i = 1; i < signal.length - 1; i++) {
+    if (signal[i] < peakThreshold || signal[i] < signal[i - 1] || signal[i] < signal[i + 1]) continue;
+    const t = samples[i].t;
+    if (peakTimes.length === 0 || t - peakTimes[peakTimes.length - 1] >= minGap) {
+      peakTimes.push(t);
+    } else if (signal[i] > signal[Math.max(0, i - 1)]) {
+      peakTimes[peakTimes.length - 1] = t;
+    }
+  }
+
+  if (peakTimes.length < 3) {
+    let anchorIndex = 0;
+    for (let i = 1; i < signal.length; i++) {
+      if (signal[i] > signal[anchorIndex]) anchorIndex = i;
+    }
+    let t = samples[anchorIndex].t;
+    while (t - period >= samples[0].t) t -= period;
+    while (t <= samples[samples.length - 1].t) {
+      peakTimes.push(t);
+      t += period;
+    }
+  }
+
+  return { bpm: clampTempo(bestBpm), beatTimes: peakTimes, confidence: bestScore };
+};
+
 export const useBpm = (
   analyser: AnalyserNode | null,
   enabled = true,
@@ -625,9 +709,12 @@ export const useBpm = (
   const longAvgRef = useRef(0);
   const cooldownRef = useRef(0);
   const beatTimesRef = useRef<number[]>([]);
+  const samplesRef = useRef<BpmSample[]>([]);
   const beatIdxRef = useRef(0);
   const beatCountRef = useRef(0);
   const lastBassRef = useRef(0);
+  const prevBassRef = useRef(0);
+  const lastCountedBeatRef = useRef(0);
 
   useEffect(() => {
     if (!analyser || !enabled) {
@@ -638,6 +725,8 @@ export const useBpm = (
       });
       return;
     }
+    const previousSmoothing = analyser.smoothingTimeConstant;
+    analyser.smoothingTimeConstant = Math.min(previousSmoothing, 0.45);
     const buf = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>;
     const bEnd = Math.max(1, Math.floor(buf.length * 0.1));
 
@@ -649,13 +738,20 @@ export const useBpm = (
       shortAvgRef.current = shortAvgRef.current * 0.6 + bass * 0.4;
       longAvgRef.current = longAvgRef.current * 0.97 + bass * 0.03;
       lastBassRef.current = shortAvgRef.current;
+      const now = performance.now();
+      const onset = Math.max(0, shortAvgRef.current - prevBassRef.current);
+      prevBassRef.current = shortAvgRef.current;
+      samplesRef.current.push({ t: now, bass: shortAvgRef.current, onset });
+      const sampleCutoff = now - WINDOW_MS - 2500;
+      while (samplesRef.current.length && samplesRef.current[0].t < sampleCutoff) {
+        samplesRef.current.shift();
+      }
       if (cooldownRef.current > 0) cooldownRef.current -= 1;
 
       const s = shortAvgRef.current;
       const l = longAvgRef.current;
-      if (s > l * 1.25 && s > 0.05 && cooldownRef.current <= 0) {
+      if ((s > l * 1.08 + 0.012 || onset > 0.012) && s > 0.04 && cooldownRef.current <= 0) {
         cooldownRef.current = 8;
-        const now = performance.now();
         beatTimesRef.current.push(now);
         const cutoff = now - 12000;
         while (beatTimesRef.current.length && beatTimesRef.current[0] < cutoff) {
@@ -675,30 +771,26 @@ export const useBpm = (
     const recompute = () => {
       const now = performance.now();
       const cutoff = now - WINDOW_MS;
-      const recent = beatTimesRef.current.filter((t) => t >= cutoff);
+      const sampleWindow = samplesRef.current.filter((s) => s.t >= cutoff);
+      const tempo = estimateBpmFromSamples(sampleWindow);
+      const recent = tempo.beatTimes.length ? tempo.beatTimes.filter((t) => t >= cutoff) : beatTimesRef.current.filter((t) => t >= cutoff);
       const lastBass = lastBassRef.current;
-      let bpm = 0;
+      const bpm = tempo.confidence >= 0.06 ? tempo.bpm : 0;
       let status: BpmStatus;
 
       if (lastBass < 0.02) {
         status = "silent";
-      } else if (recent.length === 0) {
+      } else if (sampleWindow.length < 90) {
         status = "listening";
-      } else if (recent.length < 4) {
+      } else if (bpm === 0 || recent.length < 3) {
         status = "detecting";
       } else {
-        const intervals: number[] = [];
-        for (let i = 1; i < recent.length; i++) intervals.push(recent[i] - recent[i - 1]);
-        const valid = intervals.filter((d) => d > 270 && d < 1500);
-        if (valid.length < 3) {
-          status = "detecting";
-        } else {
-          const sorted = [...valid].sort((a, b) => a - b);
-          const median = sorted[Math.floor(sorted.length / 2)];
-          bpm = Math.round(60000 / median);
-          while (bpm < 60) bpm *= 2;
-          while (bpm > 180) bpm = Math.round(bpm / 2);
-          status = "locked";
+        status = "locked";
+        const newBeats = recent.filter((t) => t > lastCountedBeatRef.current).length;
+        if (newBeats > 0) {
+          beatCountRef.current += newBeats;
+          beatIdxRef.current = (beatIdxRef.current + newBeats) % 4;
+          lastCountedBeatRef.current = recent[recent.length - 1];
         }
       }
 
@@ -706,6 +798,8 @@ export const useBpm = (
         ...st,
         bpm,
         status,
+        beatIndex: beatIdxRef.current,
+        beatCount: beatCountRef.current,
         beatTimes: recent.slice(),
         lastComputeAt: now,
         lastBass,
@@ -720,6 +814,7 @@ export const useBpm = (
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (intervalRef.current) clearInterval(intervalRef.current);
       clearTimeout(initTimer);
+      analyser.smoothingTimeConstant = previousSmoothing;
     };
   }, [analyser, enabled]);
 
