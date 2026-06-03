@@ -597,10 +597,11 @@ export const useBpm = (
 ): { bpm: number; beatIndex: number; beatCount: number } => {
   const [state, setState] = useState({ bpm: 0, beatIndex: 0, beatCount: 0 });
   const rafRef = useRef<number | null>(null);
-  const avgRef = useRef(0);
+  const intervalRef = useRef<number | null>(null);
+  const shortAvgRef = useRef(0);
+  const longAvgRef = useRef(0);
   const cooldownRef = useRef(0);
-  const lastBeatTsRef = useRef(0);
-  const intervalsRef = useRef<number[]>([]);
+  const beatTimesRef = useRef<number[]>([]);
   const beatIdxRef = useRef(0);
   const beatCountRef = useRef(0);
 
@@ -610,53 +611,74 @@ export const useBpm = (
       return;
     }
     const buf = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>;
-    const bEnd = Math.max(1, Math.floor(buf.length * 0.08));
+    const bEnd = Math.max(1, Math.floor(buf.length * 0.1));
 
     const tick = () => {
       analyser.getByteFrequencyData(buf);
       let sum = 0;
       for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
       const bass = sum / bEnd / 255;
-      const avg = avgRef.current;
-      avgRef.current = avg * 0.92 + bass * 0.08;
+      // Fast envelope (short window) vs slow baseline (long window).
+      shortAvgRef.current = shortAvgRef.current * 0.6 + bass * 0.4;
+      longAvgRef.current = longAvgRef.current * 0.97 + bass * 0.03;
       if (cooldownRef.current > 0) cooldownRef.current -= 1;
-      if (bass > avg * 1.22 && bass > 0.06 && cooldownRef.current <= 0) {
+
+      const s = shortAvgRef.current;
+      const l = longAvgRef.current;
+      // Trigger when short-term energy spikes above long-term baseline.
+      if (s > l * 1.25 && s > 0.05 && cooldownRef.current <= 0) {
+        cooldownRef.current = 8; // ~130ms @ 60fps -> caps at ~460 BPM
         const now = performance.now();
-        cooldownRef.current = 8;
-        if (lastBeatTsRef.current > 0) {
-          const delta = now - lastBeatTsRef.current;
-          // accept reasonable musical intervals (40–220 BPM)
-          if (delta > 270 && delta < 1500) {
-            const arr = intervalsRef.current;
-            arr.push(delta);
-            if (arr.length > 16) arr.shift();
-            const sorted = [...arr].sort((a, b) => a - b);
-            const median = sorted[Math.floor(sorted.length / 2)];
-            const bpm = Math.round(60000 / median);
-            beatCountRef.current += 1;
-            beatIdxRef.current = (beatIdxRef.current + 1) % 4;
-            setState({ bpm, beatIndex: beatIdxRef.current, beatCount: beatCountRef.current });
-          } else if (delta >= 1500) {
-            // reset tempo tracking on long gaps
-            intervalsRef.current = [];
-            beatCountRef.current += 1;
-            beatIdxRef.current = (beatIdxRef.current + 1) % 4;
-            setState((s) => ({ bpm: s.bpm, beatIndex: beatIdxRef.current, beatCount: beatCountRef.current }));
-          }
-        } else {
-          // first beat — register it so the grid pulses immediately
-          beatCountRef.current += 1;
-          setState((s) => ({ ...s, beatCount: beatCountRef.current }));
+        beatTimesRef.current.push(now);
+        // Keep last 12 seconds of beats.
+        const cutoff = now - 12000;
+        while (beatTimesRef.current.length && beatTimesRef.current[0] < cutoff) {
+          beatTimesRef.current.shift();
         }
-        lastBeatTsRef.current = now;
+        beatCountRef.current += 1;
+        beatIdxRef.current = (beatIdxRef.current + 1) % 4;
+        setState((st) => ({
+          bpm: st.bpm,
+          beatIndex: beatIdxRef.current,
+          beatCount: beatCountRef.current,
+        }));
       }
       rafRef.current = requestAnimationFrame(tick);
     };
+
+    const recompute = () => {
+      const now = performance.now();
+      const cutoff = now - 10000; // last 10s window
+      const recent = beatTimesRef.current.filter((t) => t >= cutoff);
+      if (recent.length < 4) {
+        setState((st) => ({ ...st, bpm: 0 }));
+        return;
+      }
+      const intervals: number[] = [];
+      for (let i = 1; i < recent.length; i++) intervals.push(recent[i] - recent[i - 1]);
+      // Reject obvious outliers (40–220 BPM range).
+      const valid = intervals.filter((d) => d > 270 && d < 1500);
+      if (valid.length < 3) {
+        setState((st) => ({ ...st, bpm: 0 }));
+        return;
+      }
+      const sorted = [...valid].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      let bpm = Math.round(60000 / median);
+      // Fold into a musical range (60–180).
+      while (bpm < 60) bpm *= 2;
+      while (bpm > 180) bpm = Math.round(bpm / 2);
+      setState((st) => ({ ...st, bpm }));
+    };
+
     rafRef.current = requestAnimationFrame(tick);
+    intervalRef.current = window.setInterval(recompute, 5000);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [analyser, enabled]);
+
 
   return state;
 };
