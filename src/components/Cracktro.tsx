@@ -221,6 +221,13 @@ const Cracktro = ({
   }, [skinOverride]);
   const skin: Skin = skinOverride === "auto" ? autoSkin : skinOverride;
 
+  const [gooseOn, setGooseOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("cracktro-goose") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("cracktro-goose", gooseOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [gooseOn]);
+
 
 
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
