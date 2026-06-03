@@ -51,10 +51,10 @@ const Visualizer = ({ analyser, style }: Props) => {
     if (!ctx) return;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    let freq: Uint8Array<ArrayBuffer> | null = analyser
+    const freq: Uint8Array<ArrayBuffer> | null = analyser
       ? (new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>)
       : null;
-    let time: Uint8Array<ArrayBuffer> | null = analyser
+    const time: Uint8Array<ArrayBuffer> | null = analyser
       ? (new Uint8Array(new ArrayBuffer(analyser.fftSize)) as Uint8Array<ArrayBuffer>)
       : null;
 
@@ -775,7 +775,7 @@ export const useBpm = (
       const tempo = estimateBpmFromSamples(sampleWindow);
       const recent = tempo.beatTimes.length ? tempo.beatTimes.filter((t) => t >= cutoff) : beatTimesRef.current.filter((t) => t >= cutoff);
       const lastBass = lastBassRef.current;
-      let bpm = tempo.confidence >= 0.06 ? tempo.bpm : 0;
+      const bpm = tempo.confidence >= 0.06 ? tempo.bpm : 0;
       let status: BpmStatus;
 
       if (lastBass < 0.02) {
