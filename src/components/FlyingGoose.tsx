@@ -395,20 +395,49 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
             g.targetY = rand(80, Math.max(120, h - 120));
       }
 
-      // Sitting behaviour — periodically the goose lands and rests for a few seconds.
+      // Sitting behaviour — periodically the goose lands on a song letter or
+      // floating-window header and rests for a few seconds.
       geese.forEach((g) => {
         if (!g.active || g.isAway || ball.active) return;
         if (!g.isSitting && now >= g.nextSitAt) {
-          g.isSitting = true;
-          g.sitUntil = now + rand(4000, 9000);
-          g.targetX = Math.max(60, Math.min(w - SPRITE_W - 60, g.x));
-          g.targetY = h - SPRITE_H - 20;
-          g.headSwayAccum = 0;
+          const perches = Array.from(
+            document.querySelectorAll<HTMLElement>('[data-goose-letter],[data-goose-perch="window"]'),
+          ).filter((el) => {
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0 && r.top > 60 && r.top < h - 40;
+          });
+          if (perches.length) {
+            const perch = perches[Math.floor(Math.random() * perches.length)];
+            const r = perch.getBoundingClientRect();
+            g.isSitting = true;
+            g.sitUntil = now + rand(5000, 11000);
+            g.perchEl = perch;
+            g.perchFacingLeft = Math.random() < 0.5;
+            g.targetX = r.left + r.width / 2 - SPRITE_W / 2;
+            g.targetY = r.top - SPRITE_H + 4;
+            g.headSwayAccum = 0;
+          } else {
+            // No perch available — try again soon, keep flying.
+            g.nextSitAt = now + rand(4000, 8000);
+          }
         } else if (g.isSitting && now >= g.sitUntil) {
           g.isSitting = false;
+          g.perchEl = null;
           g.nextSitAt = now + rand(25000, 55000);
           g.targetX = rand(80, Math.max(120, w - 80));
           g.targetY = rand(80, Math.max(120, h - 220));
+        } else if (g.isSitting && g.perchEl) {
+          // Track perch in case it moves (draggable windows, scrolling text).
+          if (!g.perchEl.isConnected) {
+            g.isSitting = false;
+            g.perchEl = null;
+            g.nextSitAt = now + rand(2000, 5000);
+            g.targetY = rand(80, Math.max(120, h - 220));
+          } else {
+            const r = g.perchEl.getBoundingClientRect();
+            g.targetX = r.left + r.width / 2 - SPRITE_W / 2;
+            g.targetY = r.top - SPRITE_H + 4;
+          }
         }
       });
 
