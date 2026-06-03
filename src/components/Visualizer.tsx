@@ -131,14 +131,15 @@ const Visualizer = ({ analyser, style }: Props) => {
       hue: 28 + Math.random() * 40,
     }));
 
-    const renderStarfield = () => {
+    const renderStarfield = (dt: number) => {
       const w = canvas.width;
       const h = canvas.height;
       const cx = w / 2;
       const cy = h / 2;
       ctx.fillStyle = "hsla(20, 25%, 6%, 0.2)";
       ctx.fillRect(0, 0, w, h);
-      const speed = 1.4 * dpr;
+      const baseSpeed = 1.4 * dpr; // units per frame at 60fps
+      const speed = baseSpeed * (dt / (1000 / 60)); // scale by actual frame time
       const hue = 28;
       const light = 60;
 
