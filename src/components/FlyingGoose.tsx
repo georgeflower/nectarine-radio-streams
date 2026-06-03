@@ -526,18 +526,33 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
           }
         }
 
-        g.frameAccum += dtMs;
-        const frameDur = ballReady ? 95 : 125;
-        if (g.frameAccum >= frameDur) {
-          g.frameAccum -= frameDur;
-          g.frame = (g.frame + 1) % 4;
-          const img = imgsRef.current[index];
-          if (img) img.src = frameSets[index][g.frame];
+        const img = imgsRef.current[index];
+        if (g.isSitting) {
+          if (img && img.dataset.pose !== "sit") {
+            img.src = frameSets[index][3];
+            img.dataset.pose = "sit";
+          }
+          g.headSwayAccum += dtMs;
+        } else {
+          g.frameAccum += dtMs;
+          const frameDur = ballReady ? 95 : 125;
+          if (g.frameAccum >= frameDur) {
+            g.frameAccum -= frameDur;
+            g.frame = (g.frame + 1) % 3; // cycle flying frames 0,1,2 only
+            if (img) {
+              img.src = frameSets[index][g.frame];
+              img.dataset.pose = "fly";
+            }
+          }
         }
 
         const wrap = wrapsRef.current[index];
         if (wrap) {
-          const facingLeft = g.vx < 0;
+          let facingLeft = g.vx < 0;
+          if (g.isSitting) {
+            // Gentle head sway side-to-side while resting.
+            facingLeft = Math.sin(g.headSwayAccum / 700) < 0;
+          }
           const visible = !g.isAway || g.x <= w + SPRITE_W * 2;
           wrap.style.opacity = visible ? "1" : "0";
           wrap.style.transform = `translate3d(${g.x}px, ${g.y}px, 0) scaleX(${facingLeft ? -1 : 1})`;
