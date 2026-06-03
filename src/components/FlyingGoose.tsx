@@ -191,7 +191,7 @@ const CHAT_LINES: [string, string][] = [
 const LONELY_LINES = [
   "Where's my pal?",
   "Have you seen my goose friend around here?",
-  "I'm so lonely! ��",
+  "I'm so lonely! ;(",
 ];
 
 const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
