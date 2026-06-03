@@ -677,7 +677,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
           }}
         />
         <img
-          ref={imgStandRef}
+          ref={imgStandBodyRef}
           alt=""
           width={SPRITE_W}
           height={SPRITE_H}
@@ -690,6 +690,24 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
             transition: "opacity 260ms ease-out",
           }}
         />
+        <img
+          ref={imgStandHeadRef}
+          alt=""
+          width={SPRITE_W}
+          height={SPRITE_H}
+          style={{
+            imageRendering: "pixelated",
+            display: "block",
+            position: "absolute",
+            inset: 0,
+            opacity: 0,
+            // Pivot at the base of the neck (col ~10, row ~10 in the 24x18 grid
+            // ⇒ 30px,30px at PIXEL=3) so scale/rotation feel anchored.
+            transformOrigin: `${10 * PIXEL}px ${10 * PIXEL}px`,
+            transition: "opacity 260ms ease-out",
+          }}
+        />
+
 
       </div>
       {/* Reaction bubble: WHATTA!! / smileys / pixel heart */}
