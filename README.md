@@ -30,3 +30,10 @@ Example:
 ```
 
 When these are not present, the app falls back to station name and Nectarine track data.
+
+## Fullscreen overlays
+
+In fullscreen cracktro mode, optional overlays can be toggled from the control row:
+
+- Goose (`cracktro-goose` in `localStorage`)
+- Boing (`cracktro-boing` in `localStorage`)
