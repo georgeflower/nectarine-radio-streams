@@ -490,12 +490,22 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
             g.x = w - SPRITE_W + 20;
             g.vx = -Math.abs(g.vx);
           }
-          if (g.y < 40) {
-            g.y = 40;
-            g.vy = Math.abs(g.vy);
-          } else if (g.y > h - SPRITE_H - 20) {
-            g.y = h - SPRITE_H - 20;
-            g.vy = -Math.abs(g.vy);
+          if (g.isSitting) {
+            // Force a real landing on the ground — no bouncing back up.
+            const ground = h - SPRITE_H - 20;
+            if (g.y >= ground - 1) {
+              g.y = ground;
+              g.vy = 0;
+              g.vx = 0;
+            }
+          } else {
+            if (g.y < 40) {
+              g.y = 40;
+              g.vy = Math.abs(g.vy);
+            } else if (g.y > h - SPRITE_H - 20) {
+              g.y = h - SPRITE_H - 20;
+              g.vy = -Math.abs(g.vy);
+            }
           }
         }
 
