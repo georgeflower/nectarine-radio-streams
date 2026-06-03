@@ -1,46 +1,49 @@
-## Goal
+# Platform-themed scroller skins
 
-Bring `useBpm` closer to `librosa.beat.beat_track` by adopting its three signature pieces — a **log-mel onset strength envelope**, an **autocorrelation tempo estimate weighted by a log-Gaussian prior around 125 BPM**, and a **dynamic-programming beat tracker** — and use the result to lock the existing phase-locked metronome.
+Add an automatic scroller "skin" that overrides the glyph rendering style based on the currently playing song's platform. The existing scroller motion modes (sinus / bouncy / zoomer / wobble / copper / vector / infobar) stay untouched — the **skin** only changes how each glyph is *painted* (colors, fill pattern, font feel), not how it moves.
 
-librosa runs offline on the whole file; we can't. The adaptation is to run the same math on a rolling window (~8 s) every ~1 s and feed the result into the metronome we already have, which keeps ticking between updates.
+## Skins (from the reference images)
 
-## What changes vs today
+1. **Amiga skin** — gold/bronze letters on black with a diagonal hatched/striped fill and a darker outline. Classic Amiga cracktro chunky look. Trigger: `platformName` contains "amiga".
+2. **Atari skin** — bold blocky letters split into horizontal color bands top→bottom: red / yellow / green / blue (the Atari rainbow logo palette). Trigger: `platformName` contains "atari".
+3. **C64 skin** — chunky letters with horizontal red / yellow / green bands (no blue), slight pixel feel. Trigger: `platformName` contains "commodore 64" or "c64".
+4. **XM / Fasttracker 2 skin** — white pixel-style font with a dark blue chrome/wave gradient overlay, evoking the FT2 logo. Trigger: `platformName` contains "xm" or the song title ends in `.xm`, or platform is "FastTracker"/"Extended Module".
+5. **Default skin** — current neon HSL rainbow (unchanged), used when no platform match.
 
-Today `useBpm` does:
-- raw spectral flux per frame
-- whitened peak picking → onsets
-- phase/period nudges from median inter-onset
-- coarse autocorrelation only as a re-seed safety net
+## How the skin is applied
 
-The librosa-style upgrade:
-1. **Onset strength** — replace raw flux with log-mel flux: build a small fixed mel filterbank (≈40 bands, 0–8 kHz), apply `log1p` to each band, sum positive frame-to-frame differences, half-wave rectify, normalize. This is exactly `librosa.onset.onset_strength` at low cost and is far more reliable on chip/synth music than full-spectrum flux.
-2. **Tempo estimate** — every ~1 s, autocorrelate the last ~8 s of onset envelope. Multiply the autocorrelation by a **log-Gaussian prior**: `exp(-0.5 · ((log2(bpm/125) / 1.0))²)` (librosa defaults, with our 125 BPM seed). Pick the peak in 60–200 BPM. This is what librosa does in `librosa.beat.tempo`.
-3. **DP beat tracker** — over the same 8 s onset envelope at the estimated period `P`, run Ellis' DP:
-   - score[i] = onset[i] + max over j<i of (score[j] − λ · (log((i−j)/P))²)
-   - backtrack from the best end frame to get a beat sequence
-   - λ ≈ 100 (librosa's `tightness=100` default)
-   This gives a clean, globally-consistent beat grid for the window, immune to single-onset noise.
-4. **Drive the metronome from the DP grid** — take the last DP beat time + period as the new phase reference. If it agrees with the current metronome within ±period·0.1, just nudge (`alpha` small) so the click stays smooth. If it disagrees beyond that and the DP confidence is high, snap.
-5. **Confidence** — derived from how strong the chosen autocorrelation peak is vs the rest, and how consistent successive DP grids are. Replaces the current heuristic confidence so the existing "don't update often once confident" behavior still works.
+In `src/components/Cracktro.tsx`'s scroller `tick()` loop, the per-glyph paint block (currently the `ctx.shadowColor` / `fillStyle` / `fillText` calls) is replaced with a `paintGlyph(ctx, char, x, y, w, h, dpr, t, skin)` dispatch that runs a skin-specific painter. Motion (`y`, `scale`, `rotation`, `skewY`) computed by the current `mode` switch is reused as-is.
 
-The existing metronome rAF loop, lazy-start on first audio, silence detection, octave folding, displayed-BPM smoothing, and debug panel all stay. Only the onset extractor, the prior-weighted tempo estimator, and the DP beat selector are new/replaced.
+Each skin painter draws the glyph using `clip()` on the glyph path so band/stripe fills are confined to the letter shape:
 
-## Technical notes
+- **Amiga**: gold gradient (`#3a1e08 → #d4a13a → #fff1c2 → #b8741c`) + a repeating 45° dark stripe pattern multiplied on top, dark outline stroke.
+- **Atari**: clip to glyph, fill 4 horizontal bands (red `#d8341c`, yellow `#f5c518`, green `#3aa84a`, blue `#1f5fd6`) across the glyph's vertical extent. Tiny gap between bands.
+- **C64**: same as Atari but 3 bands (red `#c44a3a`, yellow `#e8c352`, green `#5aa86a`), no blue.
+- **XM/FT2**: white base fill + dark-blue chrome gradient (`#0a1a3a → #2a6acc → #b8d0ff → #1a3a7a`) running vertically through the glyph, subtle horizontal scan-line shimmer (`t`-animated) to mimic the FT2 logo waves; use a chunky pixel-y font stack (`"VT323","Press Start 2P",monospace`) for these letters only.
 
-- **Mel filterbank** — precomputed once: 40 triangular filters over the analyser's `frequencyBinCount` linear bins, mel-spaced 0–8 kHz. Stored as `Float32Array[]` of bin-weights so per-frame cost is one dot product per band.
-- **Onset envelope buffer** — circular `Float32Array` sized to 8 s at the rAF rate (~60 Hz → 480 samples). Cheap.
-- **Autocorrelation** — only lags corresponding to 60–200 BPM (≈ 18–60 frames at 60 Hz). ~40 lags × 480 samples ≈ 19 k mults every second. Trivial.
-- **Prior** — `weight(lag) = exp(-0.5 · (log2(bpmAtLag/125))²)`, applied as a multiplier on the autocorrelation before peak-picking.
-- **DP** — O(N·W) where N≈480 frames, W ≈ ±20% of P ≈ ~20 frames → ~10 k ops per recompute. Also trivial.
-- **Re-seed cadence** — DP runs at most once per second; metronome rAF keeps ticking at 60 Hz between updates. Once `confidence > 0.7`, DP recomputes drop to once every ~2 s to satisfy the "don't update often when confident" rule.
-- **No new deps**, no audio worklet, no change to `Visualizer` rendering, `Cracktro`, audio routing, or the debug panel layout (same fields: `bpm`, `period`, `confidence`, `phaseErrorMs`, `windowMs`, `beatTimes`, `lastBass`).
+The hue-cycle / shadow-glow paint is kept only for the **Default** skin.
+
+## Platform detection
+
+New helper `pickSkin(platformName, title): Skin` in `Cracktro.tsx`:
+
+```text
+lower = platformName.toLowerCase()
+if "amiga" in lower            -> "amiga"
+if "atari" in lower            -> "atari"
+if "c64" in lower or "commodore 64" in lower -> "c64"
+if "xm" in lower or "fasttracker" in lower or title endsWith ".xm" -> "xm"
+otherwise                       -> "default"
+```
+
+The skin is recomputed (via `useMemo`) whenever `platform` or `title` changes, and added to the scroller `useEffect`'s deps so a track change immediately repaints in the new style.
+
+## Out of scope
+
+- No new user-facing toggle for skins — fully automatic from platform metadata.
+- No changes to motion modes, controls bar, info-bar mode, beat detection, or visualizer.
+- No image assets imported; all four skins are drawn procedurally on the existing 2D canvas.
 
 ## Files touched
 
-- `src/components/Visualizer.tsx` — replace the onset extractor and the autocorrelation/re-seed block inside `useBpm` with the mel-flux + prior-weighted autocorr + DP beat tracker. Wire its output into the existing metronome state.
-
-## Non-goals
-
-- No librosa runtime in the browser (it's Python/C). We port the algorithm, not the package.
-- No change to UI, visual styles, scrollers, or audio pipeline.
-- No offline/whole-track analysis — strictly the rolling-window adaptation.
+- `src/components/Cracktro.tsx` — add `Skin` type, `pickSkin()`, four painter functions, swap the per-glyph paint block to dispatch by skin, extend scroller `useEffect` deps.
