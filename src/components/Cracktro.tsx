@@ -734,6 +734,21 @@ const Cracktro = ({
           >
             {gooseOn ? "ON" : "OFF"}
           </button>
+
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Boing</span>
+          <button
+            type="button"
+            onClick={() => setBoingOn((v) => !v)}
+            className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              boingOn
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-pressed={boingOn}
+            title="Toggle Amiga boing ball"
+          >
+            {boingOn ? "ON" : "OFF"}
+          </button>
         </div>
 
         {/* Row: floating panel toggles */}
