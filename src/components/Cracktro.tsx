@@ -174,7 +174,7 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
 
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
   useEffect(() => {
-    if (!scrollOn || mode === "infobar") return;
+    if (!scrollOn) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
