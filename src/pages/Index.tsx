@@ -211,8 +211,10 @@ const Index = () => {
     } catch {
       // ignore
     }
-    return "legacy";
+    return "nostalgia";
   });
+
+  const [scanlines, setScanlines] = usePersistedBool(SCANLINES_STORAGE_KEY, false);
 
   useEffect(() => {
     const def = THEMES.find((t) => t.id === theme);
@@ -224,6 +226,10 @@ const Index = () => {
       // ignore
     }
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-scanlines", scanlines ? "on" : "off");
+  }, [scanlines]);
 
   const loadEndpoint = useCallback(async (endpoint: Endpoint) => {
     try {
