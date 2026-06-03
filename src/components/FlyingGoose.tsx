@@ -1,18 +1,16 @@
 import { useEffect, useRef } from "react";
+import { SMILEYS } from "@/lib/smileys";
+import type { OnelinerEntry } from "@/lib/nectarine";
 
 /**
  * Pixel-art goose drawn entirely in code (no image asset). Wanders the viewport
- * with smooth heading drift and banking turns. Periodically perches on title
- * letters (elements with `data-goose-letter`) in the on-screen info bar. While
- * perched, head looks side-to-side with subtle idle motion. If the letter it's
- * sitting on disappears or changes, the goose startles, shouts "WHATTA!!" and
- * takes off again.
+ * and periodically perches on title letters (elements with `data-goose-letter`).
+ * Reacts to new oneliner posts: if the post contains a smiley code, the goose
+ * mirrors it in a speech bubble; if it contains the word "goose", a giant
+ * pixel-art heart pops above the bird.
  */
 
 // --- Sprite definition ---------------------------------------------------
-// Each frame is a 20x14 grid of single-character pixel codes.
-// Legend:  . = transparent  K = outline  W = white body  G = grey wing
-//          O = orange beak/feet  E = eye
 const FRAMES: string[][] = [
   // 0 — wings up high
   [
@@ -31,7 +29,6 @@ const FRAMES: string[][] = [
     "....................",
     "....................",
   ],
-  // 1 — wings mid-down
   [
     "....................",
     "....................",
@@ -48,7 +45,6 @@ const FRAMES: string[][] = [
     "....................",
     "....................",
   ],
-  // 2 — wings down (extended)
   [
     "....................",
     "....................",
@@ -65,7 +61,6 @@ const FRAMES: string[][] = [
     "......O..O..........",
     "....................",
   ],
-  // 3 — wings mid-up
   [
     "....................",
     "....KK..............",
@@ -82,7 +77,7 @@ const FRAMES: string[][] = [
     "....................",
     "....................",
   ],
-  // 4 — STANDING: wings folded against body, feet planted, head up
+  // 4 — STANDING
   [
     "....................",
     "....................",
@@ -109,7 +104,7 @@ const COLORS: Record<string, string> = {
   E: "#1a1a1a",
 };
 
-const PIXEL = 3; // px per sprite pixel
+const PIXEL = 3;
 const FRAME_W = 20;
 const FRAME_H = 14;
 const SPRITE_W = FRAME_W * PIXEL;
@@ -133,12 +128,105 @@ function buildFrameSvgs(): string[] {
   });
 }
 
+// --- Smiley detection ----------------------------------------------------
+// Build lookup once; sorted longest-first so e.g. ":facepalm2:" beats ":facepalm:".
+function escapeRegex(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+const SMILEY_KEYS = Object.keys(SMILEYS).sort((a, b) => b.length - a.length);
+const SMILEY_RE = new RegExp(SMILEY_KEYS.map(escapeRegex).join("|"), "i");
+const SMILEY_LC: Record<string, string> = {};
+for (const k of SMILEY_KEYS) SMILEY_LC[k.toLowerCase()] = k;
+
+function firstSmileyUrl(text: string): string | null {
+  const m = SMILEY_RE.exec(text);
+  if (!m) return null;
+  const canonical = SMILEY_LC[m[0].toLowerCase()];
+  return canonical ? SMILEYS[canonical] : null;
+}
+
+// Pixel-art heart SVG (retro 11x10 grid).
+const HEART_SVG = (() => {
+  const grid = [
+    ".RR...RR.",
+    "RRRR.RRRR",
+    "RRRRRRRRR",
+    "RRRRRRRRR",
+    "RRRRRRRRR",
+    ".RRRRRRR.",
+    "..RRRRR..",
+    "...RRR...",
+    "....R....",
+  ];
+  const px = 5;
+  const W = grid[0].length * px;
+  const H = grid.length * px;
+  const rects: string[] = [];
+  grid.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === "R") {
+        rects.push(
+          `<rect x="${x * px}" y="${y * px}" width="${px}" height="${px}" fill="#ff3355"/>`,
+        );
+        // pixel outline
+        rects.push(
+          `<rect x="${x * px}" y="${y * px}" width="${px}" height="${px}" fill="none" stroke="#1a1a1a" stroke-width="0.6"/>`,
+        );
+      }
+    }
+  });
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
+  return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+})();
+
 type Mode = "fly" | "approach" | "land" | "startle";
 
-const FlyingGoose = () => {
+type Props = {
+  oneliners?: OnelinerEntry[];
+};
+
+const FlyingGoose = ({ oneliners = [] }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const bubbleRef = useRef<HTMLDivElement | null>(null);
+  // Imperative reaction state shared between effects.
+  const reactionUntilRef = useRef<number>(0);
+  const lastOnelinerKeyRef = useRef<string | null>(null);
+
+  // React to new oneliner entries.
+  useEffect(() => {
+    if (!oneliners.length) return;
+    const top = oneliners[0];
+    const key = `${top.time}|${top.username}|${top.text}`;
+    if (lastOnelinerKeyRef.current === null) {
+      // First load — don't react retroactively.
+      lastOnelinerKeyRef.current = key;
+      return;
+    }
+    if (key === lastOnelinerKeyRef.current) return;
+    lastOnelinerKeyRef.current = key;
+
+    const bubble = bubbleRef.current;
+    if (!bubble) return;
+
+    const text = top.text || "";
+    const mentionsGoose = /\bgoose\b/i.test(text);
+    const smileyUrl = firstSmileyUrl(text);
+
+    let content = "";
+    if (mentionsGoose) {
+      content = `<img src="${HEART_SVG}" alt="heart" style="image-rendering:pixelated;display:block;width:55px;height:auto" />`;
+    } else if (smileyUrl) {
+      content = `<img src="${smileyUrl}" alt="" style="display:block;height:28px;width:auto" />`;
+    } else {
+      return;
+    }
+
+    bubble.innerHTML = content;
+    bubble.style.opacity = "1";
+    bubble.style.transform = "scale(1)";
+    reactionUntilRef.current = performance.now() + 2600;
+  }, [oneliners]);
 
   useEffect(() => {
     const frames = buildFrameSvgs().map(
@@ -172,16 +260,20 @@ const FlyingGoose = () => {
     let last = performance.now();
     let raf = 0;
 
+    // Random helpers for landing/perch cadence.
+    const rand = (a: number, b: number) => a + Math.random() * (b - a);
+    const nextPerchDelay = () => rand(8000, 28000); // ms between landings
+    const sitDuration = () => rand(5000, 22000); // ms sat on a letter
+
     // Perch state
     let mode: Mode = "fly";
     let perchEl: HTMLElement | null = null;
     let perchChar = "";
-    let nextPerchAt = 6000 + Math.random() * 7000;
+    let nextPerchAt = nextPerchDelay();
     let takeoffAt = 0;
     let nextLookAt = 0;
     let lookDir: 1 | -1 = 1;
     let startleEnd = 0;
-    let landingFacingLeft = false;
 
     const wrap = wrapRef.current;
     const img = imgRef.current;
@@ -201,19 +293,27 @@ const FlyingGoose = () => {
       return { el, char: el.getAttribute("data-goose-letter") || "" };
     };
 
-    const showBubble = (show: boolean) => {
-      bubble.style.opacity = show ? "1" : "0";
-      bubble.style.transform = show ? "scale(1)" : "scale(0.7)";
+    const showStartleBubble = () => {
+      bubble.innerHTML = "WHATTA!!";
+      bubble.style.opacity = "1";
+      bubble.style.transform = "scale(1)";
+      reactionUntilRef.current = performance.now() + 1400;
+    };
+
+    const hideBubbleIfExpired = (now: number) => {
+      if (reactionUntilRef.current && now >= reactionUntilRef.current) {
+        bubble.style.opacity = "0";
+        bubble.style.transform = "scale(0.7)";
+        reactionUntilRef.current = 0;
+      }
     };
 
     const setLanded = () => {
       const r = perchEl!.getBoundingClientRect();
-      landingFacingLeft = Math.random() < 0.5;
-      lookDir = landingFacingLeft ? -1 : 1;
+      lookDir = Math.random() < 0.5 ? -1 : 1;
       img.src = frames[STAND_FRAME];
-      takeoffAt = elapsed + 6000 + Math.random() * 7000;
-      nextLookAt = elapsed + 700 + Math.random() * 900;
-      // Snap to letter
+      takeoffAt = elapsed + sitDuration();
+      nextLookAt = elapsed + rand(700, 1600);
       x = r.left + r.width / 2;
       y = r.top - SPRITE_H / 2;
     };
@@ -222,20 +322,17 @@ const FlyingGoose = () => {
       mode = "startle";
       startleEnd = elapsed + 1400;
       img.src = frames[STAND_FRAME];
-      showBubble(true);
-      // shake direction prep — keep facing as was
+      showStartleBubble();
     };
 
     const takeoff = () => {
       mode = "fly";
       perchEl = null;
-      showBubble(false);
-      // Pop upward with a heading away from edges
       heading = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
       targetHeading = heading;
       speed = 180;
       targetSpeed = 130;
-      nextPerchAt = elapsed + 7000 + Math.random() * 9000;
+      nextPerchAt = elapsed + nextPerchDelay();
       frameIdx = 2;
       img.src = frames[frameIdx];
     };
@@ -246,12 +343,20 @@ const FlyingGoose = () => {
       const dt = dtMs / 1000;
       elapsed += dtMs;
 
-      // ===== Validate perch (used by land + startle) =====
+      hideBubbleIfExpired(now);
+
       const perchAlive = () =>
         !!perchEl &&
         perchEl.isConnected &&
         (perchEl.getAttribute("data-goose-letter") || "") === perchChar &&
         perchEl.textContent === perchChar;
+
+      // Reposition the bubble above the goose every frame while visible.
+      const positionBubble = (cx: number, cy: number) => {
+        if (!reactionUntilRef.current) return;
+        bubble.style.left = `${cx}px`;
+        bubble.style.top = `${cy - SPRITE_H / 2 - 6}px`;
+      };
 
       if (mode === "land") {
         if (!perchAlive()) {
@@ -260,17 +365,16 @@ const FlyingGoose = () => {
           const r = perchEl!.getBoundingClientRect();
           const cx = r.left + r.width / 2;
           const topY = r.top;
-          // Head look toggling
           if (elapsed >= nextLookAt) {
             lookDir = (lookDir === 1 ? -1 : 1) as 1 | -1;
-            nextLookAt = elapsed + 700 + Math.random() * 1200;
+            nextLookAt = elapsed + rand(700, 1900);
           }
           const idleBob = Math.sin(elapsed / 320) * 0.8;
           const idleSway = Math.sin(elapsed / 540) * 0.6;
-          // Feet sit on top of letter
           const tx = cx - SPRITE_W / 2 + idleSway;
           const ty = topY - SPRITE_H + 2 + idleBob;
           wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) scaleX(${lookDir})`;
+          positionBubble(cx, topY);
           if (elapsed >= takeoffAt) takeoff();
           raf = requestAnimationFrame(tick);
           return;
@@ -278,14 +382,11 @@ const FlyingGoose = () => {
       }
 
       if (mode === "startle") {
-        // Freeze position roughly where it was; shake bubble + sprite
         const shake = Math.sin(elapsed / 35) * 2;
         const baseX = x - SPRITE_W / 2 + shake;
         const baseY = y - SPRITE_H / 2;
         wrap.style.transform = `translate3d(${baseX}px, ${baseY}px, 0) scaleX(${lookDir})`;
-        // Position bubble above
-        bubble.style.left = `${x}px`;
-        bubble.style.top = `${y - SPRITE_H / 2 - 8}px`;
+        positionBubble(x, y);
         if (elapsed >= startleEnd) takeoff();
         raf = requestAnimationFrame(tick);
         return;
@@ -298,68 +399,59 @@ const FlyingGoose = () => {
           perchEl = p.el;
           perchChar = p.char;
           mode = "approach";
+          targetSpeed = 110; // normal cruise — do NOT sprint to the letter
         } else {
-          nextPerchAt = elapsed + 4000 + Math.random() * 4000;
+          nextPerchAt = elapsed + rand(4000, 9000);
         }
       }
 
       if (mode === "approach") {
         if (!perchAlive()) {
           mode = "fly";
-          nextPerchAt = elapsed + 5000 + Math.random() * 6000;
+          nextPerchAt = elapsed + nextPerchDelay();
         } else {
           const r = perchEl!.getBoundingClientRect();
           const tx = r.left + r.width / 2;
           const ty = r.top - SPRITE_H / 2 + 2;
-          // Ease toward landing point
-          const k = Math.min(1, dt * 2.4);
-          x += (tx - x) * k;
-          y += (ty - y) * k;
-          // Facing
-          const facingLeft = tx < x - 1;
-          const scaleX = facingLeft ? -1 : 1;
-          // Flap while approaching (slower)
-          frameAccum += dtMs;
-          const frameDur = 1000 / 5;
-          if (frameAccum >= frameDur) {
-            frameIdx = (frameIdx + 1) % 4;
-            frameAccum = 0;
-            img.src = frames[frameIdx];
-          }
-          wrap.style.transform = `translate3d(${x - SPRITE_W / 2}px, ${y - SPRITE_H / 2}px, 0) scaleX(${scaleX})`;
-          // Arrived?
-          if (Math.hypot(tx - x, ty - y) < 3) {
+          // Steer heading toward landing point, keep normal flight speed.
+          targetHeading = Math.atan2(ty - y, tx - x);
+          // Snap to land when close enough.
+          if (Math.hypot(tx - x, ty - y) < 8) {
+            x = tx;
+            y = ty;
             mode = "land";
             setLanded();
+            raf = requestAnimationFrame(tick);
+            return;
           }
-          raf = requestAnimationFrame(tick);
-          return;
         }
       }
 
-      // === Normal flying ===
-      if (elapsed >= nextDriftAt) {
-        targetHeading += (Math.random() - 0.5) * 0.6;
-        nextDriftAt = elapsed + 400 + Math.random() * 500;
-      }
-      if (elapsed >= nextBankAt) {
-        const turn = (Math.PI / 180) * (60 + Math.random() * 80);
-        targetHeading += (Math.random() < 0.5 ? -1 : 1) * turn;
-        targetSpeed = 80 + Math.random() * 90;
-        nextBankAt = elapsed + 3500 + Math.random() * 5000;
-      }
+      // === Normal flying (also used during approach) ===
+      if (mode === "fly") {
+        if (elapsed >= nextDriftAt) {
+          targetHeading += (Math.random() - 0.5) * 0.6;
+          nextDriftAt = elapsed + 400 + Math.random() * 500;
+        }
+        if (elapsed >= nextBankAt) {
+          const turn = (Math.PI / 180) * (60 + Math.random() * 80);
+          targetHeading += (Math.random() < 0.5 ? -1 : 1) * turn;
+          targetSpeed = 80 + Math.random() * 90;
+          nextBankAt = elapsed + 3500 + Math.random() * 5000;
+        }
 
-      const margin = 80;
-      if (x < margin || x > w - margin || y < margin || y > h - margin) {
-        const cx = w / 2;
-        const cy = h / 2;
-        const inward = Math.atan2(cy - y, cx - x);
-        targetHeading = inward + (Math.random() - 0.5) * 0.4;
+        const margin = 80;
+        if (x < margin || x > w - margin || y < margin || y > h - margin) {
+          const cx = w / 2;
+          const cy = h / 2;
+          const inward = Math.atan2(cy - y, cx - x);
+          targetHeading = inward + (Math.random() - 0.5) * 0.4;
+        }
       }
 
       let dh = ((targetHeading - heading + Math.PI) % (Math.PI * 2)) - Math.PI;
       if (dh < -Math.PI) dh += Math.PI * 2;
-      const turnRate = (reducedMotion ? 0.6 : 1.4) * dt;
+      const turnRate = (reducedMotion ? 0.6 : mode === "approach" ? 2.2 : 1.4) * dt;
       heading += Math.max(-turnRate, Math.min(turnRate, dh));
 
       speed += (targetSpeed - speed) * Math.min(1, dt * 1.2);
@@ -388,6 +480,7 @@ const FlyingGoose = () => {
       const scaleX = facingLeft ? -1 : 1;
 
       wrap.style.transform = `translate3d(${x - SPRITE_W / 2}px, ${y - SPRITE_H / 2}px, 0) rotate(${visualRot}deg) scaleX(${scaleX})`;
+      positionBubble(x, y);
 
       raf = requestAnimationFrame(tick);
     };
@@ -427,7 +520,7 @@ const FlyingGoose = () => {
           style={{ imageRendering: "pixelated", display: "block" }}
         />
       </div>
-      {/* Startle speech bubble */}
+      {/* Reaction bubble: WHATTA!! / smileys / pixel heart */}
       <div
         ref={bubbleRef}
         style={{
@@ -437,7 +530,8 @@ const FlyingGoose = () => {
           transform: "scale(0.7)",
           transformOrigin: "left bottom",
           opacity: 0,
-          transition: "opacity 120ms ease-out, transform 160ms cubic-bezier(0.34,1.56,0.64,1)",
+          transition:
+            "opacity 120ms ease-out, transform 160ms cubic-bezier(0.34,1.56,0.64,1)",
           padding: "4px 10px",
           background: "#fff",
           color: "#1a1a1a",
@@ -450,10 +544,12 @@ const FlyingGoose = () => {
           boxShadow: "2px 2px 0 rgba(0,0,0,0.4)",
           whiteSpace: "nowrap",
           translate: "8px -100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: 20,
         }}
-      >
-        WHATTA!!
-      </div>
+      />
     </div>
   );
 };
