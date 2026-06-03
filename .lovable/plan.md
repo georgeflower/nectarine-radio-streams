@@ -1,30 +1,35 @@
-## Problem
+## Add more music-reactive effects
 
-The screenshot shows `Sarcophaser` rated **3.18 (11 votes)** in the app, but the upstream Scenestream page shows **4.25 (93 votes)**. The song id is the same — the value in the app is just stale.
+The app already has an `AnalyserNode` wired from the audio stream into a `Visualizer` component with styles: off / starfield / bars / plasma / oscilloscope. I'll extend that pipeline with new reactive visualizer modes and add some subtle UI elements that pulse to the beat.
 
-`src/lib/entityCache.ts` caches every entity (song / artist / group / compilation) in `localStorage` **forever**. Once an entry exists it is never refetched, so ratings and vote counts frozen on first lookup never update — even across days. `SongRating` / `SongPlatform` only call `requestInfo()` when the cached value is missing the field, which it isn't.
+### New visualizer styles (in `src/components/Visualizer.tsx`)
 
-## Fix — stale-while-revalidate with a TTL
+Add four new options to the existing dropdown:
 
-Add a per-entry timestamp and a freshness check. Songs (which carry rating + votes) get a short TTL; other kinds get a longer one.
+1. **Tunnel** — concentric rings warping outward from the center, ring spacing and color hue driven by bass + mid energy. Gives a classic demoscene "vortex" feel.
+2. **Spectrum Rings** — circular polar-coordinate spectrum, with each frequency bin drawn as a radial spike around the center; rotation speed scales with overall RMS.
+3. **Particles** — a swarm of glow particles that drift slowly and get an outward velocity kick on each detected beat (simple energy-threshold beat detector on the bass band).
+4. **Waveform Mirror** — a thick mirrored oscilloscope (top + bottom reflection) with neon gradient stroke and a soft trailing afterimage (semi-transparent fill each frame).
 
-### Changes in `src/lib/entityCache.ts`
+All styles reuse the existing analyser, semantic color tokens (`--primary`, `--accent`), and the same canvas/resize/rAF scaffolding.
 
-1. Store entries as `{ info, fetchedAt }` instead of bare `EntityInfo`. Bump the storage prefix to `nectarine-entity-cache-v3-` (old v2 entries are simply ignored / re-fetched).
-2. Add `isStale(kind, fetchedAt)`:
-   - `song`: 2 minutes (rating/votes change)
-   - `artist` / `group` / `compilation`: 24 hours
-3. `getCachedInfo()` keeps returning the cached `info` immediately (no UI flicker), but `requestInfo()` now also triggers a background refetch when the entry is stale (in addition to when it's missing).
-4. `resolveOne()` updates `fetchedAt` on every successful fetch and notifies subscribers — existing components already re-render via `subscribe`.
+### Beat detection helper
 
-### Changes in `src/pages/Index.tsx`
+Add a small shared hook/util inside `Visualizer.tsx`:
+- Compute bass energy (avg of first ~8 FFT bins).
+- Maintain a rolling average; flag a "beat" when current energy exceeds `1.3 × avg` with a short refractory period.
+- Expose current `bass`, `mid`, `treble`, and `beat` to the per-style render functions.
 
-`SongRating` and `SongPlatform` should always call `requestInfo("song", songId)` on mount / when `songId` changes. The cache layer decides whether that turns into a network call. This guarantees a freshness check every time a new song becomes the "now playing" track, while still showing the cached value instantly.
+### Subtle UI reactivity (in `src/pages/Index.tsx`)
 
-No other components need changes — they all go through `getCachedInfo` / `requestInfo` already.
+Lift the analyser-derived bass level (already available via `analyser` state) into a lightweight `useAudioLevel` hook that returns a 0–1 value via rAF. Use it for two small touches, gated behind the existing visualizer toggle being non-"off" so users who disable effects get a calm UI:
 
-## Result
+- **Now-playing title glow**: animate `text-shadow` intensity of the current song title with the bass level (uses existing `--primary` color, no new colors).
+- **Album/now-playing border pulse**: animate the `box-shadow` spread on the "Now Playing" panel border with the same level.
 
-- First render still shows cached rating instantly (no flash of empty state).
-- Within a couple of seconds the value silently updates to the live rating/votes.
-- When a song repeats hours later it is automatically refreshed.
+No new dependencies, no layout changes, no backend changes.
+
+### Files to edit
+
+- `src/components/Visualizer.tsx` — add 4 new styles + beat/energy helper, extend `VisualizerStyle` union.
+- `src/pages/Index.tsx` — extend `VIZ_STYLES` list, add `useAudioLevel` hook, apply pulse to title + now-playing panel.

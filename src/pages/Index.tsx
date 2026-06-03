@@ -21,7 +21,7 @@ import {
   type StreamSource,
 } from "@/lib/nectarine";
 import AudioPlayer from "@/components/AudioPlayer";
-import Visualizer, { type VisualizerStyle } from "@/components/Visualizer";
+import Visualizer, { useAudioLevel, type VisualizerStyle } from "@/components/Visualizer";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
@@ -99,7 +99,7 @@ const ExtLink = ({ href, children, className }: ExtLinkProps) => {
   );
 };
 
-const VIZ_STYLES: VisualizerStyle[] = ["off", "starfield", "bars", "plasma", "oscilloscope"];
+const VIZ_STYLES: VisualizerStyle[] = ["off", "starfield", "bars", "plasma", "oscilloscope", "tunnel", "rings", "particles", "mirror"];
 const VIZ_STORAGE_KEY = "nectarine-viz";
 
 type ThemeId = "legacy" | "nectalift" | "nostalgia";
@@ -159,6 +159,7 @@ const Index = () => {
     return "plasma";
   });
   const inFlight = useRef(false);
+  const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
 
   useEffect(() => {
     try {
@@ -355,7 +356,14 @@ const Index = () => {
         </div>
 
         <section className="grid gap-4 md:grid-cols-2 min-w-0" aria-label="Demovibes panels">
-          <article className="panel md:order-2 min-w-0 overflow-hidden">
+          <article
+            className="panel md:order-2 min-w-0 overflow-hidden transition-shadow duration-100"
+            style={{
+              boxShadow: audioLevel > 0
+                ? `0 0 ${8 + audioLevel * 40}px hsl(var(--primary) / ${0.25 + audioLevel * 0.6})`
+                : undefined,
+            }}
+          >
             <button
               type="button"
               onClick={() => setNowOpen((o) => !o)}
@@ -368,7 +376,16 @@ const Index = () => {
               <div className="mt-3">
                 {now ? (
                   <>
-                    <p className="text-lg font-bold neon break-words">
+                    <p
+                      className="text-lg font-bold neon break-words"
+                      style={
+                        audioLevel > 0
+                          ? {
+                              textShadow: `0 0 ${4 + audioLevel * 24}px hsl(var(--primary) / ${0.5 + audioLevel * 0.5}), 0 0 ${2 + audioLevel * 8}px hsl(var(--primary) / 0.8)`,
+                            }
+                          : undefined
+                      }
+                    >
                       <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink>{" "}
                       <SongPlatform songId={now.songId} />{" "}
                       <SongRating songId={now.songId} />
