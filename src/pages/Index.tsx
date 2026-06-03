@@ -185,7 +185,7 @@ const Index = () => {
       if (document.hidden) { raf = requestAnimationFrame(tick); return; }
       analyser.getByteFrequencyData(buf);
       let sum = 0;
-      for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
+      for (let i = 0; i < bEnd; i++) sum += buf[i];
       smooth = smooth * 0.7 + (sum / bEnd / 255) * 0.3;
       nowPlayingRef.current?.style.setProperty("--al", smooth.toFixed(4));
       raf = requestAnimationFrame(tick);

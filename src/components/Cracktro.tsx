@@ -343,7 +343,7 @@ const Cracktro = ({
       const uniqueChars = [...new Set(chars)];
       for (const ch of uniqueChars) {
         const idx = chars.indexOf(ch);
-        const cw = widths[idx] ?? (ctx.measureText(ch).width + 4 * dpr);
+        const cw = widths[idx];
         const oc = document.createElement("canvas");
         oc.width = Math.max(1, Math.ceil(cw + 8 * dpr));
         oc.height = canvas.height;

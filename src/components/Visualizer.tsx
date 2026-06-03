@@ -17,7 +17,7 @@ function getFreqFrame(analyser: AnalyserNode): FreqFrame {
     const buf = f?.buf ?? new Uint8Array(analyser.frequencyBinCount);
     analyser.getByteFrequencyData(buf);
     let sum = 0;
-    for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
+    for (let i = 0; i < bEnd; i++) sum += buf[i];
     f = { ts: now, buf, bass: sum / bEnd / 255, bEnd };
     freqFrameCache.set(analyser, f);
   }
