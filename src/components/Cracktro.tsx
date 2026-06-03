@@ -45,7 +45,7 @@ const MODES: { id: ScrollMode; label: string }[] = [
 const STORAGE_MODE = "cracktro-scroll-mode";
 const STORAGE_ON = "cracktro-scroll-on";
 
-const Cracktro = ({ analyser, style, artist, title, songId, onExit }: Props) => {
+const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChange }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const onExitRef = useRef(onExit);
