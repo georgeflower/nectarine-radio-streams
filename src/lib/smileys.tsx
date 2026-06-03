@@ -136,6 +136,12 @@ export const SMILEYS: Record<string, string> = {
   ":1*:": `${BASE}/static/emoticons/1star.gif`,
 };
 
+// Case-insensitive lookup: lowercase code -> canonical key in SMILEYS
+const LOWERCASE_TO_CODE: Record<string, string> = {};
+for (const code of Object.keys(SMILEYS)) {
+  LOWERCASE_TO_CODE[code.toLowerCase()] = code;
+}
+
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -143,7 +149,7 @@ function escapeRegex(s: string) {
 // Build a single regex once, sorted longest-first so e.g. ":facepalm2:" wins over ":facepalm:"
 const SMILEY_PATTERN = (() => {
   const codes = Object.keys(SMILEYS).sort((a, b) => b.length - a.length);
-  return new RegExp(codes.map(escapeRegex).join("|"), "g");
+  return new RegExp(codes.map(escapeRegex).join("|"), "gi");
 })();
 
 export function renderWithSmileys(text: string): ReactNode[] {
@@ -156,12 +162,13 @@ export function renderWithSmileys(text: string): ReactNode[] {
   while ((m = SMILEY_PATTERN.exec(text)) !== null) {
     if (m.index > last) out.push(text.slice(last, m.index));
     const code = m[0];
+    const canonical = LOWERCASE_TO_CODE[code.toLowerCase()] ?? code;
     out.push(
       <img
         key={`s-${key++}`}
-        src={SMILEYS[code]}
-        alt={code}
-        title={code}
+        src={SMILEYS[canonical]}
+        alt={canonical}
+        title={canonical}
         loading="lazy"
         className="inline-block h-4 align-text-bottom mx-0.5"
       />,
