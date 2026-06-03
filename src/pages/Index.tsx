@@ -380,7 +380,7 @@ const Index = () => {
         </header>
 
         <div className="mb-4">
-          <AudioPlayer streams={streams} currentTrack={now} onAnalyserReady={setAnalyser} />
+          <AudioPlayer streams={streams} currentTrack={now} onAnalyserReady={setAnalyser} onSeek={() => setSeekCount((c) => c + 1)} />
         </div>
 
         <section className="grid gap-4 md:grid-cols-2 min-w-0" aria-label="Demovibes panels">
