@@ -175,6 +175,10 @@ type Goose = {
   frameAccum: number;
   isAway: boolean;
   awayUntil: number;
+  isSitting: boolean;
+  sitUntil: number;
+  nextSitAt: number;
+  headSwayAccum: number;
 };
 
 type Props = {
@@ -191,7 +195,7 @@ const CHAT_LINES: [string, string][] = [
 const LONELY_LINES = [
   "Where's my pal?",
   "Have you seen my goose friend around here?",
-  "I'm so lonely! ��",
+  "I'm so lonely! ;(",
 ];
 
 const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
@@ -221,17 +225,21 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
     const geese: Goose[] = [
       {
         active: true,
-        x: w * 0.35,
+        x: -SPRITE_W,
         y: h * 0.42,
         vx: 80,
         vy: 15,
         speed: 105,
-        targetX: w * 0.7,
-        targetY: h * 0.35,
+        targetX: w * 0.5,
+        targetY: h * 0.4,
         frame: 0,
         frameAccum: 0,
         isAway: false,
         awayUntil: 0,
+        isSitting: false,
+        sitUntil: 0,
+        nextSitAt: performance.now() + 18000 + Math.random() * 20000,
+        headSwayAccum: 0,
       },
       {
         active: false,
@@ -246,6 +254,10 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
         frameAccum: 0,
         isAway: false,
         awayUntil: 0,
+        isSitting: false,
+        sitUntil: 0,
+        nextSitAt: performance.now() + 25000 + Math.random() * 20000,
+        headSwayAccum: 0,
       },
     ];
 
@@ -260,7 +272,7 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
     const brownJoinAt = startAt + BROWN_GOOSE_JOIN_DELAY_MS;
     let nextChatAt = startAt + 12000;
     let nextTargetShiftAt = startAt + 2000;
-    let nextBallModeAt = startAt + 35000;
+    let nextBallModeAt = startAt + 60000;
     let nextFlyAwayAt = startAt + 55000;
     let nextLonelyAt = 0;
 
@@ -292,9 +304,14 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
 
     const startBallMode = (now: number) => {
       ball.active = true;
-      ball.until = now + rand(45000, 120000);
+      ball.until = now + rand(18000, 32000);
       ball.catcherIndex = Math.random() < 0.5 ? 0 : 1;
       ball.cooldownUntil = now + 600;
+      // Wake any sitting geese so they can play.
+      geese.forEach((g) => {
+        g.isSitting = false;
+        g.sitUntil = 0;
+      });
       onBallModeChangeRef.current?.(true);
       showBubble(0, "Kickoff! ⚽", 1600);
       showBubble(1, "Pass!", 1600);
@@ -302,7 +319,7 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
 
     const stopBallMode = (now: number) => {
       ball.active = false;
-      nextBallModeAt = now + rand(90000, 200000);
+      nextBallModeAt = now + rand(140000, 260000);
       onBallModeChangeRef.current?.(false);
     };
 
@@ -314,8 +331,13 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
 
       if (!geese[1].active && now >= brownJoinAt && geese[0].active) {
         geese[1].active = true;
-        geese[1].x = Math.min(w - SPRITE_W, geese[0].x + 120);
-        geese[1].y = Math.min(h - SPRITE_H, geese[0].y + 60);
+        // Enter by flying in from the right edge.
+        geese[1].x = w + SPRITE_W;
+        geese[1].y = rand(120, Math.max(140, h - 200));
+        geese[1].vx = -110;
+        geese[1].vy = 0;
+        geese[1].targetX = Math.max(60, geese[0].x - 140);
+        geese[1].targetY = geese[0].y + 20;
         showBubble(0, "Hi!", 1700);
         showBubble(1, "Hi!", 1700);
       }
@@ -365,7 +387,25 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
           if (!ball.active) {
             g.targetX = rand(80, Math.max(120, w - 80));
             g.targetY = rand(80, Math.max(120, h - 120));
-          }
+      }
+
+      // Sitting behaviour — periodically the goose lands and rests for a few seconds.
+      geese.forEach((g) => {
+        if (!g.active || g.isAway || ball.active) return;
+        if (!g.isSitting && now >= g.nextSitAt) {
+          g.isSitting = true;
+          g.sitUntil = now + rand(4000, 9000);
+          g.targetX = Math.max(60, Math.min(w - SPRITE_W - 60, g.x));
+          g.targetY = h - SPRITE_H - 20;
+          g.headSwayAccum = 0;
+        } else if (g.isSitting && now >= g.sitUntil) {
+          g.isSitting = false;
+          g.nextSitAt = now + rand(25000, 55000);
+          g.targetX = rand(80, Math.max(120, w - 80));
+          g.targetY = rand(80, Math.max(120, h - 220));
+        }
+      });
+
           if (idx === 0 && geese[1].active && !geese[1].isAway && Math.random() < 0.22) {
             const pair = CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)];
             showBubble(0, pair[0], 1600);
@@ -414,9 +454,15 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
         const dy = g.targetY - g.y;
         const dist = Math.hypot(dx, dy) || 1;
         const isCatcher = ballReady && index === ball.catcherIndex;
-        const desiredSpeed = ballReady ? (isCatcher ? 185 : 130) : g.speed;
-        g.vx += ((dx / dist) * desiredSpeed - g.vx) * Math.min(1, dt * 2.3);
-        g.vy += ((dy / dist) * desiredSpeed - g.vy) * Math.min(1, dt * 2.3);
+        const sittingSettled = g.isSitting && dist < 6;
+        if (sittingSettled) {
+          g.vx = 0;
+          g.vy = 0;
+        } else {
+          const desiredSpeed = ballReady ? (isCatcher ? 185 : 130) : g.speed;
+          g.vx += ((dx / dist) * desiredSpeed - g.vx) * Math.min(1, dt * 2.3);
+          g.vy += ((dy / dist) * desiredSpeed - g.vy) * Math.min(1, dt * 2.3);
+        }
 
         // Soft repulsion: never let geese overlap, especially during ball play.
         if (ballReady) {
@@ -480,18 +526,33 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
           }
         }
 
-        g.frameAccum += dtMs;
-        const frameDur = ballReady ? 95 : 125;
-        if (g.frameAccum >= frameDur) {
-          g.frameAccum -= frameDur;
-          g.frame = (g.frame + 1) % 4;
-          const img = imgsRef.current[index];
-          if (img) img.src = frameSets[index][g.frame];
+        const img = imgsRef.current[index];
+        if (g.isSitting) {
+          if (img && img.dataset.pose !== "sit") {
+            img.src = frameSets[index][3];
+            img.dataset.pose = "sit";
+          }
+          g.headSwayAccum += dtMs;
+        } else {
+          g.frameAccum += dtMs;
+          const frameDur = ballReady ? 95 : 125;
+          if (g.frameAccum >= frameDur) {
+            g.frameAccum -= frameDur;
+            g.frame = (g.frame + 1) % 3; // cycle flying frames 0,1,2 only
+            if (img) {
+              img.src = frameSets[index][g.frame];
+              img.dataset.pose = "fly";
+            }
+          }
         }
 
         const wrap = wrapsRef.current[index];
         if (wrap) {
-          const facingLeft = g.vx < 0;
+          let facingLeft = g.vx < 0;
+          if (g.isSitting) {
+            // Gentle head sway side-to-side while resting.
+            facingLeft = Math.sin(g.headSwayAccum / 700) < 0;
+          }
           const visible = !g.isAway || g.x <= w + SPRITE_W * 2;
           wrap.style.opacity = visible ? "1" : "0";
           wrap.style.transform = `translate3d(${g.x}px, ${g.y}px, 0) scaleX(${facingLeft ? -1 : 1})`;
