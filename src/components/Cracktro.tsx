@@ -229,6 +229,13 @@ const Cracktro = ({
     try { localStorage.setItem("cracktro-goose", gooseOn ? "1" : "0"); } catch { /* ignore */ }
   }, [gooseOn]);
 
+  const [boingOn, setBoingOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("cracktro-boing") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("cracktro-boing", boingOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [boingOn]);
+
 
 
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
