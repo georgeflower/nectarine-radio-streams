@@ -162,7 +162,8 @@ const Index = () => {
   });
   const inFlight = useRef(false);
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
-  const { bpm, beatIndex, beatCount, status: bpmStatus, beatTimes, windowMs, lastComputeAt, lastBass, period, phaseErrorMs, confidence } = useBpm(analyser, true);
+  const trackKey = now ? `${now.artist ?? ""}||${now.song ?? ""}||${now.playstart ?? ""}` : "";
+  const { bpm, beatIndex, beatCount, status: bpmStatus, beatTimes, windowMs, lastComputeAt, lastBass, period, phaseErrorMs, confidence } = useBpm(analyser, true, trackKey);
   const [bpmDebugOpen, setBpmDebugOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
 
