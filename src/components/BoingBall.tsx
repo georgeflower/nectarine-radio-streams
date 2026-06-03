@@ -162,7 +162,7 @@ const BoingBall = () => {
       if (y + r > floor) {
         y = floor - r;
         vy = -Math.abs(vy) * bounce;
-        if (Math.abs(vy) < 80) vy = -780; // keep it lively
+        if (Math.abs(vy) < 120) vy = -900; // keep it lively, big bounces
         squash = 0.6;
       }
       if (y - r < 0) {
