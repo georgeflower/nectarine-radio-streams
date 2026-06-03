@@ -687,7 +687,6 @@ const Cracktro = ({
             <option value="c64">C64</option>
             <option value="default">Default</option>
           </select>
-          <div className="hidden">
 
           <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Info Bar</span>
           <button
