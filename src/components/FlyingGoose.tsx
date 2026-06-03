@@ -110,6 +110,15 @@ const FRAME_W = 24;
 const FRAME_H = 18;
 const SPRITE_W = FRAME_W * PIXEL;
 const SPRITE_H = FRAME_H * PIXEL;
+const BROWN_GOOSE_JOIN_DELAY_MS = 120000;
+const BROWN_FLY_AWAY_MIN_MS = 120000;
+const BROWN_FLY_AWAY_MAX_MS = 240000;
+const BALL_START_VX_MIN = 100;
+const BALL_START_VX_MAX = 180;
+const BALL_START_VY_MIN = 70;
+const BALL_START_VY_MAX = 150;
+const BALL_KICK_MIN = 180;
+const BALL_KICK_MAX = 270;
 
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -146,7 +155,8 @@ function buildFrameSvgs(palette: Record<string, string>) {
         );
       }
     });
-    return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${SPRITE_W} ${SPRITE_H}" shape-rendering="crispEdges">${rects.join("")}</svg>`)}`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${SPRITE_W} ${SPRITE_H}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   });
 }
 
@@ -242,7 +252,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     };
 
     const startAt = performance.now();
-    const brownJoinAt = startAt + 120000;
+    const brownJoinAt = startAt + BROWN_GOOSE_JOIN_DELAY_MS;
     let nextChatAt = startAt + 12000;
     let nextTargetShiftAt = startAt + 2000;
     let nextBallModeAt = startAt + 35000;
@@ -279,8 +289,10 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
       ball.active = true;
       ball.x = (geese[0].x + geese[1].x) / 2;
       ball.y = (geese[0].y + geese[1].y) / 2;
-      ball.vx = (Math.random() < 0.5 ? -1 : 1) * rand(100, 180);
-      ball.vy = (Math.random() < 0.5 ? -1 : 1) * rand(70, 150);
+      ball.vx =
+        (Math.random() < 0.5 ? -1 : 1) * rand(BALL_START_VX_MIN, BALL_START_VX_MAX);
+      ball.vy =
+        (Math.random() < 0.5 ? -1 : 1) * rand(BALL_START_VY_MIN, BALL_START_VY_MAX);
       ball.until = now + rand(45000, 120000);
       showBubble(0, "Kickoff! ⚽", 1600);
       showBubble(1, "Pass!", 1600);
@@ -306,7 +318,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
 
       if (geese[1].active && !geese[1].isAway && now >= nextFlyAwayAt && !ball.active) {
         geese[1].isAway = true;
-        geese[1].awayUntil = now + rand(120000, 240000);
+        geese[1].awayUntil = now + rand(BROWN_FLY_AWAY_MIN_MS, BROWN_FLY_AWAY_MAX_MS);
         geese[1].targetX = w + SPRITE_W * 2;
         geese[1].targetY = rand(80, Math.max(100, h - 120));
         showBubble(1, "BRB!", 1400);
@@ -423,7 +435,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
             const pdx = tx - ball.x;
             const pdy = ty - ball.y;
             const plen = Math.hypot(pdx, pdy) || 1;
-            const kick = rand(180, 270);
+            const kick = rand(BALL_KICK_MIN, BALL_KICK_MAX);
             ball.vx = (pdx / plen) * kick + rand(-20, 20);
             ball.vy = (pdy / plen) * kick + rand(-20, 20);
           }
