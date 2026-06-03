@@ -506,20 +506,21 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
             lookDir = (lookDir === 1 ? -1 : 1) as 1 | -1;
             nextLookAt = elapsed + rand(1400, 2800);
           }
-          // Smooth horizontal scale tween — passes through ~0 so only the
-          // HEAD visually turns. The body sprite is a separate layer and
-          // stays perfectly still.
-          lookScale += (lookDir - lookScale) * Math.min(1, dt * 7);
+          // Natural head turn: yaw rotation + tiny lateral sway around the
+          // neck base, instead of a mirror flip. Body stays perfectly still.
+          lookScale += (lookDir - lookScale) * Math.min(1, dt * 4);
           // Subtle idle micro-wiggle applied to the head only.
           const wiggle =
             Math.sin(elapsed / 720) * 2.2 + Math.sin(elapsed / 1130) * 1.1;
           const neckBob = Math.sin(elapsed / 520) * 0.5;
+          const yaw = lookScale * 22; // degrees of head turn
+          const lateral = lookScale * 2.5; // px of head sway
           const tx = cx - SPRITE_W / 2;
           const ty = topY - SPRITE_H + sink;
           // Wrap: position only — no flipping, no rotation. Body stays put.
           wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
-          // Head: scale + wiggle, pivoting at the base of the neck.
-          imgHead.style.transform = `translateY(${neckBob}px) rotate(${wiggle}deg) scaleX(${lookScale})`;
+          // Head: rotate + slight translate, pivoting at the neck base.
+          imgHead.style.transform = `translate(${lateral}px, ${neckBob}px) rotate(${yaw + wiggle}deg)`;
           positionBubble(cx, topY);
           if (elapsed >= takeoffAt) takeoff();
           raf = requestAnimationFrame(tick);
