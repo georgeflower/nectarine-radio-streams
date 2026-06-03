@@ -53,7 +53,19 @@ const STORAGE_MODE = "cracktro-scroll-mode";
 const STORAGE_ON = "cracktro-scroll-on";
 const STORAGE_INFOBAR = "cracktro-infobar-on";
 
-const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChange }: Props) => {
+type PanelId = "oneliner" | "online" | "queue" | "history";
+const PANELS: { id: PanelId; label: string }[] = [
+  { id: "oneliner", label: "Oneliner" },
+  { id: "online", label: "Online" },
+  { id: "queue", label: "Up Next" },
+  { id: "history", label: "Recent" },
+];
+const STORAGE_PANELS = "cracktro-panels-on";
+
+const Cracktro = ({
+  analyser, style, artist, title, songId, onExit, onStyleChange,
+  oneliners = [], users = [], usersTotal, queue = [], history = [],
+}: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const onExitRef = useRef(onExit);
