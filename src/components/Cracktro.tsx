@@ -510,6 +510,109 @@ const Cracktro = ({
         </div>
       )}
 
+      {/* Floating side panels — independently toggleable & draggable. */}
+      {panelsOn.oneliner && (
+        <FloatingWindow
+          id="oneliner"
+          title="Oneliner"
+          defaultX={16}
+          defaultY={80}
+          defaultW={320}
+          onClose={() => togglePanel("oneliner")}
+        >
+          {oneliners.length === 0 ? (
+            <p className="text-muted-foreground">No messages.</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {oneliners.slice(0, 30).map((o, i) => (
+                <li key={i} className="leading-snug break-words">
+                  <span className="text-muted-foreground text-[10px] mr-1">{o.time}</span>
+                  <span className="font-semibold text-primary">{o.username}</span>
+                  <span className="text-muted-foreground">: </span>
+                  <span>{o.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </FloatingWindow>
+      )}
+
+      {panelsOn.online && (
+        <FloatingWindow
+          id="online"
+          title={`Online${typeof usersTotal === "number" ? ` (${usersTotal})` : ""}`}
+          defaultX={16}
+          defaultY={Math.max(80, (typeof window !== "undefined" ? window.innerHeight : 800) - 340)}
+          defaultW={260}
+          onClose={() => togglePanel("online")}
+        >
+          {users.length === 0 ? (
+            <p className="text-muted-foreground">No users online.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {users.map((u, i) => (
+                <li key={i} className="flex items-center gap-2">
+                  {u.flag && <span className="text-[10px] uppercase text-muted-foreground">{u.flag}</span>}
+                  <span className="truncate">{u.name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </FloatingWindow>
+      )}
+
+      {panelsOn.queue && (
+        <FloatingWindow
+          id="queue"
+          title="Up Next"
+          defaultX={Math.max(16, (typeof window !== "undefined" ? window.innerWidth : 1200) - 336)}
+          defaultY={80}
+          defaultW={320}
+          onClose={() => togglePanel("queue")}
+        >
+          {queue.length === 0 ? (
+            <p className="text-muted-foreground">Queue is empty.</p>
+          ) : (
+            <ol className="flex flex-col gap-1.5 list-decimal pl-5">
+              {queue.map((q, i) => (
+                <li key={i} className="leading-snug break-words">
+                  <span className="font-semibold">{q.song}</span>
+                  <span className="text-muted-foreground"> — {q.artist}</span>
+                  {q.requester && (
+                    <span className="text-muted-foreground text-[10px]"> · {q.requester}</span>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </FloatingWindow>
+      )}
+
+      {panelsOn.history && (
+        <FloatingWindow
+          id="history"
+          title="Recently Played"
+          defaultX={Math.max(16, (typeof window !== "undefined" ? window.innerWidth : 1200) - 336)}
+          defaultY={Math.max(80, (typeof window !== "undefined" ? window.innerHeight : 800) - 340)}
+          defaultW={320}
+          onClose={() => togglePanel("history")}
+        >
+          {history.length === 0 ? (
+            <p className="text-muted-foreground">No history yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {history.map((h, i) => (
+                <li key={i} className="leading-snug break-words">
+                  <span className="font-semibold">{h.song}</span>
+                  <span className="text-muted-foreground"> — {h.artist}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </FloatingWindow>
+      )}
+
+
       {/* Top-right exit — auto-hides with the controls. */}
       <button
         type="button"
