@@ -162,8 +162,10 @@ const Index = () => {
   });
   const inFlight = useRef(false);
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
-  const { bpm, beatIndex, beatCount } = useBpm(analyser, true);
+  const { bpm, beatIndex, beatCount, status: bpmStatus, beatTimes, windowMs, lastComputeAt, lastBass } = useBpm(analyser, true);
+  const [bpmDebugOpen, setBpmDebugOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
+
 
   useEffect(() => {
     try {
