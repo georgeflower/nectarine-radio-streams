@@ -22,6 +22,7 @@ import {
 } from "@/lib/nectarine";
 import AudioPlayer from "@/components/AudioPlayer";
 import Visualizer, { useAudioLevel, type VisualizerStyle } from "@/components/Visualizer";
+import BeatOverlay from "@/components/BeatOverlay";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
@@ -277,6 +278,7 @@ const Index = () => {
   return (
     <div className="crt min-h-screen relative overflow-x-hidden">
       <Visualizer analyser={analyser} style={vizStyle} />
+      <BeatOverlay analyser={analyser} enabled={vizStyle !== "off"} />
       <main
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"
         style={{
