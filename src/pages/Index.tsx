@@ -277,6 +277,8 @@ const Index = () => {
 
   const now = playlist.now;
   const timeLeft = now ? computeTimeLeft(now.playstart, now.lengthSec) : "-";
+  const trackKey = now ? `${now.artist ?? ""}||${now.song ?? ""}||${now.playstart ?? ""}` : "";
+  const { bpm, beatIndex, beatCount, status: bpmStatus, beatTimes, windowMs, lastComputeAt, lastBass, period, phaseErrorMs, confidence } = useBpm(analyser, true, trackKey);
   void tick;
 
   return (
