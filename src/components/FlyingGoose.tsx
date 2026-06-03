@@ -371,11 +371,16 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
 
       hideBubbleIfExpired(now);
 
-      const perchAlive = () =>
-        !!perchEl &&
-        perchEl.isConnected &&
-        (perchEl.getAttribute("data-goose-letter") || "") === perchChar &&
-        perchEl.textContent === perchChar;
+      const perchAlive = () => {
+        if (!perchEl || !perchEl.isConnected) return false;
+        if (perchKind === "letter") {
+          return (
+            (perchEl.getAttribute("data-goose-letter") || "") === perchChar &&
+            perchEl.textContent === perchChar
+          );
+        }
+        return perchEl.hasAttribute("data-goose-perch");
+      };
 
       // Reposition the bubble above the goose every frame while visible.
       const positionBubble = (cx: number, cy: number) => {
