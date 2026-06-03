@@ -723,6 +723,7 @@ const Cracktro = ({
             title="Toggle flying goose"
           >
             {gooseOn ? "ON" : "OFF"}
+          </button>
         </div>
 
         {/* Row: floating panel toggles */}
