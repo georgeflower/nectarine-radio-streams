@@ -208,7 +208,7 @@ const Index = () => {
     } catch {
       // ignore
     }
-    return "nostalgia";
+    return "legacy";
   });
 
   useEffect(() => {
