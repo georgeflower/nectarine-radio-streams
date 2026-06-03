@@ -130,7 +130,7 @@ const Cracktro = ({ analyser, style, artist, title, onExit }: Props) => {
         x += cw;
       }
 
-      offset += 6 * dpr;
+      offset += 3 * dpr;
       t += 0.05;
       raf = requestAnimationFrame(tick);
     };
