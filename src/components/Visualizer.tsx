@@ -627,6 +627,7 @@ export type BpmDebug = {
 export const useBpm = (
   analyser: AnalyserNode | null,
   enabled = true,
+  trackKey?: string | number,
 ): BpmDebug => {
   const WINDOW_MS = 10000;
   const INITIAL_BPM = 125;
