@@ -145,6 +145,13 @@ const BoingBall = () => {
 
       const r = R();
 
+      // Consume any pending external kick (e.g. from a goose head-butt).
+      if (boingBall.pendingKick) {
+        vx = boingBall.pendingKick.vx;
+        vy = boingBall.pendingKick.vy;
+        boingBall.pendingKick = null;
+      }
+
       // Physics
       vy += gravity * dt;
       x += vx * dt;
@@ -173,24 +180,34 @@ const BoingBall = () => {
       }
 
       // Squash decays
-      // (approximation: based on vy magnitude near floor)
       const distToFloor = floor - (y + r);
       const nearFloor = Math.max(0, 1 - distToFloor / (r * 0.6));
       squash = Math.max(squash, nearFloor * 0.35);
 
       spin += spinDir * 1.8 * dt;
 
+      // Publish state for other components.
+      boingBall.x = x;
+      boingBall.y = y;
+      boingBall.r = r;
+      boingBall.vx = vx;
+      boingBall.vy = vy;
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBall(x, y, r, squash);
 
       raf = requestAnimationFrame(tick);
     };
+    boingBall.mounted = true;
     raf = requestAnimationFrame(tick);
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
+      boingBall.mounted = false;
+      boingBall.pendingKick = null;
     };
+
   }, []);
 
   return (
