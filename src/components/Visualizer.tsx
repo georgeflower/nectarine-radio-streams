@@ -627,6 +627,7 @@ export type BpmDebug = {
 export const useBpm = (
   analyser: AnalyserNode | null,
   enabled = true,
+  trackKey?: string | number,
 ): BpmDebug => {
   const WINDOW_MS = 10000;
   const INITIAL_BPM = 125;
@@ -667,6 +668,21 @@ export const useBpm = (
   const displayPeriodRef = useRef(INITIAL_PERIOD);
 
   useEffect(() => {
+    // Reset state when track changes so BPM detection starts fresh.
+    setState({
+      bpm: INITIAL_BPM,
+      beatIndex: 0,
+      beatCount: 0,
+      status: analyser && enabled ? "listening" : "no-audio",
+      beatTimes: [],
+      windowMs: WINDOW_MS,
+      lastComputeAt: 0,
+      lastBass: 0,
+      period: INITIAL_PERIOD,
+      phaseErrorMs: 0,
+      confidence: 0,
+    });
+
     if (!analyser || !enabled) {
       setState((st) => ({ ...st, status: "no-audio" }));
       return;
@@ -1075,7 +1091,7 @@ export const useBpm = (
       if (recomputeTimerRef.current) clearTimeout(recomputeTimerRef.current);
       analyser.smoothingTimeConstant = previousSmoothing;
     };
-  }, [analyser, enabled]);
+  }, [analyser, enabled, trackKey]);
 
   return state;
 };
