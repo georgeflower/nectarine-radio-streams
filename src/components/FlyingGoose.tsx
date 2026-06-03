@@ -372,7 +372,9 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
           const idleBob = Math.sin(elapsed / 320) * 0.8;
           const idleSway = Math.sin(elapsed / 540) * 0.6;
           const tx = cx - SPRITE_W / 2 + idleSway;
-          const ty = topY - SPRITE_H + 2 + idleBob;
+          // Feet should visually rest on the glyph cap. Letter rect top sits
+          // above the visible cap because of line-height, so overlap by 10px.
+          const ty = topY - SPRITE_H + 10 + idleBob;
           wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) scaleX(${lookDir})`;
           positionBubble(cx, topY);
           if (elapsed >= takeoffAt) takeoff();
