@@ -76,6 +76,27 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
     try { localStorage.setItem(STORAGE_MODE, mode); } catch { /* ignore */ }
   }, [mode]);
 
+  // Auto-hide UI (exit + controls) after 5s of no pointer activity.
+  const [showControls, setShowControls] = useState(true);
+  const hideTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    const reveal = () => {
+      setShowControls(true);
+      if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = window.setTimeout(() => setShowControls(false), 5000);
+    };
+    reveal();
+    window.addEventListener("mousemove", reveal);
+    window.addEventListener("touchstart", reveal, { passive: true });
+    window.addEventListener("keydown", reveal);
+    return () => {
+      if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+      window.removeEventListener("mousemove", reveal);
+      window.removeEventListener("touchstart", reveal);
+      window.removeEventListener("keydown", reveal);
+    };
+  }, []);
+
   // Pull song info (platform/rating) from the entity cache.
   const [info, setInfo] = useState(() => (songId ? getCachedInfo("song", songId) : undefined));
   useEffect(() => {
