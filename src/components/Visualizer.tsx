@@ -468,56 +468,6 @@ const Visualizer = ({ analyser, style }: Props) => {
       ctx.shadowBlur = 0;
     };
 
-    const renderMirror = () => {
-      const w = canvas.width;
-      const h = canvas.height;
-      const { bass, treble, rms, time } = sampleAudio();
-
-      ctx.fillStyle = "hsla(20, 25%, 6%, 0.18)";
-      ctx.fillRect(0, 0, w, h);
-
-      const centerY = h * 0.5;
-      const amp = h * (0.2 + rms * 1.6);
-      const hue1 = 28 + treble * 40;
-      const hue2 = (hue1 + 60) % 360;
-      const grad = ctx.createLinearGradient(0, 0, w, 0);
-      grad.addColorStop(0, `hsl(${hue1}, 100%, 60%)`);
-      grad.addColorStop(1, `hsl(${hue2}, 100%, 65%)`);
-
-      ctx.shadowBlur = 18 * dpr;
-      ctx.shadowColor = `hsl(${hue1}, 100%, 60%)`;
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = (2.5 + bass * 3) * dpr;
-
-      const drawWave = (mirror: number) => {
-        ctx.beginPath();
-        if (time && time.length > 1) {
-          for (let i = 0; i < time.length; i++) {
-            const x = (i / (time.length - 1)) * w;
-            const centered = (time[i] - 128) / 128;
-            const y = centerY + centered * amp * mirror;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-          }
-        } else {
-          idleTRef.current += 0.04;
-          for (let i = 0; i <= 200; i++) {
-            const x = (i / 200) * w;
-            const y = centerY + Math.sin(i * 0.15 + idleTRef.current) * h * 0.05 * mirror;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-          }
-        }
-        ctx.stroke();
-      };
-
-      drawWave(1);
-      ctx.globalAlpha = 0.55;
-      drawWave(-1);
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
-    };
-
     const render = () => {
       switch (style) {
         case "bars": renderBars(); break;
@@ -527,7 +477,6 @@ const Visualizer = ({ analyser, style }: Props) => {
         case "tunnel": renderTunnel(); break;
         case "rings": renderRings(); break;
         case "particles": renderParticles(); break;
-        case "mirror": renderMirror(); break;
       }
       rafRef.current = requestAnimationFrame(render);
     };
