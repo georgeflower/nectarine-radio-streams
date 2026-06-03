@@ -251,11 +251,9 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
 
     const ball = {
       active: false,
-      x: w * 0.5,
-      y: h * 0.45,
-      vx: 120,
-      vy: 90,
       until: 0,
+      catcherIndex: 0 as 0 | 1,
+      cooldownUntil: 0,
     };
 
     const startAt = performance.now();
@@ -294,13 +292,10 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
 
     const startBallMode = (now: number) => {
       ball.active = true;
-      ball.x = (geese[0].x + geese[1].x) / 2;
-      ball.y = (geese[0].y + geese[1].y) / 2;
-      ball.vx =
-        (Math.random() < 0.5 ? -1 : 1) * rand(BALL_START_VX_MIN, BALL_START_VX_MAX);
-      ball.vy =
-        (Math.random() < 0.5 ? -1 : 1) * rand(BALL_START_VY_MIN, BALL_START_VY_MAX);
       ball.until = now + rand(45000, 120000);
+      ball.catcherIndex = Math.random() < 0.5 ? 0 : 1;
+      ball.cooldownUntil = now + 600;
+      onBallModeChangeRef.current?.(true);
       showBubble(0, "Kickoff! ⚽", 1600);
       showBubble(1, "Pass!", 1600);
     };
@@ -308,7 +303,9 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
     const stopBallMode = (now: number) => {
       ball.active = false;
       nextBallModeAt = now + rand(90000, 200000);
+      onBallModeChangeRef.current?.(false);
     };
+
 
     const tick = (now: number) => {
       const dtMs = Math.min(64, now - last);
