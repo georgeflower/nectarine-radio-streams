@@ -310,13 +310,17 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     let takeoffAt = 0;
     let nextLookAt = 0;
     let lookDir: 1 | -1 = 1;
+    let lookScale = 1; // animated -1..1, smoothly tweens toward lookDir while standing
     let startleEnd = 0;
 
     const wrap = wrapRef.current;
     const img = imgRef.current;
+    const imgStand = imgStandRef.current;
     const bubble = bubbleRef.current;
-    if (!wrap || !img || !bubble) return;
+    if (!wrap || !img || !imgStand || !bubble) return;
     img.src = frames[0];
+    imgStand.src = frames[STAND_FRAME];
+
 
     const pickPerch = ():
       | { el: HTMLElement; char: string; kind: "letter" | "window"; offset: number }
