@@ -616,24 +616,6 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
         </div>
       ))}
 
-      <div
-        ref={ballRef}
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: 20,
-          height: 20,
-          borderRadius: "50%",
-          border: "2px solid #1a1a1a",
-          background:
-            "radial-gradient(circle at 30% 30%, #fff 0%, #fff 18%, #e11d48 19%, #e11d48 46%, #fff 47%, #fff 70%, #111 71%, #111 100%)",
-          boxShadow: "0 0 10px rgba(255,255,255,0.4)",
-          opacity: 0,
-          transition: "opacity 180ms ease-out",
-          zIndex: 61,
-        }}
-      />
     </div>
   );
 };
