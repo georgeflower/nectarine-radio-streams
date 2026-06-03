@@ -201,14 +201,25 @@ const Cracktro = ({
   ), [artist, title, platform, rating]);
 
   type Skin = "default" | "amiga" | "atari" | "c64" | "xm";
-  const skin = useMemo<Skin>(() => {
+  const autoSkin = useMemo<Skin>(() => {
     const p = (platform || "").toLowerCase();
-    const t = (title || "").toLowerCase();
     if (p.includes("amiga")) return "amiga";
     if (p.includes("atari")) return "atari";
     if (p.includes("c64") || p.includes("commodore 64")) return "c64";
     return "xm";
-  }, [platform, title]);
+  }, [platform]);
+  const [skinOverride, setSkinOverride] = useState<Skin | "auto">(() => {
+    try {
+      const v = localStorage.getItem("cracktro-skin-override") as Skin | "auto" | null;
+      if (v && ["auto", "default", "amiga", "atari", "c64", "xm"].includes(v)) return v;
+    } catch { /* ignore */ }
+    return "auto";
+  });
+  useEffect(() => {
+    try { localStorage.setItem("cracktro-skin-override", skinOverride); } catch { /* ignore */ }
+  }, [skinOverride]);
+  const skin: Skin = skinOverride === "auto" ? autoSkin : skinOverride;
+
 
 
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
