@@ -16,6 +16,7 @@ type Props = {
   streams: StreamSource[];
   currentTrack?: { artist: string; song: string } | null;
   onAnalyserReady?: (analyser: AnalyserNode) => void;
+  onSeek?: () => void;
 };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
