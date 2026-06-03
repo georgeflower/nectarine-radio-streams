@@ -3,6 +3,7 @@ import Visualizer, { type VisualizerStyle } from "./Visualizer";
 import BeatOverlay from "./BeatOverlay";
 import FloatingWindow from "./FloatingWindow";
 import FlyingGoose from "./FlyingGoose";
+import BoingBall from "./BoingBall";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 import type { OnelinerEntry, QueueEntry } from "@/lib/nectarine";
 import { renderWithSmileys } from "@/lib/smileys";
