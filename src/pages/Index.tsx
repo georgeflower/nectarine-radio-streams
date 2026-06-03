@@ -282,6 +282,15 @@ const Index = () => {
     <div className="crt min-h-screen relative overflow-x-hidden">
       <Visualizer analyser={analyser} style={vizStyle} />
       <BeatOverlay analyser={analyser} enabled={vizStyle !== "off"} />
+      {cracktroOpen && (
+        <Cracktro
+          analyser={analyser}
+          style={vizStyle}
+          artist={now?.artist ?? ""}
+          title={now?.song ?? ""}
+          onExit={() => setCracktroOpen(false)}
+        />
+      )}
       <main
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"
         style={{
