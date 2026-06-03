@@ -2,31 +2,7 @@ import { useEffect, useRef } from "react";
 import { SMILEYS } from "@/lib/smileys";
 import type { OnelinerEntry } from "@/lib/nectarine";
 
-/**
- * Pixel-art goose drawn entirely in code (no image asset). Wanders the viewport
- * and periodically perches on title letters (elements with `data-goose-letter`).
- * Reacts to new oneliner posts: if the post contains a smiley code, the goose
- * mirrors it in a speech bubble; if it contains the word "goose", a giant
- * pixel-art heart pops above the bird.
- */
-
-// --- Sprite definition ---------------------------------------------------
-// 16-bit pixel goose. Facing right; flipped via scaleX(-1) when needed.
-// Palette: K outline, W white, L belly highlight, G mid shadow,
-//          O orange beak/feet, D dark orange (beak shadow), E eye.
-// 24 x 18 grid for richer shading than the old 20x14 sprite.
-
-// Common goose body + slim straight neck + small round head w/ eye + beak.
-// Identical across all 4 flying frames so the neck stays a consistent width
-// and the head reads as an actual goose head. Only wings change per frame.
-//
-// Layout (cols/rows):
-//   body         cols 4-13, rows 6-12
-//   neck (slim)  cols 9-14, rows 7-9  (2-row K outline + 1-row L fill)
-//   head         cols 15-18, rows 6-10 (with eye at col 16 row 7)
-//   beak         cols 19-22, rows 7-9
 const FRAMES: string[][] = [
-  // 0 — FLY: wings high (upstroke peak).
   [
     "...KK...................",
     "..KGGK..................",
@@ -47,7 +23,6 @@ const FRAMES: string[][] = [
     "........................",
     "........................",
   ],
-  // 1 — FLY: wings mid-up.
   [
     "........................",
     "...KKK..................",
@@ -68,7 +43,6 @@ const FRAMES: string[][] = [
     "........................",
     "........................",
   ],
-  // 2 — FLY: wings level / fully extended out to the side.
   [
     "........................",
     "........................",
@@ -89,7 +63,6 @@ const FRAMES: string[][] = [
     "........................",
     "........................",
   ],
-  // 3 — FLY: wings down (downstroke).
   [
     "........................",
     "........................",
@@ -110,81 +83,9 @@ const FRAMES: string[][] = [
     "..KGWWWGK...............",
     "...KKKK.................",
   ],
-
-  // 4 — STANDING (full sprite, kept for compatibility / fallback)
-  [
-    "........KKKK............",
-    ".......KWWWWK...........",
-    ".......KWEWWWKKDO.......",
-    ".......KWWWWWKD.........",
-    "........KWWWK...........",
-    "........KWWK............",
-    "........KWWK............",
-    ".........KWWK...........",
-    ".........KWWK...........",
-    "..........KWWK..........",
-    "..........KWWWK.........",
-    ".........KWWWWWK........",
-    "........KWLLLLLWK.......",
-    ".......KWLLLLLLLWK......",
-    ".......KWLLLLLLLWK......",
-    "........KGGGGGGGK.......",
-    ".........KKKKKKK........",
-    "........O.....O.........",
-  ],
-  // 5 — STANDING BODY (static layer). No vertical neck collar — the whole
-  // neck lives in the head sprite, so when the head turns there are no
-  // leftover white pixels behind the rotating head.
-  [
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "..........KWWK..........",
-    ".........KWWWWWK........",
-    "........KWLLLLLWK.......",
-    ".......KWLLLLLLLWK......",
-    ".......KWLLLLLLLWK......",
-    "........KGGGGGGGK.......",
-    ".........KKKKKKK........",
-    "........O.....O.........",
-  ],
-  // 6 — STANDING HEAD (rotates / sways). Contains the FULL neck so the
-  // whole head+neck swings as one rigid piece, pivoting where the neck
-  // meets the body (col 11.5, row 10).
-  [
-    "..........KKKK..........",
-    ".........KWWWWK.........",
-    ".........KWEWWWKKDO.....",
-    ".........KWWWWWKD.......",
-    "..........KWWWK.........",
-    "..........KWWK..........",
-    "..........KWWK..........",
-    "..........KWWK..........",
-    "..........KWWK..........",
-    "..........KWWK..........",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-  ],
-
 ];
 
-
-
-
-const COLORS: Record<string, string> = {
+const WHITE_COLORS: Record<string, string> = {
   K: "#1a1a1a",
   W: "#ffffff",
   L: "#e8eaee",
@@ -194,38 +95,26 @@ const COLORS: Record<string, string> = {
   E: "#1a1a1a",
 };
 
+const BROWN_COLORS: Record<string, string> = {
+  K: "#1a1a1a",
+  W: "#b37a4c",
+  L: "#d39a68",
+  G: "#8f5f3b",
+  O: "#f29a2f",
+  D: "#b76a1f",
+  E: "#1a1a1a",
+};
+
 const PIXEL = 3;
 const FRAME_W = 24;
 const FRAME_H = 18;
 const SPRITE_W = FRAME_W * PIXEL;
 const SPRITE_H = FRAME_H * PIXEL;
-const STAND_FRAME = 4;
-const STAND_BODY = 5;
-const STAND_HEAD = 6;
 
-
-function buildFrameSvgs(): string[] {
-  return FRAMES.map((rows) => {
-    const rects: string[] = [];
-    rows.forEach((row, y) => {
-      for (let x = 0; x < row.length; x++) {
-        const c = row[x];
-        const color = COLORS[c];
-        if (!color) continue;
-        rects.push(
-          `<rect x="${x * PIXEL}" y="${y * PIXEL}" width="${PIXEL}" height="${PIXEL}" fill="${color}"/>`,
-        );
-      }
-    });
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${SPRITE_W} ${SPRITE_H}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
-  });
-}
-
-// --- Smiley detection ----------------------------------------------------
-// Build lookup once; sorted longest-first so e.g. ":facepalm2:" beats ":facepalm:".
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
 const SMILEY_KEYS = Object.keys(SMILEYS).sort((a, b) => b.length - a.length);
 const SMILEY_RE = new RegExp(SMILEY_KEYS.map(escapeRegex).join("|"), "i");
 const SMILEY_LC: Record<string, string> = {};
@@ -238,101 +127,71 @@ function firstSmileyUrl(text: string): string | null {
   return canonical ? SMILEYS[canonical] : null;
 }
 
-// Pixel-art heart SVG (retro 11x10 grid).
-const HEART_SVG = (() => {
-  const grid = [
-    ".RR...RR.",
-    "RRRR.RRRR",
-    "RRRRRRRRR",
-    "RRRRRRRRR",
-    "RRRRRRRRR",
-    ".RRRRRRR.",
-    "..RRRRR..",
-    "...RRR...",
-    "....R....",
-  ];
-  const px = 5;
-  const W = grid[0].length * px;
-  const H = grid.length * px;
-  const rects: string[] = [];
-  grid.forEach((row, y) => {
-    for (let x = 0; x < row.length; x++) {
-      if (row[x] === "R") {
+function randomSmileyUrl() {
+  if (SMILEY_KEYS.length === 0) return null;
+  const key = SMILEY_KEYS[Math.floor(Math.random() * SMILEY_KEYS.length)];
+  return SMILEYS[key] ?? null;
+}
+
+function buildFrameSvgs(palette: Record<string, string>) {
+  return FRAMES.map((rows) => {
+    const rects: string[] = [];
+    rows.forEach((row, y) => {
+      for (let x = 0; x < row.length; x++) {
+        const c = row[x];
+        const color = palette[c];
+        if (!color) continue;
         rects.push(
-          `<rect x="${x * px}" y="${y * px}" width="${px}" height="${px}" fill="#ff3355"/>`,
-        );
-        // pixel outline
-        rects.push(
-          `<rect x="${x * px}" y="${y * px}" width="${px}" height="${px}" fill="none" stroke="#1a1a1a" stroke-width="0.6"/>`,
+          `<rect x="${x * PIXEL}" y="${y * PIXEL}" width="${PIXEL}" height="${PIXEL}" fill="${color}"/>`,
         );
       }
-    }
+    });
+    return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${SPRITE_W} ${SPRITE_H}" shape-rendering="crispEdges">${rects.join("")}</svg>`)}`;
   });
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
-  return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
-})();
+}
 
-type Mode = "fly" | "approach" | "land" | "startle";
+type Goose = {
+  active: boolean;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  speed: number;
+  targetX: number;
+  targetY: number;
+  frame: number;
+  frameAccum: number;
+  isAway: boolean;
+  awayUntil: number;
+};
 
 type Props = {
   oneliners?: OnelinerEntry[];
 };
 
+const CHAT_LINES: [string, string][] = [
+  ["Hi!", "Hi!"],
+  ["Have you seen Rapture?", "Still looking!"],
+  ["I'm hungry!", "Let's find snacks!"],
+];
+
+const LONELY_LINES = [
+  "Where's my pal?",
+  "Have you seen my goose friend around here?",
+  "I'm so lonely! ��",
+];
+
 const FlyingGoose = ({ oneliners = [] }: Props) => {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const imgRef = useRef<HTMLImageElement | null>(null);
-  const imgStandBodyRef = useRef<HTMLImageElement | null>(null);
-  const imgStandHeadRef = useRef<HTMLImageElement | null>(null);
-
-  const bubbleRef = useRef<HTMLDivElement | null>(null);
-
-  // Imperative reaction state shared between effects.
-  const reactionUntilRef = useRef<number>(0);
+  const wrapsRef = useRef<Array<HTMLDivElement | null>>([]);
+  const imgsRef = useRef<Array<HTMLImageElement | null>>([]);
+  const bubblesRef = useRef<Array<HTMLDivElement | null>>([]);
+  const ballRef = useRef<HTMLDivElement | null>(null);
   const lastOnelinerKeyRef = useRef<string | null>(null);
 
-  // React to new oneliner entries.
   useEffect(() => {
-    if (!oneliners.length) return;
-    const top = oneliners[0];
-    const key = `${top.time}|${top.username}|${top.text}`;
-    if (lastOnelinerKeyRef.current === null) {
-      // First load — don't react retroactively.
-      lastOnelinerKeyRef.current = key;
-      return;
-    }
-    if (key === lastOnelinerKeyRef.current) return;
-    lastOnelinerKeyRef.current = key;
-
-    const bubble = bubbleRef.current;
-    if (!bubble) return;
-
-    const text = top.text || "";
-    const mentionsGoose = /\bgoose\b/i.test(text);
-    const smileyUrl = firstSmileyUrl(text);
-
-    let content = "";
-    if (mentionsGoose) {
-      content = `<img src="${HEART_SVG}" alt="heart" style="image-rendering:pixelated;display:block;width:55px;height:auto" />`;
-    } else if (smileyUrl) {
-      content = `<img src="${smileyUrl}" alt="" style="display:block;height:28px;width:auto" />`;
-    } else {
-      return;
-    }
-
-    bubble.innerHTML = content;
-    bubble.style.opacity = "1";
-    bubble.style.transform = "scale(1)";
-    reactionUntilRef.current = performance.now() + 2600;
-  }, [oneliners]);
-
-  useEffect(() => {
-    const frames = buildFrameSvgs().map(
-      (svg) => "data:image/svg+xml;utf8," + encodeURIComponent(svg),
-    );
-
-    const reducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const whiteFrames = buildFrameSvgs(WHITE_COLORS);
+    const brownFrames = buildFrameSvgs(BROWN_COLORS);
+    const frameSets = [whiteFrames, brownFrames];
 
     let w = window.innerWidth;
     let h = window.innerHeight;
@@ -342,312 +201,273 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     };
     window.addEventListener("resize", onResize);
 
-    // Flight state
-    let x = Math.random() * w;
-    let y = h * (0.2 + Math.random() * 0.4);
-    let heading = Math.random() * Math.PI * 2;
-    let targetHeading = heading;
-    let speed = 110;
-    let targetSpeed = speed;
-    let frameIdx = 0;
-    let frameAccum = 0;
-    let nextDriftAt = 0;
-    let nextBankAt = 800 + Math.random() * 2200;
-    let elapsed = 0;
-    let last = performance.now();
+    const geese: Goose[] = [
+      {
+        active: true,
+        x: w * 0.35,
+        y: h * 0.42,
+        vx: 80,
+        vy: 15,
+        speed: 105,
+        targetX: w * 0.7,
+        targetY: h * 0.35,
+        frame: 0,
+        frameAccum: 0,
+        isAway: false,
+        awayUntil: 0,
+      },
+      {
+        active: false,
+        x: -SPRITE_W,
+        y: h * 0.5,
+        vx: 95,
+        vy: -10,
+        speed: 110,
+        targetX: w * 0.2,
+        targetY: h * 0.4,
+        frame: 0,
+        frameAccum: 0,
+        isAway: false,
+        awayUntil: 0,
+      },
+    ];
+
+    let ball = {
+      active: false,
+      x: w * 0.5,
+      y: h * 0.45,
+      vx: 120,
+      vy: 90,
+      until: 0,
+    };
+
+    const startAt = performance.now();
+    const brownJoinAt = startAt + 120000;
+    let nextChatAt = startAt + 12000;
+    let nextTargetShiftAt = startAt + 2000;
+    let nextBallModeAt = startAt + 35000;
+    let nextFlyAwayAt = startAt + 55000;
+    let nextLonelyAt = 0;
+
     let raf = 0;
+    let last = startAt;
 
-    // Random helpers for landing/perch cadence.
     const rand = (a: number, b: number) => a + Math.random() * (b - a);
-    const nextPerchDelay = () => rand(8000, 28000); // ms between landings
-    const sitDuration = () => rand(5000, 22000); // ms sat on a letter
 
-    // Perch state
-    let mode: Mode = "fly";
-    let perchEl: HTMLElement | null = null;
-    let perchChar = "";
-    let perchKind: "letter" | "window" = "letter";
-    let perchOffset = 0.5; // horizontal position along perch (0..1)
-    let nextPerchAt = nextPerchDelay();
-    let takeoffAt = 0;
-    let nextLookAt = 0;
-    let lookDir: 1 | -1 = 1;
-    let lookScale = 1; // animated -1..1, smoothly tweens toward lookDir while standing
-    let startleEnd = 0;
-
-    const wrap = wrapRef.current;
-    const img = imgRef.current;
-    const imgBody = imgStandBodyRef.current;
-    const imgHead = imgStandHeadRef.current;
-    const bubble = bubbleRef.current;
-    if (!wrap || !img || !imgBody || !imgHead || !bubble) return;
-    img.src = frames[0];
-    imgBody.src = frames[STAND_BODY];
-    imgHead.src = frames[STAND_HEAD];
-
-
-
-    const pickPerch = ():
-      | { el: HTMLElement; char: string; kind: "letter" | "window"; offset: number }
-      | null => {
-      const candidates = Array.from(
-        document.querySelectorAll<HTMLElement>(
-          "[data-goose-letter], [data-goose-perch]",
-        ),
-      ).filter((el) => {
-        const r = el.getBoundingClientRect();
-        return r.width > 6 && r.height > 6 && r.top > 40 && r.bottom < h - 20;
-      });
-      if (candidates.length === 0) return null;
-      const el = candidates[Math.floor(Math.random() * candidates.length)];
-      const isLetter = el.hasAttribute("data-goose-letter");
-      return {
-        el,
-        char: isLetter ? el.getAttribute("data-goose-letter") || "" : "",
-        kind: isLetter ? "letter" : "window",
-        // Letters: dead-center. Windows: random spot along the bar.
-        offset: isLetter ? 0.5 : 0.15 + Math.random() * 0.7,
-      };
-    };
-
-    // Returns the visual landing point (center x, top y of the perch surface)
-    // and how much the sprite should sink onto the surface.
-    const perchTarget = (): { cx: number; topY: number; sink: number } => {
-      const r = perchEl!.getBoundingClientRect();
-      const cx = r.left + r.width * perchOffset;
-      if (perchKind === "letter") {
-        // Letter rect top sits above the visible cap because of line-height.
-        return { cx, topY: r.top, sink: 10 };
-      }
-      // Window title bar — feet rest right on the top edge.
-      return { cx, topY: r.top, sink: 2 };
-    };
-
-    const showStartleBubble = () => {
-      bubble.innerHTML = "WHATTA!!";
+    const showBubble = (index: number, html: string, durationMs: number) => {
+      const bubble = bubblesRef.current[index];
+      if (!bubble) return;
+      bubble.innerHTML = html;
       bubble.style.opacity = "1";
       bubble.style.transform = "scale(1)";
-      reactionUntilRef.current = performance.now() + 1400;
+      const hideAt = performance.now() + durationMs;
+      bubble.dataset.hideAt = String(hideAt);
     };
 
-    const hideBubbleIfExpired = (now: number) => {
-      if (reactionUntilRef.current && now >= reactionUntilRef.current) {
+    const maybeHideBubble = (index: number, now: number) => {
+      const bubble = bubblesRef.current[index];
+      if (!bubble) return;
+      const hideAt = Number(bubble.dataset.hideAt || "0");
+      if (hideAt && now >= hideAt) {
         bubble.style.opacity = "0";
-        bubble.style.transform = "scale(0.7)";
-        reactionUntilRef.current = 0;
+        bubble.style.transform = "scale(0.75)";
+        bubble.dataset.hideAt = "0";
       }
     };
 
-    const setLanded = () => {
-      const { cx, topY, sink } = perchTarget();
-      lookDir = Math.random() < 0.5 ? -1 : 1;
-      lookScale = lookDir; // snap on first land — no flip-through-zero on arrival
-      // Crossfade from flying sprite to standing (body + head) for a soft settle.
-      imgBody.style.opacity = "1";
-      imgHead.style.opacity = "1";
-      img.style.opacity = "0";
-      takeoffAt = elapsed + sitDuration();
-      nextLookAt = elapsed + rand(700, 1600);
-      x = cx;
-      y = topY - SPRITE_H + sink + SPRITE_H / 2;
+    const startBallMode = (now: number) => {
+      ball.active = true;
+      ball.x = (geese[0].x + geese[1].x) / 2;
+      ball.y = (geese[0].y + geese[1].y) / 2;
+      ball.vx = (Math.random() < 0.5 ? -1 : 1) * rand(100, 180);
+      ball.vy = (Math.random() < 0.5 ? -1 : 1) * rand(70, 150);
+      ball.until = now + rand(45000, 120000);
+      showBubble(0, "Kickoff! ⚽", 1600);
+      showBubble(1, "Pass!", 1600);
     };
 
-    const startle = () => {
-      mode = "startle";
-      startleEnd = elapsed + 1400;
-      imgBody.style.opacity = "1";
-      imgHead.style.opacity = "1";
-      img.style.opacity = "0";
-      showStartleBubble();
+    const stopBallMode = (now: number) => {
+      ball.active = false;
+      nextBallModeAt = now + rand(90000, 200000);
     };
-
-    const takeoff = () => {
-      mode = "fly";
-      perchEl = null;
-      heading = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
-      targetHeading = heading;
-      speed = 180;
-      targetSpeed = 130;
-      nextPerchAt = elapsed + nextPerchDelay();
-      frameIdx = 2;
-      img.src = frames[frameIdx];
-      // Fade flying sprite back in, standing layers out.
-      img.style.opacity = "1";
-      imgBody.style.opacity = "0";
-      imgHead.style.opacity = "0";
-    };
-
-
 
     const tick = (now: number) => {
       const dtMs = Math.min(64, now - last);
-      last = now;
       const dt = dtMs / 1000;
-      elapsed += dtMs;
+      last = now;
 
-      hideBubbleIfExpired(now);
+      if (!geese[1].active && now >= brownJoinAt && geese[0].active) {
+        geese[1].active = true;
+        geese[1].x = Math.min(w - SPRITE_W, geese[0].x + 120);
+        geese[1].y = Math.min(h - SPRITE_H, geese[0].y + 60);
+        showBubble(0, "Hi!", 1700);
+        showBubble(1, "Hi!", 1700);
+      }
 
-      const perchAlive = () => {
-        if (!perchEl || !perchEl.isConnected) return false;
-        if (perchKind === "letter") {
-          return (
-            (perchEl.getAttribute("data-goose-letter") || "") === perchChar &&
-            perchEl.textContent === perchChar
-          );
-        }
-        return perchEl.hasAttribute("data-goose-perch");
-      };
+      if (geese[1].active && !geese[1].isAway && now >= nextFlyAwayAt && !ball.active) {
+        geese[1].isAway = true;
+        geese[1].awayUntil = now + rand(120000, 240000);
+        geese[1].targetX = w + SPRITE_W * 2;
+        geese[1].targetY = rand(80, Math.max(100, h - 120));
+        showBubble(1, "BRB!", 1400);
+        nextLonelyAt = now + rand(3500, 9000);
+        nextFlyAwayAt = now + rand(260000, 420000);
+      }
 
-      // Reposition the bubble above the goose every frame while visible.
-      const positionBubble = (cx: number, cy: number) => {
-        if (!reactionUntilRef.current) return;
-        bubble.style.left = `${cx}px`;
-        bubble.style.top = `${cy - SPRITE_H / 2 - 6}px`;
-      };
+      if (geese[1].isAway && now >= geese[1].awayUntil) {
+        geese[1].isAway = false;
+        geese[1].x = -SPRITE_W;
+        geese[1].y = rand(100, Math.max(120, h - 150));
+        geese[1].targetX = w * 0.55;
+        geese[1].targetY = h * 0.4;
+        showBubble(1, "I'm back!", 1700);
+        showBubble(0, "Yay!", 1500);
+      }
 
-      if (mode === "land") {
-        if (!perchAlive()) {
-          startle();
-        } else {
-          const { cx, topY, sink } = perchTarget();
-          if (elapsed >= nextLookAt) {
-            lookDir = (lookDir === 1 ? -1 : 1) as 1 | -1;
-            nextLookAt = elapsed + rand(1400, 2800);
+      if (geese[1].active && geese[1].isAway && now >= nextLonelyAt) {
+        const line = LONELY_LINES[Math.floor(Math.random() * LONELY_LINES.length)];
+        showBubble(0, line, 2500);
+        nextLonelyAt = now + rand(18000, 32000);
+      }
+
+      if (geese[0].active && geese[1].active && !geese[1].isAway && !ball.active && now >= nextBallModeAt) {
+        startBallMode(now);
+      }
+      if (ball.active && now >= ball.until) stopBallMode(now);
+
+      if (geese[0].active && geese[1].active && !geese[1].isAway && !ball.active && now >= nextChatAt) {
+        const pair = CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)];
+        showBubble(0, pair[0], 1900);
+        showBubble(1, pair[1], 1900);
+        nextChatAt = now + rand(12000, 28000);
+      }
+
+      if (now >= nextTargetShiftAt) {
+        nextTargetShiftAt = now + rand(1800, 4500);
+        geese.forEach((g, idx) => {
+          if (!g.active || g.isAway) return;
+          if (!ball.active) {
+            g.targetX = rand(80, Math.max(120, w - 80));
+            g.targetY = rand(80, Math.max(120, h - 120));
           }
-          // Natural head turn: yaw rotation + tiny lateral sway around the
-          // neck base, instead of a mirror flip. Body stays perfectly still.
-          lookScale += (lookDir - lookScale) * Math.min(1, dt * 4);
-          // Subtle idle micro-wiggle applied to the head only.
-          const wiggle =
-            Math.sin(elapsed / 720) * 2.2 + Math.sin(elapsed / 1130) * 1.1;
-          const neckBob = Math.sin(elapsed / 520) * 0.5;
-          const yaw = lookScale * 22; // degrees of head turn
-          const lateral = lookScale * 2.5; // px of head sway
-          const tx = cx - SPRITE_W / 2;
-          const ty = topY - SPRITE_H + sink;
-          // Wrap: position only — no flipping, no rotation. Body stays put.
-          wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
-          // Head: rotate + slight translate, pivoting at the neck base.
-          imgHead.style.transform = `translate(${lateral}px, ${neckBob}px) rotate(${yaw + wiggle}deg)`;
-          positionBubble(cx, topY);
-          if (elapsed >= takeoffAt) takeoff();
-          raf = requestAnimationFrame(tick);
-          return;
+          if (idx === 0 && geese[1].active && !geese[1].isAway && Math.random() < 0.22) {
+            const pair = CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)];
+            showBubble(0, pair[0], 1600);
+            showBubble(1, pair[1], 1600);
+          }
+        });
+      }
+
+      if (ball.active) {
+        ball.x += ball.vx * dt;
+        ball.y += ball.vy * dt;
+        if (ball.x < 10) {
+          ball.x = 10;
+          ball.vx = Math.abs(ball.vx);
+        } else if (ball.x > w - 10) {
+          ball.x = w - 10;
+          ball.vx = -Math.abs(ball.vx);
+        }
+        if (ball.y < 10) {
+          ball.y = 10;
+          ball.vy = Math.abs(ball.vy);
+        } else if (ball.y > h - 10) {
+          ball.y = h - 10;
+          ball.vy = -Math.abs(ball.vy);
         }
       }
 
-      if (mode === "startle") {
-        const shake = Math.sin(elapsed / 35) * 2;
-        const baseX = x - SPRITE_W / 2 + shake;
-        const baseY = y - SPRITE_H / 2;
-        wrap.style.transform = `translate3d(${baseX}px, ${baseY}px, 0)`;
-        imgHead.style.transform = `scaleX(${lookScale})`;
-        positionBubble(x, y);
-        if (elapsed >= startleEnd) takeoff();
-        raf = requestAnimationFrame(tick);
-        return;
-      }
+      geese.forEach((g, index) => {
+        if (!g.active) return;
 
+        if (g.isAway && g.x > w + SPRITE_W * 2) return;
 
-      // ===== FLY / APPROACH =====
-      if (mode === "fly" && elapsed >= nextPerchAt) {
-        const p = pickPerch();
-        if (p) {
-          perchEl = p.el;
-          perchChar = p.char;
-          perchKind = p.kind;
-          perchOffset = p.offset;
-          mode = "approach";
-          targetSpeed = 110; // normal cruise — do NOT sprint to the perch
-        } else {
-          nextPerchAt = elapsed + rand(4000, 9000);
+        if (ball.active && (!g.isAway || index === 0)) {
+          g.targetX = ball.x + (index === 0 ? -35 : 35);
+          g.targetY = ball.y + (index === 0 ? -18 : 18);
         }
-      }
 
-      if (mode === "approach") {
-        if (!perchAlive()) {
-          mode = "fly";
-          nextPerchAt = elapsed + nextPerchDelay();
-        } else {
-          const { cx, topY, sink } = perchTarget();
-          const tx = cx;
-          const ty = topY - SPRITE_H + sink + SPRITE_H / 2;
-          targetHeading = Math.atan2(ty - y, tx - x);
-          if (Math.hypot(tx - x, ty - y) < 8) {
-            x = tx;
-            y = ty;
-            mode = "land";
-            setLanded();
-            raf = requestAnimationFrame(tick);
-            return;
+        const dx = g.targetX - g.x;
+        const dy = g.targetY - g.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const desiredSpeed = ball.active ? 155 : g.speed;
+        g.vx += ((dx / dist) * desiredSpeed - g.vx) * Math.min(1, dt * 2.3);
+        g.vy += ((dy / dist) * desiredSpeed - g.vy) * Math.min(1, dt * 2.3);
+
+        g.x += g.vx * dt;
+        g.y += g.vy * dt;
+
+        if (!g.isAway) {
+          if (g.x < -20) {
+            g.x = -20;
+            g.vx = Math.abs(g.vx);
+          } else if (g.x > w - SPRITE_W + 20) {
+            g.x = w - SPRITE_W + 20;
+            g.vx = -Math.abs(g.vx);
+          }
+          if (g.y < 40) {
+            g.y = 40;
+            g.vy = Math.abs(g.vy);
+          } else if (g.y > h - SPRITE_H - 20) {
+            g.y = h - SPRITE_H - 20;
+            g.vy = -Math.abs(g.vy);
           }
         }
-      }
 
-      // === Normal flying (also used during approach) ===
-      if (mode === "fly") {
-        if (elapsed >= nextDriftAt) {
-          targetHeading += (Math.random() - 0.5) * 0.6;
-          nextDriftAt = elapsed + 400 + Math.random() * 500;
+        if (ball.active) {
+          const dBall = Math.hypot(g.x + SPRITE_W / 2 - ball.x, g.y + SPRITE_H / 2 - ball.y);
+          if (dBall < 55) {
+            const mate = geese[index === 0 ? 1 : 0];
+            const tx = mate.active && !mate.isAway ? mate.x + SPRITE_W / 2 : (index === 0 ? w * 0.75 : w * 0.25);
+            const ty = mate.active && !mate.isAway ? mate.y + SPRITE_H / 2 : h * 0.5;
+            const pdx = tx - ball.x;
+            const pdy = ty - ball.y;
+            const plen = Math.hypot(pdx, pdy) || 1;
+            const kick = rand(180, 270);
+            ball.vx = (pdx / plen) * kick + rand(-20, 20);
+            ball.vy = (pdy / plen) * kick + rand(-20, 20);
+          }
         }
-        if (elapsed >= nextBankAt) {
-          const turn = (Math.PI / 180) * (60 + Math.random() * 80);
-          targetHeading += (Math.random() < 0.5 ? -1 : 1) * turn;
-          targetSpeed = 80 + Math.random() * 90;
-          nextBankAt = elapsed + 3500 + Math.random() * 5000;
+
+        g.frameAccum += dtMs;
+        const frameDur = ball.active ? 95 : 125;
+        if (g.frameAccum >= frameDur) {
+          g.frameAccum -= frameDur;
+          g.frame = (g.frame + 1) % 4;
+          const img = imgsRef.current[index];
+          if (img) img.src = frameSets[index][g.frame];
         }
 
-        const margin = 80;
-        if (x < margin || x > w - margin || y < margin || y > h - margin) {
-          const cx = w / 2;
-          const cy = h / 2;
-          const inward = Math.atan2(cy - y, cx - x);
-          targetHeading = inward + (Math.random() - 0.5) * 0.4;
+        const wrap = wrapsRef.current[index];
+        if (wrap) {
+          const facingLeft = g.vx < 0;
+          wrap.style.transform = `translate3d(${g.x}px, ${g.y}px, 0) scaleX(${facingLeft ? -1 : 1})`;
         }
+
+        const bubble = bubblesRef.current[index];
+        if (bubble) {
+          bubble.style.left = `${g.x + SPRITE_W * 0.5}px`;
+          bubble.style.top = `${g.y - 6}px`;
+        }
+
+        maybeHideBubble(index, now);
+      });
+
+      const ballEl = ballRef.current;
+      if (ballEl) {
+        ballEl.style.opacity = ball.active ? "1" : "0";
+        ballEl.style.transform = `translate3d(${ball.x - 10}px, ${ball.y - 10}px, 0)`;
       }
-
-      let dh = ((targetHeading - heading + Math.PI) % (Math.PI * 2)) - Math.PI;
-      if (dh < -Math.PI) dh += Math.PI * 2;
-      const turnRate = (reducedMotion ? 0.6 : mode === "approach" ? 2.2 : 1.4) * dt;
-      heading += Math.max(-turnRate, Math.min(turnRate, dh));
-
-      speed += (targetSpeed - speed) * Math.min(1, dt * 1.2);
-
-      const bob = Math.sin(elapsed / 380) * 14 * dt;
-      const vx = Math.cos(heading) * speed;
-      const vy = Math.sin(heading) * speed + bob * 4;
-      x += vx * dt;
-      y += vy * dt;
-      x = Math.max(-SPRITE_W, Math.min(w + SPRITE_W, x));
-      y = Math.max(-SPRITE_H, Math.min(h + SPRITE_H, y));
-
-      // Smoother, more even flap cycle. Slight speed influence kept tiny so
-      // the loop reads as a steady, natural wingbeat rather than a jitter.
-      const flapHz = reducedMotion ? 3 : 5.5 + speed / 240;
-      frameAccum += dtMs;
-      const frameDur = 1000 / flapHz;
-      if (frameAccum >= frameDur) {
-        frameIdx = (frameIdx + 1) % 4;
-        frameAccum -= frameDur; // preserve leftover for even cadence
-        img.src = frames[frameIdx];
-      }
-
-      const facingLeft = Math.cos(heading) < 0;
-      let pitch = Math.atan2(vy, Math.abs(vx)) * (180 / Math.PI);
-      pitch = Math.max(-22, Math.min(22, pitch));
-      // Subtle head bob + beak tilt synced to the flap cycle.
-      const flapPhase = (frameAccum / frameDur + frameIdx) * (Math.PI / 2);
-      const headBob = Math.sin(flapPhase) * 1.2; // px
-      const beakTilt = Math.cos(flapPhase) * 2.5; // deg
-      const visualRot = (facingLeft ? -pitch : pitch) + beakTilt;
-      const scaleX = facingLeft ? -1 : 1;
-
-      wrap.style.transform = `translate3d(${x - SPRITE_W / 2}px, ${y - SPRITE_H / 2 + headBob}px, 0) rotate(${visualRot}deg) scaleX(${scaleX})`;
-      positionBubble(x, y);
 
       raf = requestAnimationFrame(tick);
     };
 
+    const initialSet = () => {
+      imgsRef.current.forEach((img, i) => {
+        if (img) img.src = frameSets[i][0];
+      });
+    };
+    initialSet();
     raf = requestAnimationFrame(tick);
 
     return () => {
@@ -656,103 +476,122 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!oneliners.length) return;
+    const top = oneliners[0];
+    const key = `${top.time}|${top.username}|${top.text}`;
+    if (lastOnelinerKeyRef.current === null) {
+      lastOnelinerKeyRef.current = key;
+      return;
+    }
+    if (key === lastOnelinerKeyRef.current) return;
+    lastOnelinerKeyRef.current = key;
+
+    const text = top.text || "";
+    const smileyUrl = firstSmileyUrl(text);
+    if (!smileyUrl) return;
+
+    const randomAlt = Math.random() < 0.25 ? randomSmileyUrl() : null;
+    const urls = [smileyUrl, randomAlt || smileyUrl];
+
+    urls.forEach((url, index) => {
+      const bubble = bubblesRef.current[index];
+      if (!bubble || !url) return;
+      bubble.innerHTML = `<img src="${url}" alt="" style="display:block;height:28px;width:auto" />`;
+      bubble.style.opacity = "1";
+      bubble.style.transform = "scale(1)";
+      bubble.dataset.hideAt = String(performance.now() + 2600);
+    });
+  }, [oneliners]);
+
   return (
-    <div
-      className="fixed inset-0 pointer-events-none overflow-hidden"
-      style={{ zIndex: 60 }}
-      aria-hidden
-    >
+    <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 60 }} aria-hidden>
+      {[0, 1].map((i) => (
+        <div key={`goose-${i}`}>
+          <div
+            ref={(el) => {
+              wrapsRef.current[i] = el;
+            }}
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: SPRITE_W,
+              height: SPRITE_H,
+              willChange: "transform",
+              transformOrigin: "center center",
+              filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.25))",
+              opacity: i === 0 ? 1 : 0,
+            }}
+          >
+            <img
+              ref={(el) => {
+                imgsRef.current[i] = el;
+                if (i === 1 && el) {
+                  const observer = new MutationObserver(() => {
+                    const parent = wrapsRef.current[1];
+                    if (!parent) return;
+                    const isVisible = parent.style.transform.includes("translate3d(-72px") ? false : true;
+                    if (isVisible) parent.style.opacity = "1";
+                  });
+                  observer.observe(el, { attributes: true, attributeFilter: ["src"] });
+                }
+              }}
+              alt=""
+              width={SPRITE_W}
+              height={SPRITE_H}
+              style={{ imageRendering: "pixelated", display: "block", position: "absolute", inset: 0 }}
+            />
+          </div>
+          <div
+            ref={(el) => {
+              bubblesRef.current[i] = el;
+            }}
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              transform: "scale(0.75)",
+              transformOrigin: "left bottom",
+              opacity: 0,
+              transition: "opacity 120ms ease-out, transform 180ms cubic-bezier(0.34,1.56,0.64,1)",
+              padding: "4px 10px",
+              background: "#fff",
+              color: "#1a1a1a",
+              fontWeight: 900,
+              fontFamily: "system-ui, sans-serif",
+              fontSize: 13,
+              letterSpacing: "0.03em",
+              border: "2px solid #1a1a1a",
+              borderRadius: 8,
+              boxShadow: "2px 2px 0 rgba(0,0,0,0.4)",
+              whiteSpace: "nowrap",
+              translate: "8px -100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 20,
+            }}
+          />
+        </div>
+      ))}
+
       <div
-        ref={wrapRef}
+        ref={ballRef}
         style={{
           position: "absolute",
           left: 0,
           top: 0,
-          width: SPRITE_W,
-          height: SPRITE_H,
-          willChange: "transform",
-          transformOrigin: "center center",
-          filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.25))",
-        }}
-      >
-        <img
-          ref={imgRef}
-          alt=""
-          width={SPRITE_W}
-          height={SPRITE_H}
-          style={{
-            imageRendering: "pixelated",
-            display: "block",
-            position: "absolute",
-            inset: 0,
-            transition: "opacity 260ms ease-out",
-          }}
-        />
-        <img
-          ref={imgStandBodyRef}
-          alt=""
-          width={SPRITE_W}
-          height={SPRITE_H}
-          style={{
-            imageRendering: "pixelated",
-            display: "block",
-            position: "absolute",
-            inset: 0,
-            opacity: 0,
-            transition: "opacity 260ms ease-out",
-          }}
-        />
-        <img
-          ref={imgStandHeadRef}
-          alt=""
-          width={SPRITE_W}
-          height={SPRITE_H}
-          style={{
-            imageRendering: "pixelated",
-            display: "block",
-            position: "absolute",
-            inset: 0,
-            opacity: 0,
-            // Pivot at the neck base where it meets the body (col 11.5,
-            // row 10) so the entire head+neck swings as one piece and the
-            // body stays still with no white pixels exposed behind it.
-            transformOrigin: `${11.5 * PIXEL}px ${10 * PIXEL}px`,
-
-
-            transition: "opacity 260ms ease-out",
-          }}
-        />
-
-
-      </div>
-      {/* Reaction bubble: WHATTA!! / smileys / pixel heart */}
-      <div
-        ref={bubbleRef}
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          transform: "scale(0.7)",
-          transformOrigin: "left bottom",
-          opacity: 0,
-          transition:
-            "opacity 120ms ease-out, transform 160ms cubic-bezier(0.34,1.56,0.64,1)",
-          padding: "4px 10px",
-          background: "#fff",
-          color: "#1a1a1a",
-          fontWeight: 900,
-          fontFamily: "system-ui, sans-serif",
-          fontSize: 14,
-          letterSpacing: "0.04em",
+          width: 20,
+          height: 20,
+          borderRadius: "50%",
           border: "2px solid #1a1a1a",
-          borderRadius: 8,
-          boxShadow: "2px 2px 0 rgba(0,0,0,0.4)",
-          whiteSpace: "nowrap",
-          translate: "8px -100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 20,
+          background:
+            "radial-gradient(circle at 30% 30%, #fff 0%, #fff 18%, #e11d48 19%, #e11d48 46%, #fff 47%, #fff 70%, #111 71%, #111 100%)",
+          boxShadow: "0 0 10px rgba(255,255,255,0.4)",
+          opacity: 0,
+          transition: "opacity 180ms ease-out",
+          zIndex: 61,
         }}
       />
     </div>
