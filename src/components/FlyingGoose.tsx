@@ -101,9 +101,7 @@ const FRAMES: string[][] = [
     "........................",
     "........................",
   ],
-  // 4 — STANDING (long S-neck, plump body, two orange legs).
-  // Body re-centered around col ~11.5 (sprite center=12) so a scaleX flip
-  // for "look left/right" only swaps the head silhouette — the body stays put.
+  // 4 — STANDING (full sprite, kept for compatibility / fallback)
   [
     "........KKKK............",
     ".......KWWWWK...........",
@@ -124,8 +122,56 @@ const FRAMES: string[][] = [
     ".........KKKKKKK........",
     "........O.....O.........",
   ],
-
+  // 5 — STANDING BODY only (no head/neck). Rendered as a static layer
+  // beneath the head sprite while the goose is perched, so the body
+  // never flips when the head turns side-to-side.
+  [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "..........KWWK..........",
+    "..........KWWWK.........",
+    ".........KWWWWWK........",
+    "........KWLLLLLWK.......",
+    ".......KWLLLLLLLWK......",
+    ".......KWLLLLLLLWK......",
+    "........KGGGGGGGK.......",
+    ".........KKKKKKK........",
+    "........O.....O.........",
+  ],
+  // 6 — STANDING HEAD + NECK only. Drawn facing right; flipped via
+  // scaleX on its own <img> so only the head turns. Pivot is the
+  // base of the neck where it meets the body (col ~10, row ~10).
+  [
+    "........KKKK............",
+    ".......KWWWWK...........",
+    ".......KWEWWWKKDO.......",
+    ".......KWWWWWKD.........",
+    "........KWWWK...........",
+    "........KWWK............",
+    "........KWWK............",
+    ".........KWWK...........",
+    ".........KWWK...........",
+    "..........KWWK..........",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+  ],
 ];
+
+
+
 
 const COLORS: Record<string, string> = {
   K: "#1a1a1a",
@@ -143,6 +189,9 @@ const FRAME_H = 18;
 const SPRITE_W = FRAME_W * PIXEL;
 const SPRITE_H = FRAME_H * PIXEL;
 const STAND_FRAME = 4;
+const STAND_BODY = 5;
+const STAND_HEAD = 6;
+
 
 function buildFrameSvgs(): string[] {
   return FRAMES.map((rows) => {
@@ -221,7 +270,9 @@ type Props = {
 const FlyingGoose = ({ oneliners = [] }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
-  const imgStandRef = useRef<HTMLImageElement | null>(null);
+  const imgStandBodyRef = useRef<HTMLImageElement | null>(null);
+  const imgStandHeadRef = useRef<HTMLImageElement | null>(null);
+
   const bubbleRef = useRef<HTMLDivElement | null>(null);
 
   // Imperative reaction state shared between effects.
@@ -315,11 +366,14 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
 
     const wrap = wrapRef.current;
     const img = imgRef.current;
-    const imgStand = imgStandRef.current;
+    const imgBody = imgStandBodyRef.current;
+    const imgHead = imgStandHeadRef.current;
     const bubble = bubbleRef.current;
-    if (!wrap || !img || !imgStand || !bubble) return;
+    if (!wrap || !img || !imgBody || !imgHead || !bubble) return;
     img.src = frames[0];
-    imgStand.src = frames[STAND_FRAME];
+    imgBody.src = frames[STAND_BODY];
+    imgHead.src = frames[STAND_HEAD];
+
 
 
     const pickPerch = ():
@@ -377,8 +431,9 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
       const { cx, topY, sink } = perchTarget();
       lookDir = Math.random() < 0.5 ? -1 : 1;
       lookScale = lookDir; // snap on first land — no flip-through-zero on arrival
-      // Crossfade from flying sprite to standing sprite for a soft settle.
-      imgStand.style.opacity = "1";
+      // Crossfade from flying sprite to standing (body + head) for a soft settle.
+      imgBody.style.opacity = "1";
+      imgHead.style.opacity = "1";
       img.style.opacity = "0";
       takeoffAt = elapsed + sitDuration();
       nextLookAt = elapsed + rand(700, 1600);
@@ -389,7 +444,8 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     const startle = () => {
       mode = "startle";
       startleEnd = elapsed + 1400;
-      imgStand.style.opacity = "1";
+      imgBody.style.opacity = "1";
+      imgHead.style.opacity = "1";
       img.style.opacity = "0";
       showStartleBubble();
     };
@@ -404,10 +460,12 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
       nextPerchAt = elapsed + nextPerchDelay();
       frameIdx = 2;
       img.src = frames[frameIdx];
-      // Fade flying sprite back in, stand out.
+      // Fade flying sprite back in, standing layers out.
       img.style.opacity = "1";
-      imgStand.style.opacity = "0";
+      imgBody.style.opacity = "0";
+      imgHead.style.opacity = "0";
     };
+
 
 
     const tick = (now: number) => {
@@ -445,18 +503,20 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
             lookDir = (lookDir === 1 ? -1 : 1) as 1 | -1;
             nextLookAt = elapsed + rand(1400, 2800);
           }
-          // Smooth horizontal scale tween — passes through ~0 so the head
-          // visually "turns" instead of snapping. Body stays put because
-          // standing frame is centered on sprite midline.
+          // Smooth horizontal scale tween — passes through ~0 so only the
+          // HEAD visually turns. The body sprite is a separate layer and
+          // stays perfectly still.
           lookScale += (lookDir - lookScale) * Math.min(1, dt * 7);
-          // Subtle idle micro-wiggle: tiny rotation + neck bob, no silhouette
-          // change. Sprite stays still overall, just feels alive.
+          // Subtle idle micro-wiggle applied to the head only.
           const wiggle =
-            Math.sin(elapsed / 720) * 1.1 + Math.sin(elapsed / 1130) * 0.5;
-          const neckBob = Math.sin(elapsed / 420) * 0.6;
+            Math.sin(elapsed / 720) * 2.2 + Math.sin(elapsed / 1130) * 1.1;
+          const neckBob = Math.sin(elapsed / 520) * 0.5;
           const tx = cx - SPRITE_W / 2;
-          const ty = topY - SPRITE_H + sink + neckBob;
-          wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) rotate(${wiggle}deg) scaleX(${lookScale})`;
+          const ty = topY - SPRITE_H + sink;
+          // Wrap: position only — no flipping, no rotation. Body stays put.
+          wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
+          // Head: scale + wiggle, pivoting at the base of the neck.
+          imgHead.style.transform = `translateY(${neckBob}px) rotate(${wiggle}deg) scaleX(${lookScale})`;
           positionBubble(cx, topY);
           if (elapsed >= takeoffAt) takeoff();
           raf = requestAnimationFrame(tick);
@@ -468,13 +528,14 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
         const shake = Math.sin(elapsed / 35) * 2;
         const baseX = x - SPRITE_W / 2 + shake;
         const baseY = y - SPRITE_H / 2;
-        wrap.style.transform = `translate3d(${baseX}px, ${baseY}px, 0) scaleX(${lookScale})`;
-
+        wrap.style.transform = `translate3d(${baseX}px, ${baseY}px, 0)`;
+        imgHead.style.transform = `scaleX(${lookScale})`;
         positionBubble(x, y);
         if (elapsed >= startleEnd) takeoff();
         raf = requestAnimationFrame(tick);
         return;
       }
+
 
       // ===== FLY / APPROACH =====
       if (mode === "fly" && elapsed >= nextPerchAt) {
@@ -616,7 +677,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
           }}
         />
         <img
-          ref={imgStandRef}
+          ref={imgStandBodyRef}
           alt=""
           width={SPRITE_W}
           height={SPRITE_H}
@@ -629,6 +690,24 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
             transition: "opacity 260ms ease-out",
           }}
         />
+        <img
+          ref={imgStandHeadRef}
+          alt=""
+          width={SPRITE_W}
+          height={SPRITE_H}
+          style={{
+            imageRendering: "pixelated",
+            display: "block",
+            position: "absolute",
+            inset: 0,
+            opacity: 0,
+            // Pivot at the base of the neck (col ~10, row ~10 in the 24x18 grid
+            // ⇒ 30px,30px at PIXEL=3) so scale/rotation feel anchored.
+            transformOrigin: `${10 * PIXEL}px ${10 * PIXEL}px`,
+            transition: "opacity 260ms ease-out",
+          }}
+        />
+
 
       </div>
       {/* Reaction bubble: WHATTA!! / smileys / pixel heart */}
