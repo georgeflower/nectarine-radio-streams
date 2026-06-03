@@ -225,17 +225,21 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
     const geese: Goose[] = [
       {
         active: true,
-        x: w * 0.35,
+        x: -SPRITE_W,
         y: h * 0.42,
         vx: 80,
         vy: 15,
         speed: 105,
-        targetX: w * 0.7,
-        targetY: h * 0.35,
+        targetX: w * 0.5,
+        targetY: h * 0.4,
         frame: 0,
         frameAccum: 0,
         isAway: false,
         awayUntil: 0,
+        isSitting: false,
+        sitUntil: 0,
+        nextSitAt: performance.now() + 18000 + Math.random() * 20000,
+        headSwayAccum: 0,
       },
       {
         active: false,
@@ -250,6 +254,10 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
         frameAccum: 0,
         isAway: false,
         awayUntil: 0,
+        isSitting: false,
+        sitUntil: 0,
+        nextSitAt: performance.now() + 25000 + Math.random() * 20000,
+        headSwayAccum: 0,
       },
     ];
 
