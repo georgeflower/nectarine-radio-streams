@@ -585,8 +585,29 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
           alt=""
           width={SPRITE_W}
           height={SPRITE_H}
-          style={{ imageRendering: "pixelated", display: "block" }}
+          style={{
+            imageRendering: "pixelated",
+            display: "block",
+            position: "absolute",
+            inset: 0,
+            transition: "opacity 260ms ease-out",
+          }}
         />
+        <img
+          ref={imgStandRef}
+          alt=""
+          width={SPRITE_W}
+          height={SPRITE_H}
+          style={{
+            imageRendering: "pixelated",
+            display: "block",
+            position: "absolute",
+            inset: 0,
+            opacity: 0,
+            transition: "opacity 260ms ease-out",
+          }}
+        />
+
       </div>
       {/* Reaction bubble: WHATTA!! / smileys / pixel heart */}
       <div
