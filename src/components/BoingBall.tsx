@@ -31,8 +31,8 @@ const BoingBall = () => {
     let y = window.innerHeight * 0.3;
     let vx = 320; // px/s
     let vy = 0;
-    const gravity = 1400; // px/s^2
-    const bounce = 0.86;
+    const gravity = 650; // px/s^2 — gentler so it bounces higher
+    const bounce = 0.94;
     let spin = 0; // rotation around tilted axis (radians)
     let spinDir = 1;
 
@@ -162,7 +162,7 @@ const BoingBall = () => {
       if (y + r > floor) {
         y = floor - r;
         vy = -Math.abs(vy) * bounce;
-        if (Math.abs(vy) < 80) vy = -780; // keep it lively
+        if (Math.abs(vy) < 120) vy = -900; // keep it lively, big bounces
         squash = 0.6;
       }
       if (y - r < 0) {
