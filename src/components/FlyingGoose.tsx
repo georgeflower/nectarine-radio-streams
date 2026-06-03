@@ -168,7 +168,9 @@ const FRAMES: string[][] = [
     "........................",
     "........................",
   ],
-],
+];
+
+
 
 
 const COLORS: Record<string, string> = {
