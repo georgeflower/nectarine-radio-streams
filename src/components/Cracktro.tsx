@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Visualizer, { type VisualizerStyle } from "./Visualizer";
 import BeatOverlay from "./BeatOverlay";
+import FloatingWindow from "./FloatingWindow";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
+import type { OnelinerEntry, QueueEntry } from "@/lib/nectarine";
+
+type OnlineUser = { name: string; flag: string };
 
 type Props = {
   analyser: AnalyserNode | null;
@@ -11,6 +15,11 @@ type Props = {
   songId?: string;
   onExit: () => void;
   onStyleChange?: (s: VisualizerStyle) => void;
+  oneliners?: OnelinerEntry[];
+  users?: OnlineUser[];
+  usersTotal?: number;
+  queue?: QueueEntry[];
+  history?: QueueEntry[];
 };
 
 const VIZ_STYLES: { id: VisualizerStyle; label: string }[] = [
