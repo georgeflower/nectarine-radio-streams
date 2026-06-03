@@ -189,6 +189,9 @@ const FRAME_H = 18;
 const SPRITE_W = FRAME_W * PIXEL;
 const SPRITE_H = FRAME_H * PIXEL;
 const STAND_FRAME = 4;
+const STAND_BODY = 5;
+const STAND_HEAD = 6;
+
 
 function buildFrameSvgs(): string[] {
   return FRAMES.map((rows) => {
