@@ -443,13 +443,20 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
           const { cx, topY, sink } = perchTarget();
           if (elapsed >= nextLookAt) {
             lookDir = (lookDir === 1 ? -1 : 1) as 1 | -1;
-            nextLookAt = elapsed + rand(700, 1900);
+            nextLookAt = elapsed + rand(1400, 2800);
           }
-          const idleBob = Math.sin(elapsed / 320) * 0.8;
-          const idleSway = Math.sin(elapsed / 540) * 0.6;
-          const tx = cx - SPRITE_W / 2 + idleSway;
-          const ty = topY - SPRITE_H + sink + idleBob;
-          wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) scaleX(${lookDir})`;
+          // Smooth horizontal scale tween — passes through ~0 so the head
+          // visually "turns" instead of snapping. Body stays put because
+          // standing frame is centered on sprite midline.
+          lookScale += (lookDir - lookScale) * Math.min(1, dt * 7);
+          // Subtle idle micro-wiggle: tiny rotation + neck bob, no silhouette
+          // change. Sprite stays still overall, just feels alive.
+          const wiggle =
+            Math.sin(elapsed / 720) * 1.1 + Math.sin(elapsed / 1130) * 0.5;
+          const neckBob = Math.sin(elapsed / 420) * 0.6;
+          const tx = cx - SPRITE_W / 2;
+          const ty = topY - SPRITE_H + sink + neckBob;
+          wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) rotate(${wiggle}deg) scaleX(${lookScale})`;
           positionBubble(cx, topY);
           if (elapsed >= takeoffAt) takeoff();
           raf = requestAnimationFrame(tick);
@@ -461,7 +468,8 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
         const shake = Math.sin(elapsed / 35) * 2;
         const baseX = x - SPRITE_W / 2 + shake;
         const baseY = y - SPRITE_H / 2;
-        wrap.style.transform = `translate3d(${baseX}px, ${baseY}px, 0) scaleX(${lookDir})`;
+        wrap.style.transform = `translate3d(${baseX}px, ${baseY}px, 0) scaleX(${lookScale})`;
+
         positionBubble(x, y);
         if (elapsed >= startleEnd) takeoff();
         raf = requestAnimationFrame(tick);
