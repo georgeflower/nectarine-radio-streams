@@ -26,7 +26,7 @@ const BoingBall = () => {
     window.addEventListener("resize", resize);
 
     // Ball state (in CSS px)
-    const R = () => Math.min(window.innerWidth, window.innerHeight) * 0.14;
+    const R = () => Math.min(window.innerWidth, window.innerHeight) * 0.07;
     let x = window.innerWidth * 0.3;
     let y = window.innerHeight * 0.3;
     let vx = 320; // px/s
