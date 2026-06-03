@@ -1,5 +1,11 @@
 # Nectarine Radio Streams
 
+## Development commands
+
+- `npm run test`
+- `npm run build`
+- `npm run lint`
+
 ## Optional now-playing metadata per station
 
 The player supports per-station now-playing polling for Media Session metadata (lock screen/car Bluetooth display).
