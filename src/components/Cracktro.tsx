@@ -68,12 +68,22 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
     }
     return "sinus";
   });
+  const [infobarOn, setInfobarOn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(STORAGE_INFOBAR) === "1";
+    } catch {
+      return false;
+    }
+  });
   useEffect(() => {
     try { localStorage.setItem(STORAGE_ON, scrollOn ? "1" : "0"); } catch { /* ignore */ }
   }, [scrollOn]);
   useEffect(() => {
     try { localStorage.setItem(STORAGE_MODE, mode); } catch { /* ignore */ }
   }, [mode]);
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_INFOBAR, infobarOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [infobarOn]);
 
   // Auto-hide UI (exit + controls) after 5s of no pointer activity.
   const [showControls, setShowControls] = useState(true);
