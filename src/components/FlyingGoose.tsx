@@ -101,25 +101,25 @@ const FRAMES: string[][] = [
     "........................",
     "........................",
   ],
-  // 4 — STANDING (tall S-neck, plump body, two orange legs)
+  // 4 — STANDING (long S-neck, plump body, two orange legs)
   [
-    "........................",
-    "..............KKKK......",
-    ".............KWWWWKK....",
-    ".............KWEWWWWKKDO",
-    ".............KWWWWWWWKDO",
-    ".............KWWWWWWKK..",
-    "..............KWWWWK....",
+    "............KKKK........",
+    "...........KWWWWK.......",
+    "...........KWEWWWKKDO...",
+    "...........KWWWWWKD.....",
+    "............KWWWK.......",
+    "............KWWK........",
+    "............KWWK........",
+    ".............KWWK.......",
+    ".............KWWK.......",
+    "..............KWWK......",
     "..............KWWWK.....",
-    ".............KWWWWK.....",
-    "............KWWWWWK.....",
-    "...........KWWWLLLWK....",
-    "..........KWLLLLLLLWK...",
-    ".........KWLLLLLLLLLWK..",
-    ".........KWLLLLLLLLLWK..",
-    "..........KGGGGGGGGGK...",
-    "...........KKKKKKKKK....",
-    "............O.....O.....",
+    ".............KWWWWWK....",
+    "............KWLLLLLWK...",
+    "...........KWLLLLLLLWK..",
+    "...........KWLLLLLLLWK..",
+    "............KGGGGGGGK...",
+    ".............KKKKKKK....",
     "............O.....O.....",
   ],
 ];
@@ -523,22 +523,28 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
       x = Math.max(-SPRITE_W, Math.min(w + SPRITE_W, x));
       y = Math.max(-SPRITE_H, Math.min(h + SPRITE_H, y));
 
-      const flapHz = reducedMotion ? 3 : 4 + speed / 60;
+      // Smoother, more even flap cycle. Slight speed influence kept tiny so
+      // the loop reads as a steady, natural wingbeat rather than a jitter.
+      const flapHz = reducedMotion ? 3 : 5.5 + speed / 240;
       frameAccum += dtMs;
       const frameDur = 1000 / flapHz;
       if (frameAccum >= frameDur) {
         frameIdx = (frameIdx + 1) % 4;
-        frameAccum = 0;
+        frameAccum -= frameDur; // preserve leftover for even cadence
         img.src = frames[frameIdx];
       }
 
       const facingLeft = Math.cos(heading) < 0;
       let pitch = Math.atan2(vy, Math.abs(vx)) * (180 / Math.PI);
       pitch = Math.max(-22, Math.min(22, pitch));
-      const visualRot = facingLeft ? -pitch : pitch;
+      // Subtle head bob + beak tilt synced to the flap cycle.
+      const flapPhase = (frameAccum / frameDur + frameIdx) * (Math.PI / 2);
+      const headBob = Math.sin(flapPhase) * 1.2; // px
+      const beakTilt = Math.cos(flapPhase) * 2.5; // deg
+      const visualRot = (facingLeft ? -pitch : pitch) + beakTilt;
       const scaleX = facingLeft ? -1 : 1;
 
-      wrap.style.transform = `translate3d(${x - SPRITE_W / 2}px, ${y - SPRITE_H / 2}px, 0) rotate(${visualRot}deg) scaleX(${scaleX})`;
+      wrap.style.transform = `translate3d(${x - SPRITE_W / 2}px, ${y - SPRITE_H / 2 + headBob}px, 0) rotate(${visualRot}deg) scaleX(${scaleX})`;
       positionBubble(x, y);
 
       raf = requestAnimationFrame(tick);
