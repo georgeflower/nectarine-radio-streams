@@ -668,6 +668,21 @@ export const useBpm = (
   const displayPeriodRef = useRef(INITIAL_PERIOD);
 
   useEffect(() => {
+    // Reset state when track changes so BPM detection starts fresh.
+    setState({
+      bpm: INITIAL_BPM,
+      beatIndex: 0,
+      beatCount: 0,
+      status: analyser && enabled ? "listening" : "no-audio",
+      beatTimes: [],
+      windowMs: WINDOW_MS,
+      lastComputeAt: 0,
+      lastBass: 0,
+      period: INITIAL_PERIOD,
+      phaseErrorMs: 0,
+      confidence: 0,
+    });
+
     if (!analyser || !enabled) {
       setState((st) => ({ ...st, status: "no-audio" }));
       return;
