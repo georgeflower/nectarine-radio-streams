@@ -591,11 +591,34 @@ export const useBeat = (analyser: AnalyserNode | null, enabled = true): number =
  *  - beatIndex: 0..3 (which sixteenth-of-a-bar this beat lands on, mod 4).
  *  - beat: increments each detected beat (use to drive grid animations).
  */
+export type BpmStatus = "no-audio" | "silent" | "listening" | "detecting" | "locked";
+
+export type BpmDebug = {
+  bpm: number;
+  beatIndex: number;
+  beatCount: number;
+  status: BpmStatus;
+  beatTimes: number[]; // timestamps (ms, performance.now) within window
+  windowMs: number;
+  lastComputeAt: number; // performance.now of last recompute (0 if never)
+  lastBass: number; // 0..1 current short-term bass envelope
+};
+
 export const useBpm = (
   analyser: AnalyserNode | null,
   enabled = true,
-): { bpm: number; beatIndex: number; beatCount: number } => {
-  const [state, setState] = useState({ bpm: 0, beatIndex: 0, beatCount: 0 });
+): BpmDebug => {
+  const WINDOW_MS = 10000;
+  const [state, setState] = useState<BpmDebug>({
+    bpm: 0,
+    beatIndex: 0,
+    beatCount: 0,
+    status: "no-audio",
+    beatTimes: [],
+    windowMs: WINDOW_MS,
+    lastComputeAt: 0,
+    lastBass: 0,
+  });
   const rafRef = useRef<number | null>(null);
   const intervalRef = useRef<number | null>(null);
   const shortAvgRef = useRef(0);
@@ -604,10 +627,15 @@ export const useBpm = (
   const beatTimesRef = useRef<number[]>([]);
   const beatIdxRef = useRef(0);
   const beatCountRef = useRef(0);
+  const lastBassRef = useRef(0);
 
   useEffect(() => {
     if (!analyser || !enabled) {
-      setState({ bpm: 0, beatIndex: 0, beatCount: 0 });
+      setState({
+        bpm: 0, beatIndex: 0, beatCount: 0,
+        status: "no-audio", beatTimes: [], windowMs: WINDOW_MS,
+        lastComputeAt: 0, lastBass: 0,
+      });
       return;
     }
     const buf = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>;
@@ -618,19 +646,17 @@ export const useBpm = (
       let sum = 0;
       for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
       const bass = sum / bEnd / 255;
-      // Fast envelope (short window) vs slow baseline (long window).
       shortAvgRef.current = shortAvgRef.current * 0.6 + bass * 0.4;
       longAvgRef.current = longAvgRef.current * 0.97 + bass * 0.03;
+      lastBassRef.current = shortAvgRef.current;
       if (cooldownRef.current > 0) cooldownRef.current -= 1;
 
       const s = shortAvgRef.current;
       const l = longAvgRef.current;
-      // Trigger when short-term energy spikes above long-term baseline.
       if (s > l * 1.25 && s > 0.05 && cooldownRef.current <= 0) {
-        cooldownRef.current = 8; // ~130ms @ 60fps -> caps at ~460 BPM
+        cooldownRef.current = 8;
         const now = performance.now();
         beatTimesRef.current.push(now);
-        // Keep last 12 seconds of beats.
         const cutoff = now - 12000;
         while (beatTimesRef.current.length && beatTimesRef.current[0] < cutoff) {
           beatTimesRef.current.shift();
@@ -638,7 +664,7 @@ export const useBpm = (
         beatCountRef.current += 1;
         beatIdxRef.current = (beatIdxRef.current + 1) % 4;
         setState((st) => ({
-          bpm: st.bpm,
+          ...st,
           beatIndex: beatIdxRef.current,
           beatCount: beatCountRef.current,
         }));
@@ -648,39 +674,57 @@ export const useBpm = (
 
     const recompute = () => {
       const now = performance.now();
-      const cutoff = now - 10000; // last 10s window
+      const cutoff = now - WINDOW_MS;
       const recent = beatTimesRef.current.filter((t) => t >= cutoff);
-      if (recent.length < 4) {
-        setState((st) => ({ ...st, bpm: 0 }));
-        return;
+      const lastBass = lastBassRef.current;
+      let bpm = 0;
+      let status: BpmStatus;
+
+      if (lastBass < 0.02) {
+        status = "silent";
+      } else if (recent.length === 0) {
+        status = "listening";
+      } else if (recent.length < 4) {
+        status = "detecting";
+      } else {
+        const intervals: number[] = [];
+        for (let i = 1; i < recent.length; i++) intervals.push(recent[i] - recent[i - 1]);
+        const valid = intervals.filter((d) => d > 270 && d < 1500);
+        if (valid.length < 3) {
+          status = "detecting";
+        } else {
+          const sorted = [...valid].sort((a, b) => a - b);
+          const median = sorted[Math.floor(sorted.length / 2)];
+          bpm = Math.round(60000 / median);
+          while (bpm < 60) bpm *= 2;
+          while (bpm > 180) bpm = Math.round(bpm / 2);
+          status = "locked";
+        }
       }
-      const intervals: number[] = [];
-      for (let i = 1; i < recent.length; i++) intervals.push(recent[i] - recent[i - 1]);
-      // Reject obvious outliers (40–220 BPM range).
-      const valid = intervals.filter((d) => d > 270 && d < 1500);
-      if (valid.length < 3) {
-        setState((st) => ({ ...st, bpm: 0 }));
-        return;
-      }
-      const sorted = [...valid].sort((a, b) => a - b);
-      const median = sorted[Math.floor(sorted.length / 2)];
-      let bpm = Math.round(60000 / median);
-      // Fold into a musical range (60–180).
-      while (bpm < 60) bpm *= 2;
-      while (bpm > 180) bpm = Math.round(bpm / 2);
-      setState((st) => ({ ...st, bpm }));
+
+      setState((st) => ({
+        ...st,
+        bpm,
+        status,
+        beatTimes: recent.slice(),
+        lastComputeAt: now,
+        lastBass,
+      }));
     };
 
     rafRef.current = requestAnimationFrame(tick);
     intervalRef.current = window.setInterval(recompute, 5000);
+    // also kick an initial compute soon so status shows quickly
+    const initTimer = window.setTimeout(recompute, 1000);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (intervalRef.current) clearInterval(intervalRef.current);
+      clearTimeout(initTimer);
     };
   }, [analyser, enabled]);
 
-
   return state;
 };
+
 
 

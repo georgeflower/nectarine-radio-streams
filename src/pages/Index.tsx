@@ -162,8 +162,10 @@ const Index = () => {
   });
   const inFlight = useRef(false);
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
-  const { bpm, beatIndex, beatCount } = useBpm(analyser, true);
+  const { bpm, beatIndex, beatCount, status: bpmStatus, beatTimes, windowMs, lastComputeAt, lastBass } = useBpm(analyser, true);
+  const [bpmDebugOpen, setBpmDebugOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
+
 
   useEffect(() => {
     try {
@@ -463,7 +465,59 @@ const Index = () => {
                           );
                         })}
                       </div>
+                      {(() => {
+                        const dot =
+                          bpmStatus === "locked" ? "hsl(var(--primary))" :
+                          bpmStatus === "detecting" ? "#facc15" :
+                          bpmStatus === "listening" ? "#38bdf8" :
+                          bpmStatus === "silent" ? "hsl(var(--muted-foreground))" :
+                          "#ef4444";
+                        const label =
+                          bpmStatus === "locked" ? `locked (${bpm})` :
+                          bpmStatus === "detecting" ? "detecting…" :
+                          bpmStatus === "listening" ? "listening…" :
+                          bpmStatus === "silent" ? "silent (no audio energy)" :
+                          "no audio";
+                        return (
+                          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground" title={`BPM status: ${label}`}>
+                            <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot, boxShadow: `0 0 6px ${dot}` }} />
+                            {label}
+                          </span>
+                        );
+                      })()}
+                      <button
+                        type="button"
+                        onClick={() => setBpmDebugOpen((v) => !v)}
+                        className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                        aria-expanded={bpmDebugOpen}
+                      >
+                        {bpmDebugOpen ? "hide debug" : "debug"}
+                      </button>
                     </div>
+                    {bpmDebugOpen && (
+                      <div className="mt-2 p-2 border border-border rounded bg-muted/20 text-[11px] font-mono leading-snug">
+                        <div>status: <span className="text-foreground">{bpmStatus}</span></div>
+                        <div>bpm: <span className="text-foreground">{bpm || "--"}</span> (recomputed every 5s)</div>
+                        <div>window: <span className="text-foreground">{Math.round(windowMs / 1000)}s</span></div>
+                        <div>beats in window: <span className="text-foreground">{beatTimes.length}</span> (total {beatCount})</div>
+                        <div>last bass envelope: <span className="text-foreground">{lastBass.toFixed(3)}</span></div>
+                        <div>
+                          last compute:{" "}
+                          <span className="text-foreground">
+                            {lastComputeAt ? `${Math.round((performance.now() - lastComputeAt) / 1000)}s ago` : "—"}
+                          </span>
+                        </div>
+                        <div className="mt-1">beat timestamps (ms, relative to now):</div>
+                        <div className="text-foreground break-all">
+                          {beatTimes.length === 0
+                            ? "—"
+                            : beatTimes
+                                .map((t) => `-${Math.round((performance.now() - t))}`)
+                                .join(", ")}
+                        </div>
+                      </div>
+                    )}
+
                   </>
                 ) : (
                   <p className="text-muted-foreground text-sm">No track info yet…</p>
