@@ -387,7 +387,25 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
           if (!ball.active) {
             g.targetX = rand(80, Math.max(120, w - 80));
             g.targetY = rand(80, Math.max(120, h - 120));
-          }
+      }
+
+      // Sitting behaviour — periodically the goose lands and rests for a few seconds.
+      geese.forEach((g) => {
+        if (!g.active || g.isAway || ball.active) return;
+        if (!g.isSitting && now >= g.nextSitAt) {
+          g.isSitting = true;
+          g.sitUntil = now + rand(4000, 9000);
+          g.targetX = Math.max(60, Math.min(w - SPRITE_W - 60, g.x));
+          g.targetY = h - SPRITE_H - 20;
+          g.headSwayAccum = 0;
+        } else if (g.isSitting && now >= g.sitUntil) {
+          g.isSitting = false;
+          g.nextSitAt = now + rand(25000, 55000);
+          g.targetX = rand(80, Math.max(120, w - 80));
+          g.targetY = rand(80, Math.max(120, h - 220));
+        }
+      });
+
           if (idx === 0 && geese[1].active && !geese[1].isAway && Math.random() < 0.22) {
             const pair = CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)];
             showBubble(0, pair[0], 1600);
