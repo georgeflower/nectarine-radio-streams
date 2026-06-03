@@ -585,3 +585,73 @@ export const useBeat = (analyser: AnalyserNode | null, enabled = true): number =
   return pulse;
 };
 
+/**
+ * Returns { bpm, beatIndex, beat } based on detected bass kicks.
+ *  - bpm: rolling-median tempo across recent beat intervals (0 until enough beats).
+ *  - beatIndex: 0..3 (which sixteenth-of-a-bar this beat lands on, mod 4).
+ *  - beat: increments each detected beat (use to drive grid animations).
+ */
+export const useBpm = (
+  analyser: AnalyserNode | null,
+  enabled = true,
+): { bpm: number; beatIndex: number; beatCount: number } => {
+  const [state, setState] = useState({ bpm: 0, beatIndex: 0, beatCount: 0 });
+  const rafRef = useRef<number | null>(null);
+  const avgRef = useRef(0);
+  const cooldownRef = useRef(0);
+  const lastBeatTsRef = useRef(0);
+  const intervalsRef = useRef<number[]>([]);
+  const beatIdxRef = useRef(0);
+  const beatCountRef = useRef(0);
+
+  useEffect(() => {
+    if (!analyser || !enabled) {
+      setState({ bpm: 0, beatIndex: 0, beatCount: 0 });
+      return;
+    }
+    const buf = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>;
+    const bEnd = Math.max(1, Math.floor(buf.length * 0.08));
+
+    const tick = () => {
+      analyser.getByteFrequencyData(buf);
+      let sum = 0;
+      for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
+      const bass = sum / bEnd / 255;
+      const avg = avgRef.current;
+      avgRef.current = avg * 0.92 + bass * 0.08;
+      if (cooldownRef.current > 0) cooldownRef.current -= 1;
+      if (bass > avg * 1.35 && bass > 0.15 && cooldownRef.current <= 0) {
+        const now = performance.now();
+        cooldownRef.current = 10;
+        if (lastBeatTsRef.current > 0) {
+          const delta = now - lastBeatTsRef.current;
+          // accept reasonable musical intervals (40–220 BPM)
+          if (delta > 270 && delta < 1500) {
+            const arr = intervalsRef.current;
+            arr.push(delta);
+            if (arr.length > 16) arr.shift();
+            const sorted = [...arr].sort((a, b) => a - b);
+            const median = sorted[Math.floor(sorted.length / 2)];
+            const bpm = Math.round(60000 / median);
+            beatCountRef.current += 1;
+            beatIdxRef.current = (beatIdxRef.current + 1) % 4;
+            setState({ bpm, beatIndex: beatIdxRef.current, beatCount: beatCountRef.current });
+          } else if (delta >= 1500) {
+            // reset tempo tracking on long gaps
+            intervalsRef.current = [];
+          }
+        }
+        lastBeatTsRef.current = now;
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [analyser, enabled]);
+
+  return state;
+};
+
+
