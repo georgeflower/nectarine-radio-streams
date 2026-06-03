@@ -159,6 +159,7 @@ const Index = () => {
     return "plasma";
   });
   const inFlight = useRef(false);
+  const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
 
   useEffect(() => {
     try {
