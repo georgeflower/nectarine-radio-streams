@@ -99,7 +99,7 @@ const ExtLink = ({ href, children, className }: ExtLinkProps) => {
   );
 };
 
-const VIZ_STYLES: VisualizerStyle[] = ["off", "starfield", "bars", "plasma", "oscilloscope"];
+const VIZ_STYLES: VisualizerStyle[] = ["off", "starfield", "bars", "plasma", "oscilloscope", "tunnel", "rings", "particles", "mirror"];
 const VIZ_STORAGE_KEY = "nectarine-viz";
 
 type ThemeId = "legacy" | "nectalift" | "nostalgia";
