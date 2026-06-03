@@ -59,7 +59,7 @@ const resolveArtworkUrl = (rawUrl: string | undefined, fallbackArtwork: string):
   }
 };
 
-const AudioPlayer = ({ streams, currentTrack, onAnalyserReady }: Props) => {
+const AudioPlayer = ({ streams, currentTrack, onAnalyserReady, onSeek }: Props) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
