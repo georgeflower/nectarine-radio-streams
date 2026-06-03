@@ -140,6 +140,12 @@ const BoingBall = () => {
     };
 
     const tick = (now: number) => {
+      // Opt 3: pause physics and rendering while the tab is hidden.
+      if (document.hidden) {
+        last = now; // reset so dt doesn't spike on resume
+        raf = requestAnimationFrame(tick);
+        return;
+      }
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
 

@@ -254,14 +254,12 @@ const Cracktro = ({
     // Tall enough that wave displacement + glyph + shadow blur never clips.
     const CSS_H = 360;
 
-    const resize = () => {
-      canvas.width = Math.floor(window.innerWidth * dpr);
-      canvas.height = Math.floor(CSS_H * dpr);
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${CSS_H}px`;
-    };
-    resize();
-    window.addEventListener("resize", resize);
+    // Do the initial canvas size synchronously so font metrics and the glyph
+    // cache are computed against the correct canvas height.
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(CSS_H * dpr);
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${CSS_H}px`;
 
     const fontSize = 64 * dpr;
     const fontStr = skin === "xm"
@@ -273,14 +271,116 @@ const Cracktro = ({
     const widths = chars.map((c) => ctx.measureText(c).width + 4 * dpr);
     const totalW = widths.reduce((a, b) => a + b, 0);
 
-    // Offscreen glyph canvas for clipped/banded skins.
-    const og = document.createElement("canvas");
-    og.height = canvas.height;
-    const octx = og.getContext("2d");
+    // Opt 6: per-glyph raster cache — pre-render each unique character once onto
+    // an offscreen canvas and reuse the bitmap every frame.  This avoids the
+    // expensive gradient + hatching compositing that `paintSkinned` did per frame.
+    // The xm shimmer uses a static t=0 (no frame-to-frame animation) — the
+    // difference is subtle and the savings are significant.
+    const glyphCache = new Map<string, HTMLCanvasElement>();
+
+    // Paints one glyph onto a caller-provided, pre-sized offscreen canvas.
+    const paintSkinnedToCanvas = (ch: string, cw: number, oc: HTMLCanvasElement, octx2: CanvasRenderingContext2D) => {
+      const ow = oc.width;
+      const oh = oc.height;
+      octx2.clearRect(0, 0, ow, oh);
+      const glyphH = fontSize * 0.82;
+      const top = oh / 2 - glyphH / 2;
+
+      if (skin === "amiga") {
+        const g = octx2.createLinearGradient(0, top, 0, top + glyphH);
+        g.addColorStop(0, "#fff3c4");
+        g.addColorStop(0.35, "#e6b94a");
+        g.addColorStop(0.65, "#8a5a14");
+        g.addColorStop(1, "#2a1604");
+        octx2.fillStyle = g;
+        octx2.fillRect(0, top, ow, glyphH);
+        // 45° dark hatching
+        octx2.fillStyle = "rgba(30,15,4,0.55)";
+        const stripeW = 3 * dpr;
+        for (let sx = -oh; sx < ow + oh; sx += stripeW * 2) {
+          octx2.beginPath();
+          octx2.moveTo(sx, 0);
+          octx2.lineTo(sx + oh, oh);
+          octx2.lineTo(sx + oh + stripeW, oh);
+          octx2.lineTo(sx + stripeW, 0);
+          octx2.closePath();
+          octx2.fill();
+        }
+      } else if (skin === "atari" || skin === "c64") {
+        const colors = skin === "atari"
+          ? ["#d8341c", "#f5c518", "#3aa84a", "#1f5fd6"]
+          : ["#c44a3a", "#e8c352", "#5aa86a"];
+        const bandH = glyphH / colors.length;
+        for (let i = 0; i < colors.length; i++) {
+          octx2.fillStyle = colors[i];
+          octx2.fillRect(0, top + i * bandH, ow, bandH + 0.5);
+        }
+      } else if (skin === "xm") {
+        const g = octx2.createLinearGradient(0, top, 0, top + glyphH);
+        g.addColorStop(0, "#0a1a3a");
+        g.addColorStop(0.3, "#2a6acc");
+        g.addColorStop(0.55, "#cfe1ff");
+        g.addColorStop(0.78, "#2a6acc");
+        g.addColorStop(1, "#0a1a3a");
+        octx2.fillStyle = g;
+        octx2.fillRect(0, top, ow, glyphH);
+        // Static shimmer at t=0 (no per-frame animation; acceptable trade-off for caching).
+        for (let yy = top; yy < top + glyphH; yy += 2 * dpr) {
+          const v = (Math.sin(yy * 0.09) + 1) * 0.5;
+          octx2.fillStyle = `rgba(255,255,255,${0.05 + v * 0.18})`;
+          octx2.fillRect(0, yy, ow, dpr);
+        }
+      }
+
+      // Clip the fill to the glyph silhouette.
+      octx2.globalCompositeOperation = "destination-in";
+      octx2.font = fontStr;
+      octx2.textBaseline = "middle";
+      octx2.fillStyle = "#fff";
+      octx2.fillText(ch, 2 * dpr, oh / 2);
+      octx2.globalCompositeOperation = "source-over";
+    };
+
+    const buildGlyphCache = () => {
+      glyphCache.clear();
+      if (skin === "default") return; // default skin draws text directly; no cache needed
+      const uniqueChars = [...new Set(chars)];
+      for (const ch of uniqueChars) {
+        const idx = chars.indexOf(ch);
+        const cw = widths[idx];
+        const oc = document.createElement("canvas");
+        oc.width = Math.max(1, Math.ceil(cw + 8 * dpr));
+        oc.height = canvas.height;
+        const octx2 = oc.getContext("2d");
+        if (octx2) paintSkinnedToCanvas(ch, cw, oc, octx2);
+        glyphCache.set(ch, oc);
+      }
+    };
+
+    // Build initial cache once the canvas has its final dimensions.
+    buildGlyphCache();
+
+    // Opt 7 (skinned skins): shadow settings are the same for every glyph
+    // within a skin; cache them so the per-frame glyph loop can skip them.
+    let skinnedShadowColor = "rgba(0,0,0,0.7)";
+    let skinnedShadowBlur = 4 * dpr;
+    if (skin === "amiga") { skinnedShadowColor = "rgba(0,0,0,0.85)"; skinnedShadowBlur = 6 * dpr; }
+    else if (skin === "xm") { skinnedShadowColor = "rgba(10,20,60,0.9)"; skinnedShadowBlur = 8 * dpr; }
+
+    const resize = () => {
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(CSS_H * dpr);
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${CSS_H}px`;
+      buildGlyphCache(); // Opt 6: glyph canvas height depends on canvas.height
+    };
+    window.addEventListener("resize", resize);
 
     let offset = 0;
     let t = 0;
     let raf = 0;
+    // Opt 4: delta-time tracking so scroller speed is frame-rate independent.
+    let last = 0;
 
     const drawBackdrop = (w: number, h: number) => {
       if (mode === "copper") {
@@ -299,71 +399,19 @@ const Cracktro = ({
       }
     };
 
-    // Paint one glyph onto the offscreen canvas (size already set), clipped to letter shape.
-    const paintSkinned = (ch: string, cw: number) => {
-      if (!octx) return;
-      const ow = og.width;
-      const oh = og.height;
-      octx.clearRect(0, 0, ow, oh);
-      const glyphH = fontSize * 0.82;
-      const top = oh / 2 - glyphH / 2;
-
-      if (skin === "amiga") {
-        const g = octx.createLinearGradient(0, top, 0, top + glyphH);
-        g.addColorStop(0, "#fff3c4");
-        g.addColorStop(0.35, "#e6b94a");
-        g.addColorStop(0.65, "#8a5a14");
-        g.addColorStop(1, "#2a1604");
-        octx.fillStyle = g;
-        octx.fillRect(0, top, ow, glyphH);
-        // 45° dark hatching
-        octx.fillStyle = "rgba(30,15,4,0.55)";
-        const stripeW = 3 * dpr;
-        for (let sx = -oh; sx < ow + oh; sx += stripeW * 2) {
-          octx.beginPath();
-          octx.moveTo(sx, 0);
-          octx.lineTo(sx + oh, oh);
-          octx.lineTo(sx + oh + stripeW, oh);
-          octx.lineTo(sx + stripeW, 0);
-          octx.closePath();
-          octx.fill();
-        }
-      } else if (skin === "atari" || skin === "c64") {
-        const colors = skin === "atari"
-          ? ["#d8341c", "#f5c518", "#3aa84a", "#1f5fd6"]
-          : ["#c44a3a", "#e8c352", "#5aa86a"];
-        const bandH = glyphH / colors.length;
-        for (let i = 0; i < colors.length; i++) {
-          octx.fillStyle = colors[i];
-          octx.fillRect(0, top + i * bandH, ow, bandH + 0.5);
-        }
-      } else if (skin === "xm") {
-        const g = octx.createLinearGradient(0, top, 0, top + glyphH);
-        g.addColorStop(0, "#0a1a3a");
-        g.addColorStop(0.3, "#2a6acc");
-        g.addColorStop(0.55, "#cfe1ff");
-        g.addColorStop(0.78, "#2a6acc");
-        g.addColorStop(1, "#0a1a3a");
-        octx.fillStyle = g;
-        octx.fillRect(0, top, ow, glyphH);
-        // animated horizontal shimmer scan lines (FT2 wave feel)
-        for (let yy = top; yy < top + glyphH; yy += 2 * dpr) {
-          const v = (Math.sin(yy * 0.09 + t * 2.4) + 1) * 0.5;
-          octx.fillStyle = `rgba(255,255,255,${0.05 + v * 0.18})`;
-          octx.fillRect(0, yy, ow, dpr);
-        }
+    const tick = (now: number) => {
+      // Opt 3: pause scroller loop while the tab is hidden.
+      if (document.hidden) {
+        last = 0; // reset so dt doesn't spike on resume
+        raf = requestAnimationFrame(tick);
+        return;
       }
 
-      // Clip the fill to the glyph silhouette.
-      octx.globalCompositeOperation = "destination-in";
-      octx.font = fontStr;
-      octx.textBaseline = "middle";
-      octx.fillStyle = "#fff";
-      octx.fillText(ch, 2 * dpr, oh / 2);
-      octx.globalCompositeOperation = "source-over";
-    };
+      // Opt 4: compute delta-time so scroll speed is independent of refresh rate.
+      // Cap at 50 ms to avoid a large jump after the tab was hidden or frozen.
+      const dt = last ? Math.min((now - last) / 1000, 0.05) : 0;
+      last = now;
 
-    const tick = () => {
       ctx.font = fontStr;
       ctx.textBaseline = "middle";
       const w = canvas.width;
@@ -376,6 +424,13 @@ const Cracktro = ({
       const amp = Math.min(h * 0.22, 80 * dpr);
 
       if (w - offset + totalW < 0) offset = 0;
+
+      // Opt 7 (skinned skins): set shadow once before the loop to avoid
+      // changing canvas state on every glyph iteration.
+      if (skin !== "default") {
+        ctx.shadowColor = skinnedShadowColor;
+        ctx.shadowBlur = skinnedShadowBlur;
+      }
 
       let x = w - offset;
       for (let i = 0; i < chars.length; i++) {
@@ -446,22 +501,9 @@ const Cracktro = ({
           ctx.fillStyle = `hsl(${(hue + 30) % 360}, 100%, 88%)`;
           ctx.fillText(chars[i], -cw / 2 + 2 * dpr, -2 * dpr);
         } else {
-          // Resize offscreen for this glyph (height is constant).
-          const ow = Math.max(1, Math.ceil(cw + 8 * dpr));
-          if (og.width !== ow) og.width = ow;
-          paintSkinned(chars[i], cw);
-          // Optional outline glow for legibility on the visualizer backdrop.
-          if (skin === "amiga") {
-            ctx.shadowColor = "rgba(0,0,0,0.85)";
-            ctx.shadowBlur = 6 * dpr;
-          } else if (skin === "xm") {
-            ctx.shadowColor = "rgba(10,20,60,0.9)";
-            ctx.shadowBlur = 8 * dpr;
-          } else {
-            ctx.shadowColor = "rgba(0,0,0,0.7)";
-            ctx.shadowBlur = 4 * dpr;
-          }
-          ctx.drawImage(og, -cw / 2, -og.height / 2);
+          // Opt 6: draw from pre-rendered glyph cache instead of repainting.
+          const gc = glyphCache.get(chars[i]);
+          if (gc) ctx.drawImage(gc, -cw / 2, -gc.height / 2);
           ctx.shadowBlur = 0;
         }
         ctx.restore();
@@ -469,8 +511,12 @@ const Cracktro = ({
         x += cw;
       }
 
-      offset += 3 * dpr;
-      t += 0.05;
+      // Opt 4: advance scroller position and wave phase using delta-time so
+      // speed is consistent across 30 fps, 60 fps, 120 fps, and 144 fps.
+      // Equivalent rates at 60 fps: offset += 3*dpr/frame → 180*dpr px/s;
+      //                             t += 0.05/frame → 3 rad/s.
+      offset += 180 * dpr * dt;
+      t += 3 * dt;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
