@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { SMILEYS } from "@/lib/smileys";
+import { boingBall, kickBoingBall } from "@/lib/boingBallState";
 import type { OnelinerEntry } from "@/lib/nectarine";
+
 
 const FRAMES: string[][] = [
   [
