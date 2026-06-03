@@ -463,9 +463,6 @@ const Index = () => {
                           );
                         })}
                       </div>
-                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground tabular-nums">
-                        · {beatCount} kicks
-                      </span>
                     </div>
                   </>
                 ) : (
