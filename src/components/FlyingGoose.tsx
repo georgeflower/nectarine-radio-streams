@@ -232,7 +232,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
       },
     ];
 
-    let ball = {
+    const ball = {
       active: false,
       x: w * 0.5,
       y: h * 0.45,
@@ -441,6 +441,8 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
         const wrap = wrapsRef.current[index];
         if (wrap) {
           const facingLeft = g.vx < 0;
+          const visible = !g.isAway || g.x <= w + SPRITE_W * 2;
+          wrap.style.opacity = visible ? "1" : "0";
           wrap.style.transform = `translate3d(${g.x}px, ${g.y}px, 0) scaleX(${facingLeft ? -1 : 1})`;
         }
 
@@ -527,15 +529,6 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
             <img
               ref={(el) => {
                 imgsRef.current[i] = el;
-                if (i === 1 && el) {
-                  const observer = new MutationObserver(() => {
-                    const parent = wrapsRef.current[1];
-                    if (!parent) return;
-                    const isVisible = parent.style.transform.includes("translate3d(-72px") ? false : true;
-                    if (isVisible) parent.style.opacity = "1";
-                  });
-                  observer.observe(el, { attributes: true, attributeFilter: ["src"] });
-                }
               }}
               alt=""
               width={SPRITE_W}
