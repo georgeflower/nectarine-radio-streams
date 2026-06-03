@@ -201,14 +201,25 @@ const Cracktro = ({
   ), [artist, title, platform, rating]);
 
   type Skin = "default" | "amiga" | "atari" | "c64" | "xm";
-  const skin = useMemo<Skin>(() => {
+  const autoSkin = useMemo<Skin>(() => {
     const p = (platform || "").toLowerCase();
-    const t = (title || "").toLowerCase();
     if (p.includes("amiga")) return "amiga";
     if (p.includes("atari")) return "atari";
     if (p.includes("c64") || p.includes("commodore 64")) return "c64";
     return "xm";
-  }, [platform, title]);
+  }, [platform]);
+  const [skinOverride, setSkinOverride] = useState<Skin | "auto">(() => {
+    try {
+      const v = localStorage.getItem("cracktro-skin-override") as Skin | "auto" | null;
+      if (v && ["auto", "default", "amiga", "atari", "c64", "xm"].includes(v)) return v;
+    } catch { /* ignore */ }
+    return "auto";
+  });
+  useEffect(() => {
+    try { localStorage.setItem("cracktro-skin-override", skinOverride); } catch { /* ignore */ }
+  }, [skinOverride]);
+  const skin: Skin = skinOverride === "auto" ? autoSkin : skinOverride;
+
 
 
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
@@ -663,6 +674,20 @@ const Cracktro = ({
               </button>
             ))}
           </div>
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Font</span>
+          <select
+            value={skinOverride}
+            onChange={(e) => setSkinOverride(e.target.value as Skin | "auto")}
+            className="min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
+          >
+            <option value="auto">Auto ({autoSkin})</option>
+            <option value="xm">XM</option>
+            <option value="amiga">Amiga</option>
+            <option value="atari">Atari</option>
+            <option value="c64">C64</option>
+            <option value="default">Default</option>
+          </select>
+
           <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Info Bar</span>
           <button
             type="button"
