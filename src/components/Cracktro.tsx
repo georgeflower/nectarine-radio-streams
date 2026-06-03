@@ -10,7 +10,18 @@ type Props = {
   title: string;
   songId?: string;
   onExit: () => void;
+  onStyleChange?: (s: VisualizerStyle) => void;
 };
+
+const VIZ_STYLES: { id: VisualizerStyle; label: string }[] = [
+  { id: "starfield", label: "Starfield" },
+  { id: "bars", label: "Bars" },
+  { id: "plasma", label: "Plasma" },
+  { id: "oscilloscope", label: "Scope" },
+  { id: "tunnel", label: "Tunnel" },
+  { id: "rings", label: "Rings" },
+  { id: "particles", label: "Particles" },
+];
 
 type ScrollMode =
   | "sinus"
@@ -34,7 +45,7 @@ const MODES: { id: ScrollMode; label: string }[] = [
 const STORAGE_MODE = "cracktro-scroll-mode";
 const STORAGE_ON = "cracktro-scroll-on";
 
-const Cracktro = ({ analyser, style, artist, title, songId, onExit }: Props) => {
+const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChange }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const onExitRef = useRef(onExit);
@@ -64,6 +75,27 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit }: Props) => 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_MODE, mode); } catch { /* ignore */ }
   }, [mode]);
+
+  // Auto-hide UI (exit + controls) after 5s of no pointer activity.
+  const [showControls, setShowControls] = useState(true);
+  const hideTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    const reveal = () => {
+      setShowControls(true);
+      if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = window.setTimeout(() => setShowControls(false), 5000);
+    };
+    reveal();
+    window.addEventListener("mousemove", reveal);
+    window.addEventListener("touchstart", reveal, { passive: true });
+    window.addEventListener("keydown", reveal);
+    return () => {
+      if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+      window.removeEventListener("mousemove", reveal);
+      window.removeEventListener("touchstart", reveal);
+      window.removeEventListener("keydown", reveal);
+    };
+  }, []);
 
   // Pull song info (platform/rating) from the entity cache.
   const [info, setInfo] = useState(() => (songId ? getCachedInfo("song", songId) : undefined));
@@ -327,50 +359,82 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit }: Props) => 
         </div>
       )}
 
-      {/* Top-right exit. */}
+      {/* Top-right exit — auto-hides with the controls. */}
       <button
         type="button"
         onClick={onExit}
-        className="absolute top-4 right-4 min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/80 text-foreground hover:bg-card hover:opacity-90 touch-manipulation"
+        className={`absolute top-4 right-4 min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/80 text-foreground hover:bg-card hover:opacity-90 touch-manipulation transition-opacity duration-500 ${
+          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
         style={{ zIndex: 10 }}
         aria-label="Exit fullscreen cracktro"
       >
         Exit ✕
       </button>
 
-      {/* Bottom controls bar: scroll on/off + mode picker. */}
+      {/* Bottom controls bar — scroller toggle + scroller mode + visualizer effect.
+          Hides after 5s of inactivity; reappears on mousemove/touch/keypress. */}
       <div
-        className="absolute left-0 right-0 bottom-0 flex flex-wrap items-center justify-center gap-2 px-3 py-2 bg-card/70 border-t border-border backdrop-blur-sm"
+        className={`absolute left-0 right-0 bottom-0 flex flex-col gap-1.5 px-3 py-2 bg-card/70 border-t border-border backdrop-blur-sm transition-opacity duration-500 ${
+          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
         style={{ zIndex: 11 }}
       >
-        <button
-          type="button"
-          onClick={() => setScrollOn((v) => !v)}
-          className="min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
-          aria-pressed={scrollOn}
-        >
-          Scroller: {scrollOn ? "ON" : "OFF"}
-        </button>
-        <div className="flex flex-wrap items-center gap-1">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => { setMode(m.id); if (!scrollOn) setScrollOn(true); }}
-              disabled={!scrollOn}
-              className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                mode === m.id
-                  ? "border-primary bg-primary/20 text-foreground"
-                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              } ${!scrollOn ? "opacity-40 cursor-not-allowed" : ""}`}
-            >
-              {m.label}
-            </button>
-          ))}
+        {/* Row 1: scroller controls */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mr-1">Scroller</span>
+          <button
+            type="button"
+            onClick={() => setScrollOn((v) => !v)}
+            className="min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
+            aria-pressed={scrollOn}
+          >
+            {scrollOn ? "ON" : "OFF"}
+          </button>
+          <div className="flex flex-wrap items-center gap-1">
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => { setMode(m.id); if (!scrollOn) setScrollOn(true); }}
+                disabled={!scrollOn}
+                className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                  mode === m.id
+                    ? "border-primary bg-primary/20 text-foreground"
+                    : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                } ${!scrollOn ? "opacity-40 cursor-not-allowed" : ""}`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <span className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground ml-2">
-          ESC to exit
-        </span>
+
+        {/* Row 2: visualizer effect picker */}
+        {onStyleChange && (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mr-1">Effect</span>
+            <div className="flex flex-wrap items-center gap-1">
+              {VIZ_STYLES.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => onStyleChange(v.id)}
+                  className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                    style === v.id
+                      ? "border-primary bg-primary/20 text-foreground"
+                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            <span className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground ml-2">
+              ESC to exit
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
