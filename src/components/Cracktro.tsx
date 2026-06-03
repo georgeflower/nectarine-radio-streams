@@ -29,8 +29,7 @@ type ScrollMode =
   | "zoomer"
   | "wobble"
   | "copper"
-  | "vector"
-  | "infobar";
+  | "vector";
 
 const MODES: { id: ScrollMode; label: string }[] = [
   { id: "sinus", label: "Sinus" },
@@ -39,11 +38,11 @@ const MODES: { id: ScrollMode; label: string }[] = [
   { id: "wobble", label: "Wobble" },
   { id: "copper", label: "Copper" },
   { id: "vector", label: "Vector" },
-  { id: "infobar", label: "Info Bar" },
 ];
 
 const STORAGE_MODE = "cracktro-scroll-mode";
 const STORAGE_ON = "cracktro-scroll-on";
+const STORAGE_INFOBAR = "cracktro-infobar-on";
 
 const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChange }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
