@@ -8,8 +8,7 @@ export type VisualizerStyle =
   | "oscilloscope"
   | "tunnel"
   | "rings"
-  | "particles"
-  | "mirror";
+  | "particles";
 
 type Props = {
   analyser: AnalyserNode | null;
