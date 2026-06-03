@@ -105,6 +105,23 @@ const Cracktro = ({
   useEffect(() => {
     try { localStorage.setItem(STORAGE_INFOBAR, infobarOn ? "1" : "0"); } catch { /* ignore */ }
   }, [infobarOn]);
+  const [panelsOn, setPanelsOn] = useState<Record<PanelId, boolean>>(() => {
+    const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: false, history: false };
+    try {
+      const raw = localStorage.getItem(STORAGE_PANELS);
+      if (raw) {
+        const v = JSON.parse(raw) as Partial<Record<PanelId, boolean>>;
+        return { ...defaults, ...v };
+      }
+    } catch {
+      // ignore
+    }
+    return defaults;
+  });
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_PANELS, JSON.stringify(panelsOn)); } catch { /* ignore */ }
+  }, [panelsOn]);
+  const togglePanel = (id: PanelId) => setPanelsOn((p) => ({ ...p, [id]: !p[id] }));
 
   // Auto-hide UI (exit + controls) after 5s of no pointer activity.
   const [showControls, setShowControls] = useState(true);
