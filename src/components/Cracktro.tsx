@@ -117,7 +117,7 @@ const Cracktro = ({ analyser, style, artist, title, onExit }: Props) => {
         if (x > w) break;
         // Travelling wave: the crest sweeps rightward through the letters
         // instead of every glyph bobbing in lockstep.
-        const phase = x * 0.014 - t * 2.2;
+        const phase = x * 0.006 - t * 2.2;
         const y = cy + Math.sin(phase) * amp;
         const hue = (x * 0.4 + t * 60) % 360;
         ctx.shadowColor = `hsl(${hue}, 100%, 55%)`;
