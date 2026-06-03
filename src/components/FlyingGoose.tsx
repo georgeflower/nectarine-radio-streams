@@ -366,11 +366,14 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
 
     const wrap = wrapRef.current;
     const img = imgRef.current;
-    const imgStand = imgStandRef.current;
+    const imgBody = imgStandBodyRef.current;
+    const imgHead = imgStandHeadRef.current;
     const bubble = bubbleRef.current;
-    if (!wrap || !img || !imgStand || !bubble) return;
+    if (!wrap || !img || !imgBody || !imgHead || !bubble) return;
     img.src = frames[0];
-    imgStand.src = frames[STAND_FRAME];
+    imgBody.src = frames[STAND_BODY];
+    imgHead.src = frames[STAND_HEAD];
+
 
 
     const pickPerch = ():
