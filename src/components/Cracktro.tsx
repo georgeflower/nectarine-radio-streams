@@ -236,6 +236,10 @@ const Cracktro = ({
     try { localStorage.setItem("cracktro-boing", boingOn ? "1" : "0"); } catch { /* ignore */ }
   }, [boingOn]);
 
+  // Geese can request the Boing ball to appear so they can play with it.
+  const [gooseWantsBall, setGooseWantsBall] = useState(false);
+
+
 
 
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
@@ -486,8 +490,9 @@ const Cracktro = ({
     >
       <Visualizer analyser={analyser} style={style === "off" ? "tunnel" : style} />
       <BeatOverlay analyser={analyser} enabled />
-      {gooseOn && <FlyingGoose oneliners={oneliners} />}
-      {boingOn && <BoingBall />}
+      {gooseOn && <FlyingGoose oneliners={oneliners} onBallModeChange={setGooseWantsBall} />}
+      {(boingOn || (gooseOn && gooseWantsBall)) && <BoingBall />}
+
 
       {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
       {scrollOn && (

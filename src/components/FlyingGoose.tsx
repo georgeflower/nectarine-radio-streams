@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { SMILEYS } from "@/lib/smileys";
+import { boingBall, kickBoingBall } from "@/lib/boingBallState";
 import type { OnelinerEntry } from "@/lib/nectarine";
+
 
 const FRAMES: string[][] = [
   [
@@ -177,6 +179,7 @@ type Goose = {
 
 type Props = {
   oneliners?: OnelinerEntry[];
+  onBallModeChange?: (active: boolean) => void;
 };
 
 const CHAT_LINES: [string, string][] = [
@@ -191,14 +194,18 @@ const LONELY_LINES = [
   "I'm so lonely! ��",
 ];
 
-const FlyingGoose = ({ oneliners = [] }: Props) => {
+const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
   const wrapsRef = useRef<Array<HTMLDivElement | null>>([]);
   const imgsRef = useRef<Array<HTMLImageElement | null>>([]);
   const bubblesRef = useRef<Array<HTMLDivElement | null>>([]);
-  const ballRef = useRef<HTMLDivElement | null>(null);
   const lastOnelinerKeyRef = useRef<string | null>(null);
+  const onBallModeChangeRef = useRef(onBallModeChange);
+  useEffect(() => {
+    onBallModeChangeRef.current = onBallModeChange;
+  }, [onBallModeChange]);
 
   useEffect(() => {
+
     const whiteFrames = buildFrameSvgs(WHITE_COLORS);
     const brownFrames = buildFrameSvgs(BROWN_COLORS);
     const frameSets = [whiteFrames, brownFrames];
@@ -244,11 +251,9 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
 
     const ball = {
       active: false,
-      x: w * 0.5,
-      y: h * 0.45,
-      vx: 120,
-      vy: 90,
       until: 0,
+      catcherIndex: 0 as 0 | 1,
+      cooldownUntil: 0,
     };
 
     const startAt = performance.now();
@@ -287,13 +292,10 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
 
     const startBallMode = (now: number) => {
       ball.active = true;
-      ball.x = (geese[0].x + geese[1].x) / 2;
-      ball.y = (geese[0].y + geese[1].y) / 2;
-      ball.vx =
-        (Math.random() < 0.5 ? -1 : 1) * rand(BALL_START_VX_MIN, BALL_START_VX_MAX);
-      ball.vy =
-        (Math.random() < 0.5 ? -1 : 1) * rand(BALL_START_VY_MIN, BALL_START_VY_MAX);
       ball.until = now + rand(45000, 120000);
+      ball.catcherIndex = Math.random() < 0.5 ? 0 : 1;
+      ball.cooldownUntil = now + 600;
+      onBallModeChangeRef.current?.(true);
       showBubble(0, "Kickoff! ⚽", 1600);
       showBubble(1, "Pass!", 1600);
     };
@@ -301,7 +303,9 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     const stopBallMode = (now: number) => {
       ball.active = false;
       nextBallModeAt = now + rand(90000, 200000);
+      onBallModeChangeRef.current?.(false);
     };
+
 
     const tick = (now: number) => {
       const dtMs = Math.min(64, now - last);
@@ -370,22 +374,34 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
         });
       }
 
-      if (ball.active) {
-        ball.x += ball.vx * dt;
-        ball.y += ball.vy * dt;
-        if (ball.x < 10) {
-          ball.x = 10;
-          ball.vx = Math.abs(ball.vx);
-        } else if (ball.x > w - 10) {
-          ball.x = w - 10;
-          ball.vx = -Math.abs(ball.vx);
+      // Read the shared Amiga Boing ball position (set by BoingBall component).
+      const bx = boingBall.x;
+      const by = boingBall.y;
+      const br = boingBall.r || 40;
+      const ballReady = ball.active && boingBall.mounted;
+      const MIN_SEP = Math.max(180, SPRITE_W * 2.4);
+
+      if (ballReady) {
+        const catcher = geese[ball.catcherIndex];
+        const otherIdx: 0 | 1 = ball.catcherIndex === 0 ? 1 : 0;
+        const other = geese[otherIdx];
+
+        // Catcher chases the ball, slightly above so its head meets it.
+        if (catcher.active && !catcher.isAway) {
+          catcher.targetX = bx - SPRITE_W / 2;
+          catcher.targetY = by - SPRITE_H / 2 - br * 0.2;
         }
-        if (ball.y < 10) {
-          ball.y = 10;
-          ball.vy = Math.abs(ball.vy);
-        } else if (ball.y > h - 10) {
-          ball.y = h - 10;
-          ball.vy = -Math.abs(ball.vy);
+
+        // Non-catcher waits at a receiver spot on the opposite side, keeping
+        // a comfortable distance from the catcher.
+        if (other.active && !other.isAway) {
+          const catcherCx = catcher.x + SPRITE_W / 2;
+          const sideSign = catcherCx < w / 2 ? 1 : -1;
+          let rx = bx + sideSign * MIN_SEP;
+          rx = Math.max(60, Math.min(w - SPRITE_W - 60, rx));
+          const ry = Math.max(80, Math.min(h - SPRITE_H - 80, by - 30));
+          other.targetX = rx;
+          other.targetY = ry;
         }
       }
 
@@ -394,17 +410,28 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
 
         if (g.isAway && g.x > w + SPRITE_W * 2) return;
 
-        if (ball.active && (!g.isAway || index === 0)) {
-          g.targetX = ball.x + (index === 0 ? -35 : 35);
-          g.targetY = ball.y + (index === 0 ? -18 : 18);
-        }
-
         const dx = g.targetX - g.x;
         const dy = g.targetY - g.y;
         const dist = Math.hypot(dx, dy) || 1;
-        const desiredSpeed = ball.active ? 155 : g.speed;
+        const isCatcher = ballReady && index === ball.catcherIndex;
+        const desiredSpeed = ballReady ? (isCatcher ? 185 : 130) : g.speed;
         g.vx += ((dx / dist) * desiredSpeed - g.vx) * Math.min(1, dt * 2.3);
         g.vy += ((dy / dist) * desiredSpeed - g.vy) * Math.min(1, dt * 2.3);
+
+        // Soft repulsion: never let geese overlap, especially during ball play.
+        if (ballReady) {
+          const mate = geese[index === 0 ? 1 : 0];
+          if (mate.active && !mate.isAway) {
+            const sx = g.x - mate.x;
+            const sy = g.y - mate.y;
+            const sd = Math.hypot(sx, sy) || 1;
+            if (sd < MIN_SEP) {
+              const push = (MIN_SEP - sd) / MIN_SEP;
+              g.vx += (sx / sd) * push * 220 * dt;
+              g.vy += (sy / sd) * push * 120 * dt;
+            }
+          }
+        }
 
         g.x += g.vx * dt;
         g.y += g.vy * dt;
@@ -426,23 +453,35 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
           }
         }
 
-        if (ball.active) {
-          const dBall = Math.hypot(g.x + SPRITE_W / 2 - ball.x, g.y + SPRITE_H / 2 - ball.y);
-          if (dBall < 55) {
+        // Only the current catcher can actually strike the ball — this
+        // enforces strict alternation ("every second time").
+        if (ballReady && isCatcher && now >= ball.cooldownUntil) {
+          const gcx = g.x + SPRITE_W / 2;
+          const gcy = g.y + SPRITE_H / 2;
+          const dBall = Math.hypot(gcx - bx, gcy - by);
+          if (dBall < br + SPRITE_W * 0.35) {
             const mate = geese[index === 0 ? 1 : 0];
             const tx = mate.active && !mate.isAway ? mate.x + SPRITE_W / 2 : (index === 0 ? w * 0.75 : w * 0.25);
             const ty = mate.active && !mate.isAway ? mate.y + SPRITE_H / 2 : h * 0.5;
-            const pdx = tx - ball.x;
-            const pdy = ty - ball.y;
+            const pdx = tx - bx;
+            const pdy = ty - by;
             const plen = Math.hypot(pdx, pdy) || 1;
-            const kick = rand(BALL_KICK_MIN, BALL_KICK_MAX);
-            ball.vx = (pdx / plen) * kick + rand(-20, 20);
-            ball.vy = (pdy / plen) * kick + rand(-20, 20);
+            const kickH = rand(BALL_KICK_MIN, BALL_KICK_MAX) * 1.4;
+            const lift = -Math.abs(rand(380, 540)); // upward arc
+            kickBoingBall(
+              (pdx / plen) * kickH + rand(-30, 30),
+              lift + (pdy / plen) * 60,
+            );
+            ball.catcherIndex = index === 0 ? 1 : 0;
+            ball.cooldownUntil = now + 450;
+            if (Math.random() < 0.35) {
+              showBubble(index, "Pass!", 900);
+            }
           }
         }
 
         g.frameAccum += dtMs;
-        const frameDur = ball.active ? 95 : 125;
+        const frameDur = ballReady ? 95 : 125;
         if (g.frameAccum >= frameDur) {
           g.frameAccum -= frameDur;
           g.frame = (g.frame + 1) % 4;
@@ -467,11 +506,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
         maybeHideBubble(index, now);
       });
 
-      const ballEl = ballRef.current;
-      if (ballEl) {
-        ballEl.style.opacity = ball.active ? "1" : "0";
-        ballEl.style.transform = `translate3d(${ball.x - 10}px, ${ball.y - 10}px, 0)`;
-      }
+
 
       raf = requestAnimationFrame(tick);
     };
@@ -581,24 +616,6 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
         </div>
       ))}
 
-      <div
-        ref={ballRef}
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: 20,
-          height: 20,
-          borderRadius: "50%",
-          border: "2px solid #1a1a1a",
-          background:
-            "radial-gradient(circle at 30% 30%, #fff 0%, #fff 18%, #e11d48 19%, #e11d48 46%, #fff 47%, #fff 70%, #111 71%, #111 100%)",
-          boxShadow: "0 0 10px rgba(255,255,255,0.4)",
-          opacity: 0,
-          transition: "opacity 180ms ease-out",
-          zIndex: 61,
-        }}
-      />
     </div>
   );
 };
