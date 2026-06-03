@@ -1,84 +1,46 @@
 ## Goal
 
-Make BPM detection actually track the music by running an internal metronome that **phase-locks** to detected onsets, instead of trying to compute BPM cold from a 10-second autocorrelation every 5 seconds.
+Bring `useBpm` closer to `librosa.beat.beat_track` by adopting its three signature pieces — a **log-mel onset strength envelope**, an **autocorrelation tempo estimate weighted by a log-Gaussian prior around 125 BPM**, and a **dynamic-programming beat tracker** — and use the result to lock the existing phase-locked metronome.
 
-## Why this approach
+librosa runs offline on the whole file; we can't. The adaptation is to run the same math on a rolling window (~8 s) every ~1 s and feed the result into the metronome we already have, which keeps ticking between updates.
 
-The current code does two things that fight each other:
-1. A bass-energy threshold detector that fires "beats" whenever the bass jumps.
-2. An autocorrelation over a 10s window that picks the best 60–180 BPM.
+## What changes vs today
 
-Both produce noisy output on real demoscene/chip tracks (sparse kicks, melodic bass, irregular tempos) and rarely converge. The user's intuition — "compare to my own metronome and sync the click" — is exactly the standard real-time beat-tracking technique used in DJ software and Ellis/Large-style trackers.
+Today `useBpm` does:
+- raw spectral flux per frame
+- whitened peak picking → onsets
+- phase/period nudges from median inter-onset
+- coarse autocorrelation only as a re-seed safety net
 
-Best-practice pipeline for real-time beat tracking:
+The librosa-style upgrade:
+1. **Onset strength** — replace raw flux with log-mel flux: build a small fixed mel filterbank (≈40 bands, 0–8 kHz), apply `log1p` to each band, sum positive frame-to-frame differences, half-wave rectify, normalize. This is exactly `librosa.onset.onset_strength` at low cost and is far more reliable on chip/synth music than full-spectrum flux.
+2. **Tempo estimate** — every ~1 s, autocorrelate the last ~8 s of onset envelope. Multiply the autocorrelation by a **log-Gaussian prior**: `exp(-0.5 · ((log2(bpm/125) / 1.0))²)` (librosa defaults, with our 125 BPM seed). Pick the peak in 60–200 BPM. This is what librosa does in `librosa.beat.tempo`.
+3. **DP beat tracker** — over the same 8 s onset envelope at the estimated period `P`, run Ellis' DP:
+   - score[i] = onset[i] + max over j<i of (score[j] − λ · (log((i−j)/P))²)
+   - backtrack from the best end frame to get a beat sequence
+   - λ ≈ 100 (librosa's `tightness=100` default)
+   This gives a clean, globally-consistent beat grid for the window, immune to single-onset noise.
+4. **Drive the metronome from the DP grid** — take the last DP beat time + period as the new phase reference. If it agrees with the current metronome within ±period·0.1, just nudge (`alpha` small) so the click stays smooth. If it disagrees beyond that and the DP confidence is high, snap.
+5. **Confidence** — derived from how strong the chosen autocorrelation peak is vs the rest, and how consistent successive DP grids are. Replaces the current heuristic confidence so the existing "don't update often once confident" behavior still works.
 
-1. **Onset envelope** — spectral flux across the full spectrum (sum of positive bin-to-bin energy deltas), not just bass. This works for chip/synth music where the "kick" isn't always sub-bass.
-2. **Tempo estimate** — autocorrelation / comb filter of the onset envelope to find period (used only as a coarse prior, refined continuously).
-3. **Phase-locked oscillator** — an internal metronome with `period` and `phase`. Every onset nudges the phase toward the nearest expected beat and adapts the period slightly. This is the "metronome that syncs" the user described.
-4. **Start prior** — initialize at 125 BPM, period = 480 ms. Adapt from there.
-
-## Plan
-
-### 1. Rewrite `useBpm` in `src/components/Visualizer.tsx`
-
-Replace the existing onset/autocorrelation/threshold mix with a phase-locked tracker:
-
-- **Onset envelope** per animation frame:
-  - Pull full `getByteFrequencyData`.
-  - Compute spectral flux = sum of `max(0, currentBin − prevBin)` across all bins, normalized.
-  - Apply a short adaptive whitening (subtract a slow moving mean, divide by slow moving std) so loud and quiet sections behave the same.
-- **Onset detection**: peak in the whitened flux above a small threshold (e.g. `mean + 1.2·std`) with a 70 ms refractory period.
-- **Metronome state**:
-  - `period` (ms), initialized to `60000 / 125 = 480`.
-  - `nextBeatAt` (performance.now ms), initialized to `now + period`.
-  - `confidence` (0..1), initialized to 0.
-- **On each detected onset at time `t`**:
-  - Compute `error = t − nearestExpectedBeat(t)` (signed, within ±period/2).
-  - **Phase correction**: `nextBeatAt += error · α` with `α ≈ 0.18` (gentle pull toward the onset, prevents jitter).
-  - **Period correction**: keep a small rolling buffer of the last ~8 inter-onset intervals folded into the current period range; nudge `period += (medianFoldedInterval − period) · β` with `β ≈ 0.05`. Clamp period to 333–1000 ms (60–180 BPM) and fold octaves (×2 / ÷2) toward the current estimate to avoid half/double-time flips.
-  - Bump `confidence` toward 1 when the error is small (`|error| < period · 0.08`), decay otherwise.
-- **Coarse tempo prior** (runs every 4 s in the background): autocorrelation of the last 6 s of onset envelope, only used to **reset** the tracker if `confidence` stays below ~0.15 for >10 s. Prevents getting stuck on a wrong tempo without overriding a good lock.
-- **Beat ticks**: a separate rAF loop advances `nextBeatAt` whenever `now ≥ nextBeatAt` and increments `beatIndex` / `beatCount`. This is the "silent metronome click" that drives the UI animations.
-
-### 2. Update `BpmDebug` shape (minor, keep names compatible)
-
-Keep the existing exported fields (`bpm`, `beatIndex`, `beatCount`, `status`, `beatTimes`, `windowMs`, `lastComputeAt`, `lastBass`) and add:
-
-- `period` (ms) — current tracker period.
-- `phaseErrorMs` — last onset's phase error.
-- `confidence` (0..1) — tracker lock confidence.
-
-`bpm` is derived as `Math.round(60000 / period)`.
-
-`status` mapping:
-- `no-audio` — analyser missing.
-- `silent` — flux mean below floor.
-- `listening` — has audio, <2 s of onsets so far.
-- `detecting` — confidence < 0.35.
-- `locked` — confidence ≥ 0.35.
-
-### 3. Surface new fields in the debug panel
-
-`src/pages/Index.tsx` already destructures `useBpm()` and renders a debug panel. Extend it to show period (ms), confidence, and last phase error so the user can see the metronome sync visually. No layout changes needed; just add three rows.
-
-### 4. Keep BPM publicly stable
-
-The `bpm` value shown in the header still updates once per second (smoothed), so it does not jitter even though the internal period adapts every onset.
-
-## Non-goals
-
-- No external libraries.
-- No change to the visualizer, cracktro, or any audio routing.
-- No change to the BPM indicator dot colors or layout.
+The existing metronome rAF loop, lazy-start on first audio, silence detection, octave folding, displayed-BPM smoothing, and debug panel all stay. Only the onset extractor, the prior-weighted tempo estimator, and the DP beat selector are new/replaced.
 
 ## Technical notes
 
-- All math runs in the existing rAF loop already feeding the analyser; no extra audio worklet needed.
-- The metronome rAF must run even when no onsets are detected (so beats keep ticking through quiet bars).
-- Octave folding rule: when a candidate new period would change BPM by more than ~25%, multiply/divide by 2 first and only accept if the folded version is closer to the current period.
-- Reset rule: if `confidence < 0.15` for >10 s **and** the autocorrelation prior disagrees with current period by >15%, snap `period` to the prior and reset `nextBeatAt = now + period`.
+- **Mel filterbank** — precomputed once: 40 triangular filters over the analyser's `frequencyBinCount` linear bins, mel-spaced 0–8 kHz. Stored as `Float32Array[]` of bin-weights so per-frame cost is one dot product per band.
+- **Onset envelope buffer** — circular `Float32Array` sized to 8 s at the rAF rate (~60 Hz → 480 samples). Cheap.
+- **Autocorrelation** — only lags corresponding to 60–200 BPM (≈ 18–60 frames at 60 Hz). ~40 lags × 480 samples ≈ 19 k mults every second. Trivial.
+- **Prior** — `weight(lag) = exp(-0.5 · (log2(bpmAtLag/125))²)`, applied as a multiplier on the autocorrelation before peak-picking.
+- **DP** — O(N·W) where N≈480 frames, W ≈ ±20% of P ≈ ~20 frames → ~10 k ops per recompute. Also trivial.
+- **Re-seed cadence** — DP runs at most once per second; metronome rAF keeps ticking at 60 Hz between updates. Once `confidence > 0.7`, DP recomputes drop to once every ~2 s to satisfy the "don't update often when confident" rule.
+- **No new deps**, no audio worklet, no change to `Visualizer` rendering, `Cracktro`, audio routing, or the debug panel layout (same fields: `bpm`, `period`, `confidence`, `phaseErrorMs`, `windowMs`, `beatTimes`, `lastBass`).
 
 ## Files touched
 
-- `src/components/Visualizer.tsx` — replace `useBpm` body and `estimateBpmFromSamples` helper.
-- `src/pages/Index.tsx` — add 3 debug rows (period / confidence / phase error). No other UI changes.
+- `src/components/Visualizer.tsx` — replace the onset extractor and the autocorrelation/re-seed block inside `useBpm` with the mel-flux + prior-weighted autocorr + DP beat tracker. Wire its output into the existing metronome state.
+
+## Non-goals
+
+- No librosa runtime in the browser (it's Python/C). We port the algorithm, not the package.
+- No change to UI, visual styles, scrollers, or audio pipeline.
+- No offline/whole-track analysis — strictly the rolling-window adaptation.
