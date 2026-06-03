@@ -331,8 +331,13 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
 
       if (!geese[1].active && now >= brownJoinAt && geese[0].active) {
         geese[1].active = true;
-        geese[1].x = Math.min(w - SPRITE_W, geese[0].x + 120);
-        geese[1].y = Math.min(h - SPRITE_H, geese[0].y + 60);
+        // Enter by flying in from the right edge.
+        geese[1].x = w + SPRITE_W;
+        geese[1].y = rand(120, Math.max(140, h - 200));
+        geese[1].vx = -110;
+        geese[1].vy = 0;
+        geese[1].targetX = Math.max(60, geese[0].x - 140);
+        geese[1].targetY = geese[0].y + 20;
         showBubble(0, "Hi!", 1700);
         showBubble(1, "Hi!", 1700);
       }
