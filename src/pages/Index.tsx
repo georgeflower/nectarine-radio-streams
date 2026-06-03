@@ -498,9 +498,10 @@ const Index = () => {
                     {bpmDebugOpen && (
                       <div className="mt-2 p-2 border border-border rounded bg-muted/20 text-[11px] font-mono leading-snug">
                         <div>status: <span className="text-foreground">{bpmStatus}</span></div>
-                        <div>bpm: <span className="text-foreground">{bpm || "--"}</span> (recomputed every 5s)</div>
+                        <div>bpm: <span className="text-foreground">{bpm || "--"}</span> · period: <span className="text-foreground">{Math.round(period)}ms</span></div>
+                        <div>confidence: <span className="text-foreground">{confidence.toFixed(2)}</span> · phase err: <span className="text-foreground">{phaseErrorMs >= 0 ? "+" : ""}{Math.round(phaseErrorMs)}ms</span></div>
                         <div>window: <span className="text-foreground">{Math.round(windowMs / 1000)}s</span></div>
-                        <div>beats in window: <span className="text-foreground">{beatTimes.length}</span> (total {beatCount})</div>
+                        <div>metronome ticks in window: <span className="text-foreground">{beatTimes.length}</span> (total {beatCount})</div>
                         <div>last bass envelope: <span className="text-foreground">{lastBass.toFixed(3)}</span></div>
                         <div>
                           last compute:{" "}
