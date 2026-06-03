@@ -709,6 +709,20 @@ const Cracktro = ({
           >
             {infobarOn ? "ON" : "OFF"}
           </button>
+
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Goose</span>
+          <button
+            type="button"
+            onClick={() => setGooseOn((v) => !v)}
+            className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              gooseOn
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-pressed={gooseOn}
+            title="Toggle flying goose"
+          >
+            {gooseOn ? "ON" : "OFF"}
         </div>
 
         {/* Row: floating panel toggles */}
