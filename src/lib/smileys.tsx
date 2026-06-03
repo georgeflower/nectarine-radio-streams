@@ -162,12 +162,13 @@ export function renderWithSmileys(text: string): ReactNode[] {
   while ((m = SMILEY_PATTERN.exec(text)) !== null) {
     if (m.index > last) out.push(text.slice(last, m.index));
     const code = m[0];
+    const canonical = LOWERCASE_TO_CODE[code.toLowerCase()] ?? code;
     out.push(
       <img
         key={`s-${key++}`}
-        src={SMILEYS[code]}
-        alt={code}
-        title={code}
+        src={SMILEYS[canonical]}
+        alt={canonical}
+        title={canonical}
         loading="lazy"
         className="inline-block h-4 align-text-bottom mx-0.5"
       />,
