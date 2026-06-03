@@ -18,6 +18,10 @@ type Props = {
 const Cracktro = ({ analyser, style, artist, title, onExit }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const onExitRef = useRef(onExit);
+  useEffect(() => {
+    onExitRef.current = onExit;
+  }, [onExit]);
 
   // Request browser fullscreen when mounted, release on unmount.
   useEffect(() => {
@@ -28,12 +32,18 @@ const Cracktro = ({ analyser, style, artist, title, onExit }: Props) => {
     }).requestFullscreen ?? (el as HTMLElement & {
       webkitRequestFullscreen?: () => Promise<void>;
     }).webkitRequestFullscreen;
-    req?.call(el).catch(() => {
-      // ignore — overlay still works without true fullscreen
-    });
+    let entered = false;
+    Promise.resolve(req?.call(el))
+      .then(() => {
+        entered = !!document.fullscreenElement;
+      })
+      .catch(() => {
+        // ignore — overlay still works without true fullscreen
+      });
 
     const onFsChange = () => {
-      if (!document.fullscreenElement) onExit();
+      // Only exit when we actually entered fullscreen and the user left it.
+      if (entered && !document.fullscreenElement) onExitRef.current();
     };
     document.addEventListener("fullscreenchange", onFsChange);
     return () => {
@@ -42,16 +52,16 @@ const Cracktro = ({ analyser, style, artist, title, onExit }: Props) => {
         document.exitFullscreen?.().catch(() => undefined);
       }
     };
-  }, [onExit]);
+  }, []);
 
   // Esc handler (works even outside the browser's native fullscreen).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onExit();
+      if (e.key === "Escape") onExitRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onExit]);
+  }, []);
 
   // Sinus scroller.
   useEffect(() => {
