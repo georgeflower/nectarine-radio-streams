@@ -16,9 +16,17 @@ import type { OnelinerEntry } from "@/lib/nectarine";
 //          O orange beak/feet, D dark orange (beak shadow), E eye.
 // 24 x 18 grid for richer shading than the old 20x14 sprite.
 
+// Common goose body + slim straight neck + small round head w/ eye + beak.
+// Identical across all 4 flying frames so the neck stays a consistent width
+// and the head reads as an actual goose head. Only wings change per frame.
+//
+// Layout (cols/rows):
+//   body         cols 4-13, rows 6-12
+//   neck (slim)  cols 9-14, rows 7-9  (2-row K outline + 1-row L fill)
+//   head         cols 15-18, rows 6-10 (with eye at col 16 row 7)
+//   beak         cols 19-22, rows 7-9
 const FRAMES: string[][] = [
-  // 0 — FLY: wings high (upstroke peak). Compact body, very long
-  // forward-extended neck terminating in a small head + orange beak.
+  // 0 — FLY: wings high (upstroke peak).
   [
     "...KK...................",
     "..KGGK..................",
@@ -26,35 +34,35 @@ const FRAMES: string[][] = [
     "..KGWWGK................",
     "...KGWWGK...............",
     "....KGWWGK..............",
-    ".....KWWWWKK............",
-    "....KWLLLLLLWKKKKKKKDO..",
-    "....KWLLLLLLLLLLLLLLEKDO",
-    "....KWLLLLLLWKKKKKKKKKD.",
-    ".....KGLLLLWK...........",
-    "......KGGGGK............",
-    ".......KKKK.............",
+    ".....KWWWWKK....KKKK....",
+    "....KWLLLLLLWKKKWEWWK...",
+    "....KWLLLLLLLLWWWWWKKDO.",
+    ".....KGLLLLLWKKKWWWWKKD.",
+    "......KGGGGGK....KKKK...",
+    ".......KKKKK............",
     "........O.O.............",
+    "........................",
     "........................",
     "........................",
     "........................",
     "........................",
   ],
-  // 1 — FLY: wings mid-up. Same long neck silhouette.
+  // 1 — FLY: wings mid-up.
   [
     "........................",
     "...KKK..................",
     "..KGGGK.................",
     "..KGWWGKK...............",
-    "...KGWWWGKK.............",
-    "....KGGWWWGKK...........",
-    ".....KKGGWWGKK..........",
-    "......KWWWWWWKKKKKKDO...",
-    ".....KWLLLLLLLLLLLLLEKDO",
-    ".....KWLLLLLLWKKKKKKKKD.",
-    "......KGLLLLWK..........",
-    ".......KGGGK............",
-    "........KKK.............",
+    "...KGWWWGK..............",
+    "....KGGWWGK.............",
+    ".....KWWWWKK....KKKK....",
+    "....KWLLLLLLWKKKWEWWK...",
+    "....KWLLLLLLLLWWWWWKKDO.",
+    ".....KGLLLLLWKKKWWWWKKD.",
+    "......KGGGGGK....KKKK...",
+    ".......KKKKK............",
     "........O.O.............",
+    "........................",
     "........................",
     "........................",
     "........................",
@@ -64,18 +72,18 @@ const FRAMES: string[][] = [
   [
     "........................",
     "........................",
-    "....KKKKKK..............",
-    "...KGWWWWGKK............",
-    "....KGGWWWWGKKK.........",
-    ".....KKGGWWWWGKK........",
-    "......KWWLLLLLWKK.......",
-    ".....KWLLLLLLLLLLLLKKDO.",
-    ".....KWLLLLLLLLLLLLLLEKDO",
-    ".....KWLLLLLLLLLLLLKKKKD",
-    "......KGLLLLLLLWK.......",
-    ".......KGGGGGK..........",
-    "........KKKKK...........",
-    ".........O.O............",
+    "..KKK...................",
+    ".KGGGK..................",
+    "KGWWWGK.................",
+    ".KGGWWGK................",
+    ".....KWWWWKK....KKKK....",
+    "....KWLLLLLLWKKKWEWWK...",
+    "....KWLLLLLLLLWWWWWKKDO.",
+    ".....KGLLLLLWKKKWWWWKKD.",
+    "......KGGGGGK....KKKK...",
+    ".......KKKKK............",
+    "........O.O.............",
+    "........................",
     "........................",
     "........................",
     "........................",
@@ -86,21 +94,21 @@ const FRAMES: string[][] = [
     "........................",
     "........................",
     "........................",
-    ".......KWWWWKK..........",
-    "......KWWLLLLLWKK.......",
-    ".....KWLLLLLLLLLLLLKKDO.",
-    ".....KWLLLLLLLLLLLLLLEKDO",
-    ".....KWLLLLLLLLLLLLKKKKD",
-    "....KGGWLLLLLLWK........",
-    "...KGGGWLLLWK...........",
-    "..KGWWWGGGK.............",
-    ".KGGWWGK................",
-    ".KGGGGK.................",
-    "..KKKK..................",
-    ".........O.O............",
     "........................",
     "........................",
     "........................",
+    ".....KWWWWKK....KKKK....",
+    "....KWLLLLLLWKKKWEWWK...",
+    "....KWLLLLLLLLWWWWWKKDO.",
+    ".....KGLLLLLWKKKWWWWKKD.",
+    "......KGGGGGK....KKKK...",
+    ".......KKKKK............",
+    "........O.O.............",
+    "....KGWWGK..............",
+    "...KGWWWWGK.............",
+    "..KGWWWWWGK.............",
+    "..KGWWWGK...............",
+    "...KKKK.................",
   ],
 
   // 4 — STANDING (full sprite, kept for compatibility / fallback)
@@ -124,21 +132,21 @@ const FRAMES: string[][] = [
     ".........KKKKKKK........",
     "........O.....O.........",
   ],
-  // 5 — STANDING BODY (static layer). Includes a short vertical neck
-  // "collar" centered on col 11.5 so the rotating head sprite always
-  // lands on a continuous neck regardless of which way it's turned.
+  // 5 — STANDING BODY (static layer). No vertical neck collar — the whole
+  // neck lives in the head sprite, so when the head turns there are no
+  // leftover white pixels behind the rotating head.
   [
     "........................",
     "........................",
     "........................",
     "........................",
     "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
     "..........KWWK..........",
-    "..........KWWK..........",
-    "..........KWWK..........",
-    "..........KWWK..........",
-    "..........KWWK..........",
-    "..........KWWWK.........",
     ".........KWWWWWK........",
     "........KWLLLLLWK.......",
     ".......KWLLLLLLLWK......",
@@ -147,9 +155,9 @@ const FRAMES: string[][] = [
     ".........KKKKKKK........",
     "........O.....O.........",
   ],
-  // 6 — STANDING HEAD (rotates / flips). Head + a short upper-neck stub
-  // ending in a symmetric 2-pixel base at row 7 (cols 10-13) so the
-  // mirror around col 11.5 keeps the base exactly on the body's collar.
+  // 6 — STANDING HEAD (rotates / sways). Contains the FULL neck so the
+  // whole head+neck swings as one rigid piece, pivoting where the neck
+  // meets the body (col 11.5, row 10).
   [
     "........KKKK............",
     ".......KWWWWK...........",
@@ -157,10 +165,10 @@ const FRAMES: string[][] = [
     ".......KWWWWWKD.........",
     "........KWWWK...........",
     "........KWWK............",
-    ".........KWWK...........",
-    "..........KWWK..........",
-    "........................",
-    "........................",
+    "........KWWK............",
+    "........KWWK............",
+    "........KWWK............",
+    "........KWWK............",
     "........................",
     "........................",
     "........................",
@@ -705,9 +713,10 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
             position: "absolute",
             inset: 0,
             opacity: 0,
-            // Pivot at the neck base (cols 10-13 centerline ⇒ 11.5, row 7)
-            // so flips & rotation stay anchored to the body's neck collar.
-            transformOrigin: `${11.5 * PIXEL}px ${7 * PIXEL}px`,
+            // Pivot at the neck base where it meets the body (col 11.5,
+            // row 10) so the entire head+neck swings as one piece and the
+            // body stays still with no white pixels exposed behind it.
+            transformOrigin: `${11.5 * PIXEL}px ${10 * PIXEL}px`,
 
 
             transition: "opacity 260ms ease-out",
