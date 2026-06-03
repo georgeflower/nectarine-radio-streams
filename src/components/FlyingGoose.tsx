@@ -393,9 +393,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
         if (!perchAlive()) {
           startle();
         } else {
-          const r = perchEl!.getBoundingClientRect();
-          const cx = r.left + r.width / 2;
-          const topY = r.top;
+          const { cx, topY, sink } = perchTarget();
           if (elapsed >= nextLookAt) {
             lookDir = (lookDir === 1 ? -1 : 1) as 1 | -1;
             nextLookAt = elapsed + rand(700, 1900);
@@ -403,9 +401,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
           const idleBob = Math.sin(elapsed / 320) * 0.8;
           const idleSway = Math.sin(elapsed / 540) * 0.6;
           const tx = cx - SPRITE_W / 2 + idleSway;
-          // Feet should visually rest on the glyph cap. Letter rect top sits
-          // above the visible cap because of line-height, so overlap by 10px.
-          const ty = topY - SPRITE_H + 10 + idleBob;
+          const ty = topY - SPRITE_H + sink + idleBob;
           wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) scaleX(${lookDir})`;
           positionBubble(cx, topY);
           if (elapsed >= takeoffAt) takeoff();
