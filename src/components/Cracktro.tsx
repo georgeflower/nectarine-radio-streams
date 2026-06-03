@@ -3,6 +3,7 @@ import Visualizer, { type VisualizerStyle } from "./Visualizer";
 import BeatOverlay from "./BeatOverlay";
 import FloatingWindow from "./FloatingWindow";
 import FlyingGoose from "./FlyingGoose";
+import BoingBall from "./BoingBall";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 import type { OnelinerEntry, QueueEntry } from "@/lib/nectarine";
 import { renderWithSmileys } from "@/lib/smileys";
@@ -227,6 +228,13 @@ const Cracktro = ({
   useEffect(() => {
     try { localStorage.setItem("cracktro-goose", gooseOn ? "1" : "0"); } catch { /* ignore */ }
   }, [gooseOn]);
+
+  const [boingOn, setBoingOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("cracktro-boing") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("cracktro-boing", boingOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [boingOn]);
 
 
 
@@ -479,6 +487,7 @@ const Cracktro = ({
       <Visualizer analyser={analyser} style={style === "off" ? "tunnel" : style} />
       <BeatOverlay analyser={analyser} enabled />
       {gooseOn && <FlyingGoose />}
+      {boingOn && <BoingBall />}
 
       {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
       {scrollOn && (
@@ -724,6 +733,21 @@ const Cracktro = ({
             title="Toggle flying goose"
           >
             {gooseOn ? "ON" : "OFF"}
+          </button>
+
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Boing</span>
+          <button
+            type="button"
+            onClick={() => setBoingOn((v) => !v)}
+            className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              boingOn
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-pressed={boingOn}
+            title="Toggle Amiga boing ball"
+          >
+            {boingOn ? "ON" : "OFF"}
           </button>
         </div>
 
