@@ -620,9 +620,9 @@ export const useBpm = (
       const avg = avgRef.current;
       avgRef.current = avg * 0.92 + bass * 0.08;
       if (cooldownRef.current > 0) cooldownRef.current -= 1;
-      if (bass > avg * 1.35 && bass > 0.15 && cooldownRef.current <= 0) {
+      if (bass > avg * 1.22 && bass > 0.06 && cooldownRef.current <= 0) {
         const now = performance.now();
-        cooldownRef.current = 10;
+        cooldownRef.current = 8;
         if (lastBeatTsRef.current > 0) {
           const delta = now - lastBeatTsRef.current;
           // accept reasonable musical intervals (40–220 BPM)
@@ -639,7 +639,14 @@ export const useBpm = (
           } else if (delta >= 1500) {
             // reset tempo tracking on long gaps
             intervalsRef.current = [];
+            beatCountRef.current += 1;
+            beatIdxRef.current = (beatIdxRef.current + 1) % 4;
+            setState((s) => ({ bpm: s.bpm, beatIndex: beatIdxRef.current, beatCount: beatCountRef.current }));
           }
+        } else {
+          // first beat — register it so the grid pulses immediately
+          beatCountRef.current += 1;
+          setState((s) => ({ ...s, beatCount: beatCountRef.current }));
         }
         lastBeatTsRef.current = now;
       }
