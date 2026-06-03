@@ -292,6 +292,7 @@ const Index = () => {
           title={now?.song ?? ""}
           songId={now?.songId}
           onExit={() => setCracktroOpen(false)}
+          onStyleChange={(s) => setVizStyle(s)}
         />
       )}
       <main
