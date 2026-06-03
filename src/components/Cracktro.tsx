@@ -677,6 +677,28 @@ const Cracktro = ({
           </button>
         </div>
 
+        {/* Row: floating panel toggles */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mr-1">Panels</span>
+          <div className="flex flex-wrap items-center gap-1">
+            {PANELS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => togglePanel(p.id)}
+                className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                  panelsOn[p.id]
+                    ? "border-primary bg-primary/20 text-foreground"
+                    : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                }`}
+                aria-pressed={panelsOn[p.id]}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Row 2: visualizer effect picker */}
         {onStyleChange && (
           <div className="flex flex-wrap items-center justify-center gap-2">
