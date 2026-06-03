@@ -503,18 +503,20 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
             lookDir = (lookDir === 1 ? -1 : 1) as 1 | -1;
             nextLookAt = elapsed + rand(1400, 2800);
           }
-          // Smooth horizontal scale tween — passes through ~0 so the head
-          // visually "turns" instead of snapping. Body stays put because
-          // standing frame is centered on sprite midline.
+          // Smooth horizontal scale tween — passes through ~0 so only the
+          // HEAD visually turns. The body sprite is a separate layer and
+          // stays perfectly still.
           lookScale += (lookDir - lookScale) * Math.min(1, dt * 7);
-          // Subtle idle micro-wiggle: tiny rotation + neck bob, no silhouette
-          // change. Sprite stays still overall, just feels alive.
+          // Subtle idle micro-wiggle applied to the head only.
           const wiggle =
-            Math.sin(elapsed / 720) * 1.1 + Math.sin(elapsed / 1130) * 0.5;
-          const neckBob = Math.sin(elapsed / 420) * 0.6;
+            Math.sin(elapsed / 720) * 2.2 + Math.sin(elapsed / 1130) * 1.1;
+          const neckBob = Math.sin(elapsed / 520) * 0.5;
           const tx = cx - SPRITE_W / 2;
-          const ty = topY - SPRITE_H + sink + neckBob;
-          wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) rotate(${wiggle}deg) scaleX(${lookScale})`;
+          const ty = topY - SPRITE_H + sink;
+          // Wrap: position only — no flipping, no rotation. Body stays put.
+          wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
+          // Head: scale + wiggle, pivoting at the base of the neck.
+          imgHead.style.transform = `translateY(${neckBob}px) rotate(${wiggle}deg) scaleX(${lookScale})`;
           positionBubble(cx, topY);
           if (elapsed >= takeoffAt) takeoff();
           raf = requestAnimationFrame(tick);
@@ -526,13 +528,14 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
         const shake = Math.sin(elapsed / 35) * 2;
         const baseX = x - SPRITE_W / 2 + shake;
         const baseY = y - SPRITE_H / 2;
-        wrap.style.transform = `translate3d(${baseX}px, ${baseY}px, 0) scaleX(${lookScale})`;
-
+        wrap.style.transform = `translate3d(${baseX}px, ${baseY}px, 0)`;
+        imgHead.style.transform = `scaleX(${lookScale})`;
         positionBubble(x, y);
         if (elapsed >= startleEnd) takeoff();
         raf = requestAnimationFrame(tick);
         return;
       }
+
 
       // ===== FLY / APPROACH =====
       if (mode === "fly" && elapsed >= nextPerchAt) {
