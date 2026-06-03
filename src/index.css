@@ -169,13 +169,7 @@
   .panel {
     @apply bg-card/80 border border-border rounded-sm p-4 backdrop-blur-sm;
     box-shadow: inset 0 0 30px hsl(20 30% 0% / 0.6), 0 0 0 1px hsl(28 60% 25% / 0.4);
-  [data-scanlines="off"] body {
-    background-image: none;
   }
-  [data-scanlines="off"] .crt::before {
-    display: none;
-  }
-}
   [data-theme="gem"] .panel,
   [data-theme="workbench"] .panel {
     @apply bg-card backdrop-blur-none;
