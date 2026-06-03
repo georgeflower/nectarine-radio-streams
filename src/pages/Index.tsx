@@ -339,6 +339,14 @@ const Index = () => {
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={() => setScanlines((s) => !s)}
+              aria-pressed={scanlines}
+              title="Toggle CRT scanlines"
+              className="min-h-11 px-2 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation"
+            >
+              Scanlines: {scanlines ? "On" : "Off"}
             <select
               value={vizStyle}
               onChange={(e) => setVizStyle(e.target.value as VisualizerStyle)}
