@@ -90,6 +90,7 @@ const FloatingWindow = ({ id, title, defaultX, defaultY, defaultW = 280, default
       }}
     >
       <div
+        data-goose-perch="window"
         className="flex items-center justify-between px-2 py-1 border-b border-border bg-background/60 cursor-move select-none touch-none"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

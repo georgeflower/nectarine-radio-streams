@@ -269,6 +269,8 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     let mode: Mode = "fly";
     let perchEl: HTMLElement | null = null;
     let perchChar = "";
+    let perchKind: "letter" | "window" = "letter";
+    let perchOffset = 0.5; // horizontal position along perch (0..1)
     let nextPerchAt = nextPerchDelay();
     let takeoffAt = 0;
     let nextLookAt = 0;
@@ -281,16 +283,40 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     if (!wrap || !img || !bubble) return;
     img.src = frames[0];
 
-    const pickPerch = (): { el: HTMLElement; char: string } | null => {
+    const pickPerch = ():
+      | { el: HTMLElement; char: string; kind: "letter" | "window"; offset: number }
+      | null => {
       const candidates = Array.from(
-        document.querySelectorAll<HTMLElement>("[data-goose-letter]"),
+        document.querySelectorAll<HTMLElement>(
+          "[data-goose-letter], [data-goose-perch]",
+        ),
       ).filter((el) => {
         const r = el.getBoundingClientRect();
         return r.width > 6 && r.height > 6 && r.top > 40 && r.bottom < h - 20;
       });
       if (candidates.length === 0) return null;
       const el = candidates[Math.floor(Math.random() * candidates.length)];
-      return { el, char: el.getAttribute("data-goose-letter") || "" };
+      const isLetter = el.hasAttribute("data-goose-letter");
+      return {
+        el,
+        char: isLetter ? el.getAttribute("data-goose-letter") || "" : "",
+        kind: isLetter ? "letter" : "window",
+        // Letters: dead-center. Windows: random spot along the bar.
+        offset: isLetter ? 0.5 : 0.15 + Math.random() * 0.7,
+      };
+    };
+
+    // Returns the visual landing point (center x, top y of the perch surface)
+    // and how much the sprite should sink onto the surface.
+    const perchTarget = (): { cx: number; topY: number; sink: number } => {
+      const r = perchEl!.getBoundingClientRect();
+      const cx = r.left + r.width * perchOffset;
+      if (perchKind === "letter") {
+        // Letter rect top sits above the visible cap because of line-height.
+        return { cx, topY: r.top, sink: 10 };
+      }
+      // Window title bar — feet rest right on the top edge.
+      return { cx, topY: r.top, sink: 2 };
     };
 
     const showStartleBubble = () => {
@@ -309,13 +335,13 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     };
 
     const setLanded = () => {
-      const r = perchEl!.getBoundingClientRect();
+      const { cx, topY, sink } = perchTarget();
       lookDir = Math.random() < 0.5 ? -1 : 1;
       img.src = frames[STAND_FRAME];
       takeoffAt = elapsed + sitDuration();
       nextLookAt = elapsed + rand(700, 1600);
-      x = r.left + r.width / 2;
-      y = r.top - SPRITE_H / 2;
+      x = cx;
+      y = topY - SPRITE_H + sink + SPRITE_H / 2;
     };
 
     const startle = () => {
@@ -345,11 +371,16 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
 
       hideBubbleIfExpired(now);
 
-      const perchAlive = () =>
-        !!perchEl &&
-        perchEl.isConnected &&
-        (perchEl.getAttribute("data-goose-letter") || "") === perchChar &&
-        perchEl.textContent === perchChar;
+      const perchAlive = () => {
+        if (!perchEl || !perchEl.isConnected) return false;
+        if (perchKind === "letter") {
+          return (
+            (perchEl.getAttribute("data-goose-letter") || "") === perchChar &&
+            perchEl.textContent === perchChar
+          );
+        }
+        return perchEl.hasAttribute("data-goose-perch");
+      };
 
       // Reposition the bubble above the goose every frame while visible.
       const positionBubble = (cx: number, cy: number) => {
@@ -362,9 +393,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
         if (!perchAlive()) {
           startle();
         } else {
-          const r = perchEl!.getBoundingClientRect();
-          const cx = r.left + r.width / 2;
-          const topY = r.top;
+          const { cx, topY, sink } = perchTarget();
           if (elapsed >= nextLookAt) {
             lookDir = (lookDir === 1 ? -1 : 1) as 1 | -1;
             nextLookAt = elapsed + rand(700, 1900);
@@ -372,9 +401,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
           const idleBob = Math.sin(elapsed / 320) * 0.8;
           const idleSway = Math.sin(elapsed / 540) * 0.6;
           const tx = cx - SPRITE_W / 2 + idleSway;
-          // Feet should visually rest on the glyph cap. Letter rect top sits
-          // above the visible cap because of line-height, so overlap by 10px.
-          const ty = topY - SPRITE_H + 10 + idleBob;
+          const ty = topY - SPRITE_H + sink + idleBob;
           wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) scaleX(${lookDir})`;
           positionBubble(cx, topY);
           if (elapsed >= takeoffAt) takeoff();
@@ -400,8 +427,10 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
         if (p) {
           perchEl = p.el;
           perchChar = p.char;
+          perchKind = p.kind;
+          perchOffset = p.offset;
           mode = "approach";
-          targetSpeed = 110; // normal cruise — do NOT sprint to the letter
+          targetSpeed = 110; // normal cruise — do NOT sprint to the perch
         } else {
           nextPerchAt = elapsed + rand(4000, 9000);
         }
@@ -412,12 +441,10 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
           mode = "fly";
           nextPerchAt = elapsed + nextPerchDelay();
         } else {
-          const r = perchEl!.getBoundingClientRect();
-          const tx = r.left + r.width / 2;
-          const ty = r.top - SPRITE_H / 2 + 2;
-          // Steer heading toward landing point, keep normal flight speed.
+          const { cx, topY, sink } = perchTarget();
+          const tx = cx;
+          const ty = topY - SPRITE_H + sink + SPRITE_H / 2;
           targetHeading = Math.atan2(ty - y, tx - x);
-          // Snap to land when close enough.
           if (Math.hypot(tx - x, ty - y) < 8) {
             x = tx;
             y = ty;
