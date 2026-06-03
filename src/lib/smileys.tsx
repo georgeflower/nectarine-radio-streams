@@ -136,6 +136,12 @@ export const SMILEYS: Record<string, string> = {
   ":1*:": `${BASE}/static/emoticons/1star.gif`,
 };
 
+// Case-insensitive lookup: lowercase code -> canonical key in SMILEYS
+const LOWERCASE_TO_CODE: Record<string, string> = {};
+for (const code of Object.keys(SMILEYS)) {
+  LOWERCASE_TO_CODE[code.toLowerCase()] = code;
+}
+
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -143,7 +149,7 @@ function escapeRegex(s: string) {
 // Build a single regex once, sorted longest-first so e.g. ":facepalm2:" wins over ":facepalm:"
 const SMILEY_PATTERN = (() => {
   const codes = Object.keys(SMILEYS).sort((a, b) => b.length - a.length);
-  return new RegExp(codes.map(escapeRegex).join("|"), "g");
+  return new RegExp(codes.map(escapeRegex).join("|"), "gi");
 })();
 
 export function renderWithSmileys(text: string): ReactNode[] {
