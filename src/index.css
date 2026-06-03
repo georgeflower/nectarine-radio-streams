@@ -163,6 +163,12 @@
     font-family: "Chicago", "Pixelated MS Sans Serif", Geneva, Verdana, sans-serif;
     background-image: none;
   }
+  html[data-scanlines="off"] body {
+    background-image: none;
+  }
+  html[data-scanlines="off"] .crt::before {
+    display: none;
+  }
 }
 
 @layer components {
