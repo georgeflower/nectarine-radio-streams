@@ -596,13 +596,15 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
         const wrap = wrapsRef.current[index];
         if (wrap) {
           let facingLeft = g.vx < 0;
+          let tiltDeg = 0;
           if (g.isSitting) {
-            // Gentle head sway side-to-side while resting.
-            facingLeft = Math.sin(g.headSwayAccum / 700) < 0;
+            // Keep a consistent facing while perched, and tilt the head.
+            facingLeft = g.perchFacingLeft;
+            tiltDeg = Math.sin(g.headSwayAccum / 520) * 14;
           }
           const visible = !g.isAway || g.x <= w + SPRITE_W * 2;
           wrap.style.opacity = visible ? "1" : "0";
-          wrap.style.transform = `translate3d(${g.x}px, ${g.y}px, 0) scaleX(${facingLeft ? -1 : 1})`;
+          wrap.style.transform = `translate3d(${g.x}px, ${g.y}px, 0) scaleX(${facingLeft ? -1 : 1}) rotate(${tiltDeg}deg)`;
         }
 
         const bubble = bubblesRef.current[index];
