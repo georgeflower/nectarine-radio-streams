@@ -490,6 +490,7 @@ const Visualizer = ({ analyser, style }: Props) => {
     if (style === "off") {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     } else {
+      lastTimeRef.current = 0;
       rafRef.current = requestAnimationFrame(render);
     }
 
