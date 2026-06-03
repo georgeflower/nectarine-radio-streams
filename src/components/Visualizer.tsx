@@ -607,16 +607,21 @@ export type BpmDebug = {
   confidence: number; // 0..1 tracker lock confidence
 };
 
-// Phase-locked metronome beat tracker.
+// Real-time beat tracker, ported from librosa.beat.beat_track:
 //
-// Pipeline (industry-standard for real-time beat tracking):
-//   1. Spectral flux per frame -> adaptive-whitened onset envelope.
-//   2. Peak picking on the envelope = "onsets".
-//   3. A free-running metronome (period + nextBeatAt) is nudged in PHASE
-//      toward each onset and slowly adapts its PERIOD from the median of
-//      recent inter-onset intervals (octave-folded into the current range).
-//   4. A coarse autocorrelation prior runs periodically as a safety net to
-//      re-seed the period when confidence stays low.
+//   1. Log-mel onset strength envelope (a la librosa.onset.onset_strength):
+//      40 mel bands 0-8 kHz, log1p compression, half-wave-rectified
+//      frame-to-frame flux, summed across bands.
+//   2. Tempo estimate (a la librosa.beat.tempo): autocorrelation of the
+//      onset envelope over a rolling ~8 s window, multiplied by a
+//      log-Gaussian prior centered at 125 BPM, peak picked in 60-200 BPM.
+//   3. Dynamic-programming beat tracker (Ellis 2007 / librosa default):
+//      score[i] = onset[i] + max_j ( score[j] - tightness * log(dt/P)^2 ),
+//      backtracked to a globally consistent beat sequence over the window.
+//   4. The DP grid drives a free-running metronome (period + nextBeatAt)
+//      that keeps ticking at 60 Hz between recomputes. Phase nudges when
+//      the new grid agrees, snaps when it strongly disagrees with high
+//      confidence. Recompute cadence stretches from 1 s -> 2 s once locked.
 //
 // Starts at 125 BPM (period = 480 ms), the demoscene/dance default.
 export const useBpm = (
@@ -626,8 +631,9 @@ export const useBpm = (
   const WINDOW_MS = 10000;
   const INITIAL_BPM = 125;
   const INITIAL_PERIOD = 60000 / INITIAL_BPM;
-  const MIN_PERIOD = 60000 / 180;
+  const MIN_PERIOD = 60000 / 200;
   const MAX_PERIOD = 60000 / 60;
+  const TIGHTNESS = 100; // librosa default
 
   const [state, setState] = useState<BpmDebug>({
     bpm: INITIAL_BPM,
@@ -643,33 +649,22 @@ export const useBpm = (
     confidence: 0,
   });
 
-  // refs persist across rAF ticks without re-rendering.
   const rafRef = useRef<number | null>(null);
-  const intervalRef = useRef<number | null>(null);
+  const recomputeTimerRef = useRef<number | null>(null);
 
-  // Tracker state.
+  // Tracker / metronome state.
   const periodRef = useRef(INITIAL_PERIOD);
   const nextBeatAtRef = useRef(0);
   const confidenceRef = useRef(0);
-  const lowConfSinceRef = useRef(0); // performance.now since confidence dropped low (0 = currently fine)
   const phaseErrorRef = useRef(0);
   const beatIdxRef = useRef(0);
   const beatCountRef = useRef(0);
-  const metronomeBeatsRef = useRef<number[]>([]); // recent fired beats
+  const metronomeBeatsRef = useRef<number[]>([]);
   const startedAtRef = useRef(0);
-
-  // Onset detector state.
-  const prevSpectrumRef = useRef<Uint8Array | null>(null);
-  const fluxMeanRef = useRef(0);
-  const fluxStdRef = useRef(0);
-  const fluxHistoryRef = useRef<{ t: number; v: number }[]>([]); // for autocorrelation prior
-  const onsetTimesRef = useRef<number[]>([]); // recent raw onsets
-  const lastOnsetAtRef = useRef(0);
-  const interOnsetRef = useRef<number[]>([]); // recent inter-onset intervals (ms)
-
-  // For status/UI.
+  const lastDpPeriodRef = useRef(0);
   const lastBassRef = useRef(0);
   const lastFluxRef = useRef(0);
+  const displayPeriodRef = useRef(INITIAL_PERIOD);
 
   useEffect(() => {
     if (!analyser || !enabled) {
@@ -677,28 +672,63 @@ export const useBpm = (
       return;
     }
     const previousSmoothing = analyser.smoothingTimeConstant;
-    // Lower smoothing so spectral flux actually shows transients.
     analyser.smoothingTimeConstant = Math.min(previousSmoothing, 0.4);
 
-    const buf = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>;
-    const prev = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>;
-    prevSpectrumRef.current = prev;
-    const bassEnd = Math.max(1, Math.floor(buf.length * 0.1));
+    const NBINS = analyser.frequencyBinCount;
+    const SR = analyser.context.sampleRate;
+    const buf = new Uint8Array(new ArrayBuffer(NBINS)) as Uint8Array<ArrayBuffer>;
+    const bassEnd = Math.max(1, Math.floor(NBINS * 0.1));
 
+    // ----- mel filterbank (40 bands, 0..min(8kHz, sr/2)) -----
+    const NMEL = 40;
+    const FMAX = Math.min(8000, SR / 2);
+    const hzToMel = (hz: number) => 2595 * Math.log10(1 + hz / 700);
+    const melToHz = (m: number) => 700 * (Math.pow(10, m / 2595) - 1);
+    const melLo = hzToMel(0);
+    const melHi = hzToMel(FMAX);
+    const melPts: number[] = [];
+    for (let i = 0; i < NMEL + 2; i++) {
+      melPts.push(melToHz(melLo + ((melHi - melLo) * i) / (NMEL + 1)));
+    }
+    const binFromHz = (hz: number) => (hz / (SR / 2)) * NBINS;
+    type MelFilter = { start: number; weights: Float32Array };
+    const filters: MelFilter[] = [];
+    for (let m = 1; m <= NMEL; m++) {
+      const lo = binFromHz(melPts[m - 1]);
+      const mid = binFromHz(melPts[m]);
+      const hi = binFromHz(melPts[m + 1]);
+      const startI = Math.max(0, Math.floor(lo));
+      const endI = Math.min(NBINS - 1, Math.ceil(hi));
+      const w = new Float32Array(Math.max(1, endI - startI + 1));
+      for (let i = startI; i <= endI; i++) {
+        let v = 0;
+        if (i >= lo && i <= mid) v = (i - lo) / Math.max(1e-6, mid - lo);
+        else if (i >= mid && i <= hi) v = (hi - i) / Math.max(1e-6, hi - mid);
+        w[i - startI] = Math.max(0, v);
+      }
+      filters.push({ start: startI, weights: w });
+    }
+    const melCur = new Float32Array(NMEL);
+    const melPrev = new Float32Array(NMEL);
+
+    // ----- onset envelope ring buffer (~10s @ ~60Hz) -----
+    const FRAMES = 700;
+    const envT = new Float64Array(FRAMES);
+    const envV = new Float32Array(FRAMES);
+    let envIdx = 0;
+    let envFilled = 0;
+
+    // ----- runtime state -----
     const now0 = performance.now();
     startedAtRef.current = now0;
-    // The metronome does NOT auto-start. It only begins ticking once we have
-    // confirmed there is audio playing (first detected onset). This avoids
-    // ghost beats while the stream is paused/loading.
     nextBeatAtRef.current = 0;
     let running = false;
     let silentSince = 0;
     const SILENT_BASS = 0.01;
     const SILENT_FLUX = 0.0005;
-    const SILENT_TIMEOUT = 2500; // ms of silence before metronome pauses
+    const SILENT_TIMEOUT = 2500;
 
-    // Smoothed period for the publicly-displayed BPM.
-    const displayPeriodRef = { current: periodRef.current };
+    const clampPeriod = (p: number) => Math.min(MAX_PERIOD, Math.max(MIN_PERIOD, p));
 
     const foldOctave = (candidate: number, ref: number) => {
       let p = candidate;
@@ -707,128 +737,54 @@ export const useBpm = (
       return p;
     };
 
-    const clampPeriod = (p: number) => Math.min(MAX_PERIOD, Math.max(MIN_PERIOD, p));
-
-    const onOnset = (t: number) => {
-      // 1) Inter-onset bookkeeping (with outlier rejection).
-      const last = lastOnsetAtRef.current;
-      if (last > 0) {
-        const dt = t - last;
-        if (dt >= 120 && dt <= 2000) {
-          // Octave-fold then reject if it disagrees strongly with the rolling
-          // median — defends against syncopation/hi-hat spam pulling the period.
-          const folded = foldOctave(dt, periodRef.current);
-          const buf = interOnsetRef.current;
-          let accept = true;
-          if (buf.length >= 4) {
-            const sorted = buf.slice().sort((a, b) => a - b);
-            const median = sorted[Math.floor(sorted.length / 2)];
-            // Reject outliers once we have some confidence in the period.
-            const tol = confidenceRef.current >= 0.4 ? 0.18 : 0.35;
-            if (Math.abs(folded - median) / median > tol) accept = false;
-          }
-          if (accept) {
-            buf.push(folded);
-            if (buf.length > 16) buf.shift();
-          }
-        }
-      }
-      lastOnsetAtRef.current = t;
-      onsetTimesRef.current.push(t);
-      const cutoff = t - WINDOW_MS;
-      while (onsetTimesRef.current.length && onsetTimesRef.current[0] < cutoff) onsetTimesRef.current.shift();
-
-      // Lazy-start the metronome on first onset of a playing stream.
-      if (!running) {
-        running = true;
-        nextBeatAtRef.current = t + periodRef.current;
-        return;
-      }
-
-      // 2) Phase correction — gentler once confident.
-      const period = periodRef.current;
-      const k = Math.round((t - nextBeatAtRef.current) / period);
-      const expected = nextBeatAtRef.current + k * period;
-      const error = t - expected;
-      phaseErrorRef.current = error;
-
-      const conf = confidenceRef.current;
-      // Phase pull weakens as confidence grows -> stable, no jitter.
-      const alpha = conf >= 0.7 ? 0.05 : conf >= 0.4 ? 0.1 : 0.18;
-      nextBeatAtRef.current += error * alpha;
-
-      // 3) Period correction from median (rejected outliers already filtered).
-      if (interOnsetRef.current.length >= 4) {
-        const sorted = interOnsetRef.current.slice().sort((a, b) => a - b);
-        const median = sorted[Math.floor(sorted.length / 2)];
-        // Strong smoothing once confident — barely move the period.
-        const beta = conf >= 0.7 ? 0.01 : conf >= 0.4 ? 0.03 : 0.08;
-        const target = clampPeriod(median);
-        periodRef.current = clampPeriod(period + (target - period) * beta);
-      }
-
-      // 4) Confidence update.
-      const relErr = Math.abs(error) / period;
-      if (relErr < 0.06) confidenceRef.current = Math.min(1, conf + 0.12);
-      else if (relErr < 0.18) confidenceRef.current = Math.min(1, conf + 0.03);
-      else confidenceRef.current = Math.max(0, conf - 0.06);
-
-      if (confidenceRef.current >= 0.2) lowConfSinceRef.current = 0;
-      else if (lowConfSinceRef.current === 0) lowConfSinceRef.current = t;
-    };
-
+    // ---- rAF loop: build onset envelope + tick metronome ----
     const tick = () => {
       analyser.getByteFrequencyData(buf);
       const now = performance.now();
 
+      // bass level (for silence detection / debug)
       let bassSum = 0;
       for (let i = 0; i < bassEnd; i++) bassSum += buf[i] ?? 0;
       lastBassRef.current = bassSum / bassEnd / 255;
 
-      let flux = 0;
-      for (let i = 0; i < buf.length; i++) {
-        const d = (buf[i] ?? 0) - (prev[i] ?? 0);
-        if (d > 0) flux += d;
-        prev[i] = buf[i] ?? 0;
+      // log-mel bands
+      for (let m = 0; m < NMEL; m++) {
+        const f = filters[m];
+        let s = 0;
+        const w = f.weights;
+        const start = f.start;
+        for (let i = 0; i < w.length; i++) s += (buf[start + i] ?? 0) * w[i];
+        melCur[m] = Math.log1p(s / 255);
       }
-      flux = flux / (buf.length * 255);
+      // half-wave-rectified flux summed across mel bands
+      let flux = 0;
+      for (let m = 0; m < NMEL; m++) {
+        const d = melCur[m] - melPrev[m];
+        if (d > 0) flux += d;
+        melPrev[m] = melCur[m];
+      }
+      flux /= NMEL;
       lastFluxRef.current = flux;
 
-      const m = fluxMeanRef.current * 0.97 + flux * 0.03;
-      const v = fluxStdRef.current * 0.97 + Math.abs(flux - m) * 0.03;
-      fluxMeanRef.current = m;
-      fluxStdRef.current = v;
-      const whitened = v > 1e-6 ? (flux - m) / v : 0;
+      // write into ring buffer
+      envT[envIdx] = now;
+      envV[envIdx] = flux;
+      envIdx = (envIdx + 1) % FRAMES;
+      if (envFilled < FRAMES) envFilled++;
 
-      fluxHistoryRef.current.push({ t: now, v: Math.max(0, whitened) });
-      const histCutoff = now - 8000;
-      while (fluxHistoryRef.current.length && fluxHistoryRef.current[0].t < histCutoff) {
-        fluxHistoryRef.current.shift();
-      }
-
-      // Silence tracking — pauses metronome when the stream is not playing.
-      const isAudible = lastBassRef.current > SILENT_BASS || flux > SILENT_FLUX;
-      if (isAudible) {
+      // silence -> pause metronome
+      const audible = lastBassRef.current > SILENT_BASS || flux > SILENT_FLUX;
+      if (audible) {
         silentSince = 0;
       } else if (silentSince === 0) {
         silentSince = now;
       } else if (running && now - silentSince > SILENT_TIMEOUT) {
-        // Stream stopped — pause the metronome and decay confidence.
         running = false;
         nextBeatAtRef.current = 0;
         confidenceRef.current = Math.max(0, confidenceRef.current - 0.2);
       }
 
-      // Onset detection — only when the stream is audible.
-      if (
-        isAudible &&
-        whitened > 1.2 &&
-        now - lastOnsetAtRef.current > 70
-      ) {
-        onOnset(now);
-      }
-
-      // Metronome ticks only when running.
+      // metronome ticks
       if (running && nextBeatAtRef.current > 0) {
         while (now >= nextBeatAtRef.current) {
           const fired = nextBeatAtRef.current;
@@ -840,75 +796,251 @@ export const useBpm = (
           beatCountRef.current += 1;
           beatIdxRef.current = (beatIdxRef.current + 1) % 4;
           nextBeatAtRef.current = fired + periodRef.current;
-          confidenceRef.current = Math.max(0, confidenceRef.current - 0.005);
         }
       }
 
       rafRef.current = requestAnimationFrame(tick);
     };
 
-    const computePrior = (): number | null => {
-      const hist = fluxHistoryRef.current;
-      if (hist.length < 60) return null;
-      const span = hist[hist.length - 1].t - hist[0].t;
-      const dt = span / Math.max(1, hist.length - 1);
-      if (!Number.isFinite(dt) || dt <= 0) return null;
-      const sig = hist.map((h) => h.v);
-      let bestBpm = 0;
-      let bestScore = 0;
-      for (let bpm = 70; bpm <= 170; bpm += 1) {
-        const lag = Math.round((60000 / bpm) / dt);
-        if (lag < 2 || lag >= sig.length * 0.6) continue;
-        let sum = 0, a = 0, b = 0;
-        for (let i = lag; i < sig.length; i++) {
-          const x = sig[i], y = sig[i - lag];
-          sum += x * y; a += x * x; b += y * y;
-        }
-        const score = a > 0 && b > 0 ? sum / Math.sqrt(a * b) : 0;
-        if (score > bestScore) { bestScore = score; bestBpm = bpm; }
+    // ---- copy ring buffer to linear oldest-to-newest arrays ----
+    const linearizeEnv = (): { t: Float64Array; v: Float32Array } | null => {
+      if (envFilled < 100) return null;
+      const len = envFilled;
+      const t = new Float64Array(len);
+      const v = new Float32Array(len);
+      const start = envFilled < FRAMES ? 0 : envIdx;
+      for (let i = 0; i < len; i++) {
+        const j = (start + i) % FRAMES;
+        t[i] = envT[j];
+        v[i] = envV[j];
       }
-      if (bestBpm === 0 || bestScore < 0.1) return null;
-      return 60000 / bestBpm;
+      return { t, v };
     };
 
+    // ---- adaptive whitening: subtract local mean, divide by local std ----
+    const whiten = (src: Float32Array): Float32Array => {
+      const n = src.length;
+      const out = new Float32Array(n);
+      const win = Math.max(20, Math.floor(n * 0.1));
+      // rolling stats via prefix sums
+      const ps = new Float64Array(n + 1);
+      const ps2 = new Float64Array(n + 1);
+      for (let i = 0; i < n; i++) {
+        ps[i + 1] = ps[i] + src[i];
+        ps2[i + 1] = ps2[i] + src[i] * src[i];
+      }
+      for (let i = 0; i < n; i++) {
+        const a = Math.max(0, i - win);
+        const b = Math.min(n, i + win + 1);
+        const cnt = b - a;
+        const mean = (ps[b] - ps[a]) / cnt;
+        const variance = Math.max(0, (ps2[b] - ps2[a]) / cnt - mean * mean);
+        const std = Math.sqrt(variance) + 1e-6;
+        const x = (src[i] - mean) / std;
+        out[i] = x > 0 ? x : 0;
+      }
+      return out;
+    };
+
+    // ---- tempo via prior-weighted autocorrelation ----
+    type TempoResult = { period: number; strength: number } | null;
+    const estimateTempo = (env: Float32Array, frameMs: number): TempoResult => {
+      const n = env.length;
+      let mean = 0;
+      for (let i = 0; i < n; i++) mean += env[i];
+      mean /= n;
+      let norm = 0;
+      const s = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        s[i] = env[i] - mean;
+        norm += s[i] * s[i];
+      }
+      if (norm < 1e-6) return null;
+
+      const minLag = Math.max(2, Math.floor(MIN_PERIOD / frameMs));
+      const maxLag = Math.min(Math.floor(n * 0.6), Math.ceil(MAX_PERIOD / frameMs));
+      if (maxLag <= minLag) return null;
+
+      let best = -Infinity;
+      let bestLag = minLag;
+      let sumScore = 0;
+      let count = 0;
+      for (let lag = minLag; lag <= maxLag; lag++) {
+        let ac = 0;
+        for (let i = lag; i < n; i++) ac += s[i] * s[i - lag];
+        ac /= norm;
+        const bpm = 60000 / (lag * frameMs);
+        const prior = Math.exp(-0.5 * Math.pow(Math.log2(bpm / 125), 2));
+        const w = ac * prior;
+        sumScore += w;
+        count++;
+        if (w > best) {
+          best = w;
+          bestLag = lag;
+        }
+      }
+      const meanAc = sumScore / Math.max(1, count);
+      const strength = (best - meanAc) / (Math.abs(meanAc) + 1e-6);
+      return { period: bestLag * frameMs, strength };
+    };
+
+    // ---- Ellis dynamic-programming beat tracker ----
+    const dpBeats = (env: Float32Array, periodFrames: number): number[] => {
+      const N = env.length;
+      if (N < 4 || periodFrames < 2) return [];
+      const score = new Float32Array(N);
+      const back = new Int32Array(N);
+      const wMin = Math.max(1, Math.floor(periodFrames * 0.5));
+      const wMax = Math.max(wMin + 1, Math.ceil(periodFrames * 2));
+      for (let i = 0; i < N; i++) {
+        let bestSc = -Infinity;
+        let bestJ = -1;
+        const jStart = Math.max(0, i - wMax);
+        const jEnd = i - wMin;
+        for (let j = jStart; j <= jEnd; j++) {
+          const dt = i - j;
+          const lp = Math.log(dt / periodFrames);
+          const penalty = TIGHTNESS * lp * lp;
+          const sc = score[j] - penalty;
+          if (sc > bestSc) {
+            bestSc = sc;
+            bestJ = j;
+          }
+        }
+        if (bestJ < 0) {
+          score[i] = env[i];
+          back[i] = -1;
+        } else {
+          score[i] = env[i] + bestSc;
+          back[i] = bestJ;
+        }
+      }
+      // pick best end in the last ~1.5 periods
+      const endStart = Math.max(0, N - Math.ceil(periodFrames * 1.5));
+      let bestEnd = N - 1;
+      let bestEndScore = -Infinity;
+      for (let i = endStart; i < N; i++) {
+        if (score[i] > bestEndScore) {
+          bestEndScore = score[i];
+          bestEnd = i;
+        }
+      }
+      const beats: number[] = [];
+      let k = bestEnd;
+      while (k >= 0) {
+        beats.push(k);
+        k = back[k];
+      }
+      beats.reverse();
+      return beats;
+    };
+
+    // ---- recompute: runs every 1-2s, updates metronome from DP grid ----
+    let recomputing = false;
     const recompute = () => {
       const now = performance.now();
       const lastBass = lastBassRef.current;
-      const onsetsInWindow = onsetTimesRef.current.length;
       const elapsed = now - startedAtRef.current;
-      const conf = confidenceRef.current;
+      let conf = confidenceRef.current;
 
-      // Re-seed prior — only if low confidence persists and we're running.
-      if (
-        running &&
-        lowConfSinceRef.current > 0 &&
-        now - lowConfSinceRef.current > 12000 &&
-        onsetsInWindow >= 8
-      ) {
-        const priorPeriod = computePrior();
-        if (priorPeriod) {
-          const folded = foldOctave(priorPeriod, periodRef.current);
-          const diff = Math.abs(folded - periodRef.current) / periodRef.current;
-          if (diff > 0.18) {
-            periodRef.current = clampPeriod(priorPeriod);
-            nextBeatAtRef.current = now + 50;
-            confidenceRef.current = 0.1;
-            lowConfSinceRef.current = now;
+      const audible =
+        lastBassRef.current > SILENT_BASS || lastFluxRef.current > SILENT_FLUX;
+
+      if (audible && !recomputing) {
+        recomputing = true;
+        const linear = linearizeEnv();
+        if (linear) {
+          const { t, v } = linear;
+          const frameMs = (t[t.length - 1] - t[0]) / Math.max(1, t.length - 1);
+          if (Number.isFinite(frameMs) && frameMs > 0 && frameMs < 100) {
+            const w = whiten(v);
+            const tempo = estimateTempo(w, frameMs);
+            if (tempo) {
+              // Fold the new period into the current period's octave band to
+              // avoid half/double-time flips once we're locked.
+              const oldPeriod = periodRef.current;
+              const folded =
+                conf >= 0.4 ? foldOctave(tempo.period, oldPeriod) : tempo.period;
+              const periodFrames = folded / frameMs;
+              const beats = dpBeats(w, periodFrames);
+              if (beats.length >= 2) {
+                const ibis: number[] = [];
+                for (let i = 1; i < beats.length; i++) {
+                  ibis.push(t[beats[i]] - t[beats[i - 1]]);
+                }
+                ibis.sort((a, b) => a - b);
+                const medianPeriod = clampPeriod(ibis[Math.floor(ibis.length / 2)]);
+                const lastBeatTime = t[beats[beats.length - 1]];
+
+                // confidence: autocorr peak strength + run-to-run consistency
+                const tempoConf = Math.max(0, Math.min(1, tempo.strength * 0.5));
+                let consistency = 0.5;
+                if (lastDpPeriodRef.current > 0) {
+                  const rel =
+                    Math.abs(medianPeriod - lastDpPeriodRef.current) /
+                    lastDpPeriodRef.current;
+                  consistency = Math.exp(-rel * 10);
+                }
+                const dpConf = tempoConf * 0.6 + consistency * 0.4;
+                // EMA — slower changes once high
+                const cAlpha = conf >= 0.7 ? 0.15 : 0.35;
+                conf = conf * (1 - cAlpha) + dpConf * cAlpha;
+                confidenceRef.current = conf;
+                lastDpPeriodRef.current = medianPeriod;
+
+                // Project last DP beat forward to the next beat after `now`
+                let nextBeat = lastBeatTime + medianPeriod;
+                while (nextBeat < now) nextBeat += medianPeriod;
+
+                if (!running) {
+                  running = true;
+                  periodRef.current = medianPeriod;
+                  nextBeatAtRef.current = nextBeat;
+                  phaseErrorRef.current = 0;
+                } else {
+                  // Period adaptation — much gentler when confident.
+                  const beta = conf >= 0.7 ? 0.05 : conf >= 0.4 ? 0.2 : 0.5;
+                  periodRef.current = clampPeriod(
+                    oldPeriod + (medianPeriod - oldPeriod) * beta
+                  );
+                  // Phase adaptation — nudge if close, snap if far + confident.
+                  const error = nextBeat - nextBeatAtRef.current;
+                  phaseErrorRef.current = error;
+                  const tol = oldPeriod * 0.1;
+                  if (Math.abs(error) < tol) {
+                    const alpha = conf >= 0.7 ? 0.1 : 0.3;
+                    nextBeatAtRef.current += error * alpha;
+                  } else if (conf >= 0.5) {
+                    nextBeatAtRef.current = nextBeat;
+                  } else {
+                    nextBeatAtRef.current += error * 0.4;
+                  }
+                }
+              }
+            }
           }
         }
+        recomputing = false;
+      } else if (!audible) {
+        // Decay confidence while silent so we re-lock fresh on resume.
+        conf = Math.max(0, conf - 0.05);
+        confidenceRef.current = conf;
       }
 
-      // Smooth the displayed period heavily when confident, so the BPM
-      // readout doesn't twitch even if the internal period drifts.
+      // Smooth the displayed BPM heavily when locked.
       const period = periodRef.current;
       const dispLerp = conf >= 0.7 ? 0.04 : conf >= 0.4 ? 0.12 : 0.3;
-      displayPeriodRef.current = displayPeriodRef.current + (period - displayPeriodRef.current) * dispLerp;
+      displayPeriodRef.current =
+        displayPeriodRef.current + (period - displayPeriodRef.current) * dispLerp;
       const displayedBpm = running ? Math.round(60000 / displayPeriodRef.current) : 0;
 
       let status: BpmStatus;
       if (!running) {
-        status = lastBass < SILENT_BASS && lastFluxRef.current < SILENT_FLUX ? "silent" : "listening";
-      } else if (elapsed < 2000 || onsetsInWindow < 2) {
+        status =
+          lastBass < SILENT_BASS && lastFluxRef.current < SILENT_FLUX
+            ? "silent"
+            : "listening";
+      } else if (elapsed < 2000) {
         status = "listening";
       } else if (conf < 0.35) {
         status = "detecting";
@@ -929,17 +1061,18 @@ export const useBpm = (
         phaseErrorMs: phaseErrorRef.current,
         confidence: conf,
       });
+
+      // Recompute cadence: faster while searching, slower once locked.
+      const nextDelay = conf >= 0.7 ? 2000 : 1000;
+      recomputeTimerRef.current = window.setTimeout(recompute, nextDelay);
     };
 
     rafRef.current = requestAnimationFrame(tick);
-    // Recompute slowly — every 2s normally; once locked the display barely
-    // moves anyway because of the heavy lerp + outlier-rejected period.
-    intervalRef.current = window.setInterval(recompute, 2000);
-    const initTimer = window.setTimeout(recompute, 400);
+    recomputeTimerRef.current = window.setTimeout(recompute, 800);
+
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      clearTimeout(initTimer);
+      if (recomputeTimerRef.current) clearTimeout(recomputeTimerRef.current);
       analyser.smoothingTimeConstant = previousSmoothing;
     };
   }, [analyser, enabled]);
