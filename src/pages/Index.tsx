@@ -158,7 +158,7 @@ const Index = () => {
     } catch {
       // ignore
     }
-    return "plasma";
+    return "starfield";
   });
   const inFlight = useRef(false);
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
@@ -208,7 +208,7 @@ const Index = () => {
     } catch {
       // ignore
     }
-    return "nostalgia";
+    return "legacy";
   });
 
   useEffect(() => {
