@@ -242,6 +242,8 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
         sitUntil: 0,
         nextSitAt: performance.now() + 18000 + Math.random() * 20000,
         headSwayAccum: 0,
+        perchEl: null,
+        perchFacingLeft: false,
       },
       {
         active: false,
