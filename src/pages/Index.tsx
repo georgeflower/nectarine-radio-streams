@@ -356,7 +356,14 @@ const Index = () => {
         </div>
 
         <section className="grid gap-4 md:grid-cols-2 min-w-0" aria-label="Demovibes panels">
-          <article className="panel md:order-2 min-w-0 overflow-hidden">
+          <article
+            className="panel md:order-2 min-w-0 overflow-hidden transition-shadow duration-100"
+            style={{
+              boxShadow: audioLevel > 0
+                ? `0 0 ${8 + audioLevel * 40}px hsl(var(--primary) / ${0.25 + audioLevel * 0.6})`
+                : undefined,
+            }}
+          >
             <button
               type="button"
               onClick={() => setNowOpen((o) => !o)}
