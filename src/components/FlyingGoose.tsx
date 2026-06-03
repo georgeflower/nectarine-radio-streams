@@ -269,6 +269,8 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     let mode: Mode = "fly";
     let perchEl: HTMLElement | null = null;
     let perchChar = "";
+    let perchKind: "letter" | "window" = "letter";
+    let perchOffset = 0.5; // horizontal position along perch (0..1)
     let nextPerchAt = nextPerchDelay();
     let takeoffAt = 0;
     let nextLookAt = 0;
