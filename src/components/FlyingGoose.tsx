@@ -175,6 +175,10 @@ type Goose = {
   frameAccum: number;
   isAway: boolean;
   awayUntil: number;
+  isSitting: boolean;
+  sitUntil: number;
+  nextSitAt: number;
+  headSwayAccum: number;
 };
 
 type Props = {
