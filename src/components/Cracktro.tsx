@@ -487,6 +487,7 @@ const Cracktro = ({
       <Visualizer analyser={analyser} style={style === "off" ? "tunnel" : style} />
       <BeatOverlay analyser={analyser} enabled />
       {gooseOn && <FlyingGoose />}
+      {boingOn && <BoingBall />}
 
       {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
       {scrollOn && (
