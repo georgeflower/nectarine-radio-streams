@@ -101,27 +101,30 @@ const FRAMES: string[][] = [
     "........................",
     "........................",
   ],
-  // 4 — STANDING (long S-neck, plump body, two orange legs)
+  // 4 — STANDING (long S-neck, plump body, two orange legs).
+  // Body re-centered around col ~11.5 (sprite center=12) so a scaleX flip
+  // for "look left/right" only swaps the head silhouette — the body stays put.
   [
-    "............KKKK........",
-    "...........KWWWWK.......",
-    "...........KWEWWWKKDO...",
-    "...........KWWWWWKD.....",
-    "............KWWWK.......",
-    "............KWWK........",
-    "............KWWK........",
-    ".............KWWK.......",
-    ".............KWWK.......",
-    "..............KWWK......",
-    "..............KWWWK.....",
-    ".............KWWWWWK....",
-    "............KWLLLLLWK...",
-    "...........KWLLLLLLLWK..",
-    "...........KWLLLLLLLWK..",
-    "............KGGGGGGGK...",
-    ".............KKKKKKK....",
-    "............O.....O.....",
+    "........KKKK............",
+    ".......KWWWWK...........",
+    ".......KWEWWWKKDO.......",
+    ".......KWWWWWKD.........",
+    "........KWWWK...........",
+    "........KWWK............",
+    "........KWWK............",
+    ".........KWWK...........",
+    ".........KWWK...........",
+    "..........KWWK..........",
+    "..........KWWWK.........",
+    ".........KWWWWWK........",
+    "........KWLLLLLWK.......",
+    ".......KWLLLLLLLWK......",
+    ".......KWLLLLLLLWK......",
+    "........KGGGGGGGK.......",
+    ".........KKKKKKK........",
+    "........O.....O.........",
   ],
+
 ];
 
 const COLORS: Record<string, string> = {
@@ -218,7 +221,9 @@ type Props = {
 const FlyingGoose = ({ oneliners = [] }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const imgStandRef = useRef<HTMLImageElement | null>(null);
   const bubbleRef = useRef<HTMLDivElement | null>(null);
+
   // Imperative reaction state shared between effects.
   const reactionUntilRef = useRef<number>(0);
   const lastOnelinerKeyRef = useRef<string | null>(null);
@@ -305,13 +310,17 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     let takeoffAt = 0;
     let nextLookAt = 0;
     let lookDir: 1 | -1 = 1;
+    let lookScale = 1; // animated -1..1, smoothly tweens toward lookDir while standing
     let startleEnd = 0;
 
     const wrap = wrapRef.current;
     const img = imgRef.current;
+    const imgStand = imgStandRef.current;
     const bubble = bubbleRef.current;
-    if (!wrap || !img || !bubble) return;
+    if (!wrap || !img || !imgStand || !bubble) return;
     img.src = frames[0];
+    imgStand.src = frames[STAND_FRAME];
+
 
     const pickPerch = ():
       | { el: HTMLElement; char: string; kind: "letter" | "window"; offset: number }
@@ -367,7 +376,10 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     const setLanded = () => {
       const { cx, topY, sink } = perchTarget();
       lookDir = Math.random() < 0.5 ? -1 : 1;
-      img.src = frames[STAND_FRAME];
+      lookScale = lookDir; // snap on first land — no flip-through-zero on arrival
+      // Crossfade from flying sprite to standing sprite for a soft settle.
+      imgStand.style.opacity = "1";
+      img.style.opacity = "0";
       takeoffAt = elapsed + sitDuration();
       nextLookAt = elapsed + rand(700, 1600);
       x = cx;
@@ -377,7 +389,8 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     const startle = () => {
       mode = "startle";
       startleEnd = elapsed + 1400;
-      img.src = frames[STAND_FRAME];
+      imgStand.style.opacity = "1";
+      img.style.opacity = "0";
       showStartleBubble();
     };
 
@@ -391,7 +404,11 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
       nextPerchAt = elapsed + nextPerchDelay();
       frameIdx = 2;
       img.src = frames[frameIdx];
+      // Fade flying sprite back in, stand out.
+      img.style.opacity = "1";
+      imgStand.style.opacity = "0";
     };
+
 
     const tick = (now: number) => {
       const dtMs = Math.min(64, now - last);
@@ -426,13 +443,20 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
           const { cx, topY, sink } = perchTarget();
           if (elapsed >= nextLookAt) {
             lookDir = (lookDir === 1 ? -1 : 1) as 1 | -1;
-            nextLookAt = elapsed + rand(700, 1900);
+            nextLookAt = elapsed + rand(1400, 2800);
           }
-          const idleBob = Math.sin(elapsed / 320) * 0.8;
-          const idleSway = Math.sin(elapsed / 540) * 0.6;
-          const tx = cx - SPRITE_W / 2 + idleSway;
-          const ty = topY - SPRITE_H + sink + idleBob;
-          wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) scaleX(${lookDir})`;
+          // Smooth horizontal scale tween — passes through ~0 so the head
+          // visually "turns" instead of snapping. Body stays put because
+          // standing frame is centered on sprite midline.
+          lookScale += (lookDir - lookScale) * Math.min(1, dt * 7);
+          // Subtle idle micro-wiggle: tiny rotation + neck bob, no silhouette
+          // change. Sprite stays still overall, just feels alive.
+          const wiggle =
+            Math.sin(elapsed / 720) * 1.1 + Math.sin(elapsed / 1130) * 0.5;
+          const neckBob = Math.sin(elapsed / 420) * 0.6;
+          const tx = cx - SPRITE_W / 2;
+          const ty = topY - SPRITE_H + sink + neckBob;
+          wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) rotate(${wiggle}deg) scaleX(${lookScale})`;
           positionBubble(cx, topY);
           if (elapsed >= takeoffAt) takeoff();
           raf = requestAnimationFrame(tick);
@@ -444,7 +468,8 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
         const shake = Math.sin(elapsed / 35) * 2;
         const baseX = x - SPRITE_W / 2 + shake;
         const baseY = y - SPRITE_H / 2;
-        wrap.style.transform = `translate3d(${baseX}px, ${baseY}px, 0) scaleX(${lookDir})`;
+        wrap.style.transform = `translate3d(${baseX}px, ${baseY}px, 0) scaleX(${lookScale})`;
+
         positionBubble(x, y);
         if (elapsed >= startleEnd) takeoff();
         raf = requestAnimationFrame(tick);
@@ -582,8 +607,29 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
           alt=""
           width={SPRITE_W}
           height={SPRITE_H}
-          style={{ imageRendering: "pixelated", display: "block" }}
+          style={{
+            imageRendering: "pixelated",
+            display: "block",
+            position: "absolute",
+            inset: 0,
+            transition: "opacity 260ms ease-out",
+          }}
         />
+        <img
+          ref={imgStandRef}
+          alt=""
+          width={SPRITE_W}
+          height={SPRITE_H}
+          style={{
+            imageRendering: "pixelated",
+            display: "block",
+            position: "absolute",
+            inset: 0,
+            opacity: 0,
+            transition: "opacity 260ms ease-out",
+          }}
+        />
+
       </div>
       {/* Reaction bubble: WHATTA!! / smileys / pixel heart */}
       <div
