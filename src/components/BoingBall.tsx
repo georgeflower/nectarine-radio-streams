@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { boingBall } from "@/lib/boingBallState";
+
 
 /**
  * Classic Amiga "Boing" ball — checkered sphere bouncing across the screen.
