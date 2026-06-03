@@ -347,6 +347,14 @@ const Index = () => {
               </button>
             </div>
             <button
+              type="button"
+              onClick={() => setCracktroOpen(true)}
+              className="min-h-11 px-3 py-2 uppercase text-xs tracking-widest rounded-sm border border-primary/60 bg-card/60 text-primary hover:bg-primary hover:text-primary-foreground transition-colors touch-manipulation shrink-0"
+              title="Fullscreen cracktro with sinus scroller"
+            >
+              ▶ Cracktro
+            </button>
+            <button
               onClick={refreshAll}
               className="min-h-11 px-3 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity touch-manipulation shrink-0"
               style={{ boxShadow: "var(--glow-primary)" }}
