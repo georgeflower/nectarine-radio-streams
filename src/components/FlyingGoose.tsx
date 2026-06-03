@@ -283,16 +283,40 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     if (!wrap || !img || !bubble) return;
     img.src = frames[0];
 
-    const pickPerch = (): { el: HTMLElement; char: string } | null => {
+    const pickPerch = ():
+      | { el: HTMLElement; char: string; kind: "letter" | "window"; offset: number }
+      | null => {
       const candidates = Array.from(
-        document.querySelectorAll<HTMLElement>("[data-goose-letter]"),
+        document.querySelectorAll<HTMLElement>(
+          "[data-goose-letter], [data-goose-perch]",
+        ),
       ).filter((el) => {
         const r = el.getBoundingClientRect();
         return r.width > 6 && r.height > 6 && r.top > 40 && r.bottom < h - 20;
       });
       if (candidates.length === 0) return null;
       const el = candidates[Math.floor(Math.random() * candidates.length)];
-      return { el, char: el.getAttribute("data-goose-letter") || "" };
+      const isLetter = el.hasAttribute("data-goose-letter");
+      return {
+        el,
+        char: isLetter ? el.getAttribute("data-goose-letter") || "" : "",
+        kind: isLetter ? "letter" : "window",
+        // Letters: dead-center. Windows: random spot along the bar.
+        offset: isLetter ? 0.5 : 0.15 + Math.random() * 0.7,
+      };
+    };
+
+    // Returns the visual landing point (center x, top y of the perch surface)
+    // and how much the sprite should sink onto the surface.
+    const perchTarget = (): { cx: number; topY: number; sink: number } => {
+      const r = perchEl!.getBoundingClientRect();
+      const cx = r.left + r.width * perchOffset;
+      if (perchKind === "letter") {
+        // Letter rect top sits above the visible cap because of line-height.
+        return { cx, topY: r.top, sink: 10 };
+      }
+      // Window title bar — feet rest right on the top edge.
+      return { cx, topY: r.top, sink: 2 };
     };
 
     const showStartleBubble = () => {
@@ -311,13 +335,13 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
     };
 
     const setLanded = () => {
-      const r = perchEl!.getBoundingClientRect();
+      const { cx, topY, sink } = perchTarget();
       lookDir = Math.random() < 0.5 ? -1 : 1;
       img.src = frames[STAND_FRAME];
       takeoffAt = elapsed + sitDuration();
       nextLookAt = elapsed + rand(700, 1600);
-      x = r.left + r.width / 2;
-      y = r.top - SPRITE_H / 2;
+      x = cx;
+      y = topY - SPRITE_H + sink + SPRITE_H / 2;
     };
 
     const startle = () => {
