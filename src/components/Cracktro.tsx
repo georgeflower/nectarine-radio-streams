@@ -152,6 +152,17 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
     `   ***   STAY TUNED TO NECTARINE DEMOSCENE RADIO   ***   GREETZ TO ALL THE SCENERS OUT THERE   ***   `
   ), [artist, title, platform, rating]);
 
+  type Skin = "default" | "amiga" | "atari" | "c64" | "xm";
+  const skin = useMemo<Skin>(() => {
+    const p = (platform || "").toLowerCase();
+    const t = (title || "").toLowerCase();
+    if (p.includes("amiga")) return "amiga";
+    if (p.includes("atari")) return "atari";
+    if (p.includes("c64") || p.includes("commodore 64")) return "c64";
+    if (p.includes("xm") || p.includes("fasttracker") || p.includes("extended module") || t.endsWith(".xm")) return "xm";
+    return "default";
+  }, [platform, title]);
+
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
   useEffect(() => {
     if (!scrollOn || mode === "infobar") return;
