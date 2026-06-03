@@ -179,6 +179,8 @@ type Goose = {
   sitUntil: number;
   nextSitAt: number;
   headSwayAccum: number;
+  perchEl: Element | null;
+  perchFacingLeft: boolean;
 };
 
 type Props = {
