@@ -179,6 +179,7 @@ type Goose = {
 
 type Props = {
   oneliners?: OnelinerEntry[];
+  onBallModeChange?: (active: boolean) => void;
 };
 
 const CHAT_LINES: [string, string][] = [
@@ -193,14 +194,18 @@ const LONELY_LINES = [
   "I'm so lonely! ��",
 ];
 
-const FlyingGoose = ({ oneliners = [] }: Props) => {
+const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
   const wrapsRef = useRef<Array<HTMLDivElement | null>>([]);
   const imgsRef = useRef<Array<HTMLImageElement | null>>([]);
   const bubblesRef = useRef<Array<HTMLDivElement | null>>([]);
-  const ballRef = useRef<HTMLDivElement | null>(null);
   const lastOnelinerKeyRef = useRef<string | null>(null);
+  const onBallModeChangeRef = useRef(onBallModeChange);
+  useEffect(() => {
+    onBallModeChangeRef.current = onBallModeChange;
+  }, [onBallModeChange]);
 
   useEffect(() => {
+
     const whiteFrames = buildFrameSvgs(WHITE_COLORS);
     const brownFrames = buildFrameSvgs(BROWN_COLORS);
     const frameSets = [whiteFrames, brownFrames];
