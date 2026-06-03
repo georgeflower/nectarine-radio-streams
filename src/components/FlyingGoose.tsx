@@ -272,7 +272,7 @@ const FlyingGoose = ({ oneliners = [], onBallModeChange }: Props) => {
     const brownJoinAt = startAt + BROWN_GOOSE_JOIN_DELAY_MS;
     let nextChatAt = startAt + 12000;
     let nextTargetShiftAt = startAt + 2000;
-    let nextBallModeAt = startAt + 35000;
+    let nextBallModeAt = startAt + 60000;
     let nextFlyAwayAt = startAt + 55000;
     let nextLonelyAt = 0;
 
