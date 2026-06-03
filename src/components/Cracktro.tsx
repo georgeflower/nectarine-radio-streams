@@ -185,12 +185,19 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
     window.addEventListener("resize", resize);
 
     const fontSize = 64 * dpr;
-    const fontStr = `900 ${fontSize}px "Impact","Arial Black","Helvetica Neue",sans-serif`;
+    const fontStr = skin === "xm"
+      ? `${fontSize}px "Press Start 2P","VT323",monospace`
+      : `900 ${fontSize}px "Impact","Arial Black","Helvetica Neue",sans-serif`;
     ctx.font = fontStr;
     ctx.textBaseline = "middle";
     const chars = Array.from(text);
     const widths = chars.map((c) => ctx.measureText(c).width + 4 * dpr);
     const totalW = widths.reduce((a, b) => a + b, 0);
+
+    // Offscreen glyph canvas for clipped/banded skins.
+    const og = document.createElement("canvas");
+    og.height = canvas.height;
+    const octx = og.getContext("2d");
 
     let offset = 0;
     let t = 0;
@@ -211,6 +218,70 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
         ctx.fillStyle = "hsla(20, 25%, 6%, 0.45)";
         ctx.fillRect(0, 0, w, h);
       }
+    };
+
+    // Paint one glyph onto the offscreen canvas (size already set), clipped to letter shape.
+    const paintSkinned = (ch: string, cw: number) => {
+      if (!octx) return;
+      const ow = og.width;
+      const oh = og.height;
+      octx.clearRect(0, 0, ow, oh);
+      const glyphH = fontSize * 0.82;
+      const top = oh / 2 - glyphH / 2;
+
+      if (skin === "amiga") {
+        const g = octx.createLinearGradient(0, top, 0, top + glyphH);
+        g.addColorStop(0, "#fff3c4");
+        g.addColorStop(0.35, "#e6b94a");
+        g.addColorStop(0.65, "#8a5a14");
+        g.addColorStop(1, "#2a1604");
+        octx.fillStyle = g;
+        octx.fillRect(0, top, ow, glyphH);
+        // 45° dark hatching
+        octx.fillStyle = "rgba(30,15,4,0.55)";
+        const stripeW = 3 * dpr;
+        for (let sx = -oh; sx < ow + oh; sx += stripeW * 2) {
+          octx.beginPath();
+          octx.moveTo(sx, 0);
+          octx.lineTo(sx + oh, oh);
+          octx.lineTo(sx + oh + stripeW, oh);
+          octx.lineTo(sx + stripeW, 0);
+          octx.closePath();
+          octx.fill();
+        }
+      } else if (skin === "atari" || skin === "c64") {
+        const colors = skin === "atari"
+          ? ["#d8341c", "#f5c518", "#3aa84a", "#1f5fd6"]
+          : ["#c44a3a", "#e8c352", "#5aa86a"];
+        const bandH = glyphH / colors.length;
+        for (let i = 0; i < colors.length; i++) {
+          octx.fillStyle = colors[i];
+          octx.fillRect(0, top + i * bandH, ow, bandH + 0.5);
+        }
+      } else if (skin === "xm") {
+        const g = octx.createLinearGradient(0, top, 0, top + glyphH);
+        g.addColorStop(0, "#0a1a3a");
+        g.addColorStop(0.3, "#2a6acc");
+        g.addColorStop(0.55, "#cfe1ff");
+        g.addColorStop(0.78, "#2a6acc");
+        g.addColorStop(1, "#0a1a3a");
+        octx.fillStyle = g;
+        octx.fillRect(0, top, ow, glyphH);
+        // animated horizontal shimmer scan lines (FT2 wave feel)
+        for (let yy = top; yy < top + glyphH; yy += 2 * dpr) {
+          const v = (Math.sin(yy * 0.09 + t * 2.4) + 1) * 0.5;
+          octx.fillStyle = `rgba(255,255,255,${0.05 + v * 0.18})`;
+          octx.fillRect(0, yy, ow, dpr);
+        }
+      }
+
+      // Clip the fill to the glyph silhouette.
+      octx.globalCompositeOperation = "destination-in";
+      octx.font = fontStr;
+      octx.textBaseline = "middle";
+      octx.fillStyle = "#fff";
+      octx.fillText(ch, 2 * dpr, oh / 2);
+      octx.globalCompositeOperation = "source-over";
     };
 
     const tick = () => {
@@ -280,19 +351,40 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
           }
         }
 
-        const hue = (x * 0.4 + t * 60) % 360;
         ctx.save();
         ctx.translate(x + cw / 2, y);
         if (rotation) ctx.rotate(rotation);
         if (skewY) ctx.transform(1, skewY, -0.25, 1, 0, 0);
         if (scale !== 1) ctx.scale(scale, scale);
-        ctx.shadowColor = `hsl(${hue}, 100%, 55%)`;
-        ctx.shadowBlur = 18 * dpr;
-        ctx.fillStyle = `hsl(${hue}, 100%, 68%)`;
-        ctx.fillText(chars[i], -cw / 2 + 2 * dpr, 0);
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = `hsl(${(hue + 30) % 360}, 100%, 88%)`;
-        ctx.fillText(chars[i], -cw / 2 + 2 * dpr, -2 * dpr);
+
+        if (skin === "default") {
+          const hue = (x * 0.4 + t * 60) % 360;
+          ctx.shadowColor = `hsl(${hue}, 100%, 55%)`;
+          ctx.shadowBlur = 18 * dpr;
+          ctx.fillStyle = `hsl(${hue}, 100%, 68%)`;
+          ctx.fillText(chars[i], -cw / 2 + 2 * dpr, 0);
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = `hsl(${(hue + 30) % 360}, 100%, 88%)`;
+          ctx.fillText(chars[i], -cw / 2 + 2 * dpr, -2 * dpr);
+        } else {
+          // Resize offscreen for this glyph (height is constant).
+          const ow = Math.max(1, Math.ceil(cw + 8 * dpr));
+          if (og.width !== ow) og.width = ow;
+          paintSkinned(chars[i], cw);
+          // Optional outline glow for legibility on the visualizer backdrop.
+          if (skin === "amiga") {
+            ctx.shadowColor = "rgba(0,0,0,0.85)";
+            ctx.shadowBlur = 6 * dpr;
+          } else if (skin === "xm") {
+            ctx.shadowColor = "rgba(10,20,60,0.9)";
+            ctx.shadowBlur = 8 * dpr;
+          } else {
+            ctx.shadowColor = "rgba(0,0,0,0.7)";
+            ctx.shadowBlur = 4 * dpr;
+          }
+          ctx.drawImage(og, -cw / 2, -og.height / 2);
+          ctx.shadowBlur = 0;
+        }
         ctx.restore();
 
         x += cw;
@@ -307,7 +399,8 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, [text, mode, scrollOn]);
+  }, [text, mode, scrollOn, skin]);
+
 
   const scrollerBottomOffset = 40; // px, leaves room for the controls bar
 
