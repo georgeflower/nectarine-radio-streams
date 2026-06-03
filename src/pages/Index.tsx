@@ -418,6 +418,46 @@ const Index = () => {
                     <p className="text-sm">
                       Time Left: <span className="text-foreground">{timeLeft}</span>
                     </p>
+                    <div className="mt-3 flex items-center gap-3 flex-wrap">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        BPM
+                      </span>
+                      <span
+                        className="neon-accent font-bold tabular-nums text-sm min-w-[2.5ch] inline-block"
+                        title="Detected tempo from bass kicks"
+                      >
+                        {bpm > 0 ? bpm : "--"}
+                      </span>
+                      <div
+                        className="flex items-center gap-1"
+                        role="img"
+                        aria-label={`Beat grid, step ${beatIndex + 1} of 4`}
+                      >
+                        {[0, 1, 2, 3].map((i) => {
+                          const active = bpm > 0 && i === beatIndex;
+                          return (
+                            <span
+                              key={i}
+                              className="block rounded-sm border border-border transition-all duration-75"
+                              style={{
+                                width: "0.85rem",
+                                height: "0.85rem",
+                                background: active
+                                  ? "hsl(var(--primary))"
+                                  : "hsl(var(--muted) / 0.4)",
+                                boxShadow: active
+                                  ? `0 0 ${6 + audioLevel * 16}px hsl(var(--primary) / 0.9)`
+                                  : "none",
+                                transform: active ? "scale(1.15)" : "scale(1)",
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground tabular-nums">
+                        · {beatCount} kicks
+                      </span>
+                    </div>
                   </>
                 ) : (
                   <p className="text-muted-foreground text-sm">No track info yet…</p>
