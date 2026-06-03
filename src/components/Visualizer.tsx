@@ -544,3 +544,49 @@ export const useAudioLevel = (analyser: AnalyserNode | null, enabled = true): nu
 
   return level;
 };
+
+/**
+ * Returns a number that bumps to 1 on each detected kick and decays back to 0.
+ * Use for flash/scale overlays. Returns 0 when analyser is null or disabled.
+ */
+export const useBeat = (analyser: AnalyserNode | null, enabled = true): number => {
+  const [pulse, setPulse] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  const avgRef = useRef(0);
+  const cooldownRef = useRef(0);
+  const pulseRef = useRef(0);
+
+  useEffect(() => {
+    if (!analyser || !enabled) {
+      setPulse(0);
+      return;
+    }
+    const buf = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>;
+    const bEnd = Math.max(1, Math.floor(buf.length * 0.08));
+
+    const tick = () => {
+      analyser.getByteFrequencyData(buf);
+      let sum = 0;
+      for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
+      const bass = sum / bEnd / 255;
+      const avg = avgRef.current;
+      avgRef.current = avg * 0.92 + bass * 0.08;
+      if (cooldownRef.current > 0) cooldownRef.current -= 1;
+      if (bass > avg * 1.35 && bass > 0.15 && cooldownRef.current <= 0) {
+        pulseRef.current = Math.min(1, 0.6 + bass);
+        cooldownRef.current = 10;
+      }
+      pulseRef.current *= 0.86;
+      if (pulseRef.current < 0.01) pulseRef.current = 0;
+      setPulse(pulseRef.current);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [analyser, enabled]);
+
+  return pulse;
+};
+
