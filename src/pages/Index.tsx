@@ -295,7 +295,13 @@ const Index = () => {
           songId={now?.songId}
           onExit={() => setCracktroOpen(false)}
           onStyleChange={(s) => setVizStyle(s)}
+          oneliners={oneliners}
+          users={users}
+          usersTotal={usersTotal}
+          queue={playlist.queue}
+          history={playlist.history}
         />
+
       )}
       <main
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"

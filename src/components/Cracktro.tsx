@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Visualizer, { type VisualizerStyle } from "./Visualizer";
 import BeatOverlay from "./BeatOverlay";
+import FloatingWindow from "./FloatingWindow";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
+import type { OnelinerEntry, QueueEntry } from "@/lib/nectarine";
+
+type OnlineUser = { name: string; flag: string };
 
 type Props = {
   analyser: AnalyserNode | null;
@@ -11,6 +15,11 @@ type Props = {
   songId?: string;
   onExit: () => void;
   onStyleChange?: (s: VisualizerStyle) => void;
+  oneliners?: OnelinerEntry[];
+  users?: OnlineUser[];
+  usersTotal?: number;
+  queue?: QueueEntry[];
+  history?: QueueEntry[];
 };
 
 const VIZ_STYLES: { id: VisualizerStyle; label: string }[] = [
@@ -44,7 +53,19 @@ const STORAGE_MODE = "cracktro-scroll-mode";
 const STORAGE_ON = "cracktro-scroll-on";
 const STORAGE_INFOBAR = "cracktro-infobar-on";
 
-const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChange }: Props) => {
+type PanelId = "oneliner" | "online" | "queue" | "history";
+const PANELS: { id: PanelId; label: string }[] = [
+  { id: "oneliner", label: "Oneliner" },
+  { id: "online", label: "Online" },
+  { id: "queue", label: "Up Next" },
+  { id: "history", label: "Recent" },
+];
+const STORAGE_PANELS = "cracktro-panels-on";
+
+const Cracktro = ({
+  analyser, style, artist, title, songId, onExit, onStyleChange,
+  oneliners = [], users = [], usersTotal, queue = [], history = [],
+}: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const onExitRef = useRef(onExit);
@@ -84,6 +105,23 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
   useEffect(() => {
     try { localStorage.setItem(STORAGE_INFOBAR, infobarOn ? "1" : "0"); } catch { /* ignore */ }
   }, [infobarOn]);
+  const [panelsOn, setPanelsOn] = useState<Record<PanelId, boolean>>(() => {
+    const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: false, history: false };
+    try {
+      const raw = localStorage.getItem(STORAGE_PANELS);
+      if (raw) {
+        const v = JSON.parse(raw) as Partial<Record<PanelId, boolean>>;
+        return { ...defaults, ...v };
+      }
+    } catch {
+      // ignore
+    }
+    return defaults;
+  });
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_PANELS, JSON.stringify(panelsOn)); } catch { /* ignore */ }
+  }, [panelsOn]);
+  const togglePanel = (id: PanelId) => setPanelsOn((p) => ({ ...p, [id]: !p[id] }));
 
   // Auto-hide UI (exit + controls) after 5s of no pointer activity.
   const [showControls, setShowControls] = useState(true);
@@ -472,6 +510,109 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
         </div>
       )}
 
+      {/* Floating side panels — independently toggleable & draggable. */}
+      {panelsOn.oneliner && (
+        <FloatingWindow
+          id="oneliner"
+          title="Oneliner"
+          defaultX={16}
+          defaultY={80}
+          defaultW={320}
+          onClose={() => togglePanel("oneliner")}
+        >
+          {oneliners.length === 0 ? (
+            <p className="text-muted-foreground">No messages.</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {oneliners.slice(0, 30).map((o, i) => (
+                <li key={i} className="leading-snug break-words">
+                  <span className="text-muted-foreground text-[10px] mr-1">{o.time}</span>
+                  <span className="font-semibold text-primary">{o.username}</span>
+                  <span className="text-muted-foreground">: </span>
+                  <span>{o.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </FloatingWindow>
+      )}
+
+      {panelsOn.online && (
+        <FloatingWindow
+          id="online"
+          title={`Online${typeof usersTotal === "number" ? ` (${usersTotal})` : ""}`}
+          defaultX={16}
+          defaultY={Math.max(80, (typeof window !== "undefined" ? window.innerHeight : 800) - 340)}
+          defaultW={260}
+          onClose={() => togglePanel("online")}
+        >
+          {users.length === 0 ? (
+            <p className="text-muted-foreground">No users online.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {users.map((u, i) => (
+                <li key={i} className="flex items-center gap-2">
+                  {u.flag && <span className="text-[10px] uppercase text-muted-foreground">{u.flag}</span>}
+                  <span className="truncate">{u.name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </FloatingWindow>
+      )}
+
+      {panelsOn.queue && (
+        <FloatingWindow
+          id="queue"
+          title="Up Next"
+          defaultX={Math.max(16, (typeof window !== "undefined" ? window.innerWidth : 1200) - 336)}
+          defaultY={80}
+          defaultW={320}
+          onClose={() => togglePanel("queue")}
+        >
+          {queue.length === 0 ? (
+            <p className="text-muted-foreground">Queue is empty.</p>
+          ) : (
+            <ol className="flex flex-col gap-1.5 list-decimal pl-5">
+              {queue.map((q, i) => (
+                <li key={i} className="leading-snug break-words">
+                  <span className="font-semibold">{q.song}</span>
+                  <span className="text-muted-foreground"> — {q.artist}</span>
+                  {q.requester && (
+                    <span className="text-muted-foreground text-[10px]"> · {q.requester}</span>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </FloatingWindow>
+      )}
+
+      {panelsOn.history && (
+        <FloatingWindow
+          id="history"
+          title="Recently Played"
+          defaultX={Math.max(16, (typeof window !== "undefined" ? window.innerWidth : 1200) - 336)}
+          defaultY={Math.max(80, (typeof window !== "undefined" ? window.innerHeight : 800) - 340)}
+          defaultW={320}
+          onClose={() => togglePanel("history")}
+        >
+          {history.length === 0 ? (
+            <p className="text-muted-foreground">No history yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {history.map((h, i) => (
+                <li key={i} className="leading-snug break-words">
+                  <span className="font-semibold">{h.song}</span>
+                  <span className="text-muted-foreground"> — {h.artist}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </FloatingWindow>
+      )}
+
+
       {/* Top-right exit — auto-hides with the controls. */}
       <button
         type="button"
@@ -534,6 +675,28 @@ const Cracktro = ({ analyser, style, artist, title, songId, onExit, onStyleChang
           >
             {infobarOn ? "ON" : "OFF"}
           </button>
+        </div>
+
+        {/* Row: floating panel toggles */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mr-1">Panels</span>
+          <div className="flex flex-wrap items-center gap-1">
+            {PANELS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => togglePanel(p.id)}
+                className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                  panelsOn[p.id]
+                    ? "border-primary bg-primary/20 text-foreground"
+                    : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                }`}
+                aria-pressed={panelsOn[p.id]}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Row 2: visualizer effect picker */}
