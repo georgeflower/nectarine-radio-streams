@@ -295,7 +295,7 @@ function pickUsageTracked<T>(bucket: string, arr: readonly T[]): T {
   let selectedIndex = weights.length - 1;
   for (let i = 0; i < weights.length; i++) {
     threshold -= weights[i];
-    if (threshold < 0) {
+    if (threshold <= 0) {
       selectedIndex = i;
       break;
     }
@@ -493,7 +493,6 @@ async function step() {
       lastFlyAwayAt = now;
       await runFlyAway();
     } else if (canStartBallPlay(now)) {
-      lastBallPlayAt = now;
       try {
         await runBallPlay();
       } finally {
