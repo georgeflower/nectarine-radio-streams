@@ -83,9 +83,9 @@ const BoingBall = () => {
       const ry = r * (1 - squash * 0.28);
 
       // Shadow ellipse on floor
-      const floor = window.innerHeight - 8;
+      const floor = stageH() - 8;
       const shadowY = floor;
-      const shadowScale = Math.max(0.35, 1 - (floor - cy) / (window.innerHeight * 0.9));
+      const shadowScale = Math.max(0.35, 1 - (floor - cy) / (stageH() * 0.9));
       ctx.save();
       ctx.scale(dpr, dpr);
       ctx.fillStyle = "rgba(0,0,0,0.35)";
