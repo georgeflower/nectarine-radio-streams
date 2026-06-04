@@ -20,21 +20,33 @@ const BoingBall = () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    const stageEl = canvas.parentElement;
+    const stageW = () => (stageEl ? stageEl.clientWidth : window.innerWidth);
+    const stageH = () => (stageEl ? stageEl.clientHeight : window.innerHeight);
+
     let dpr = Math.min(window.devicePixelRatio || 1, 2);
     const resize = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.floor(window.innerWidth * dpr);
-      canvas.height = Math.floor(window.innerHeight * dpr);
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
+      const w = stageW();
+      const h = stageH();
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
     };
     resize();
-    window.addEventListener("resize", resize);
+    let ro: ResizeObserver | null = null;
+    if (stageEl) {
+      ro = new ResizeObserver(resize);
+      ro.observe(stageEl);
+    } else {
+      window.addEventListener("resize", resize);
+    }
 
     // Ball state (in CSS px)
-    const R = () => Math.min(window.innerWidth, window.innerHeight) * 0.07;
-    let x = window.innerWidth * 0.3;
-    let y = window.innerHeight * 0.3;
+    const R = () => Math.min(stageW(), stageH()) * 0.07;
+    let x = stageW() * 0.3;
+    let y = stageH() * 0.3;
     let vx = 320; // px/s
     let vy = 0;
     const gravity = 650; // px/s^2 — gentler so it bounces higher
