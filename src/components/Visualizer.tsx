@@ -93,11 +93,16 @@ const Visualizer = ({ analyser, style }: Props) => {
       ? (new Uint8Array(new ArrayBuffer(analyser.fftSize)) as Uint8Array<ArrayBuffer>)
       : null;
 
+    const stageEl = canvas.parentElement;
+    const stageW = () => (stageEl ? stageEl.clientWidth : window.innerWidth);
+    const stageH = () => (stageEl ? stageEl.clientHeight : window.innerHeight);
     const resize = () => {
-      canvas.width = Math.floor(window.innerWidth * dpr);
-      canvas.height = Math.floor(window.innerHeight * dpr);
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
+      const w = stageW();
+      const h = stageH();
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
     };
 
     const sampleAudio = (): AudioSnapshot => {
