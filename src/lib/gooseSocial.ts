@@ -95,7 +95,9 @@ let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
 let recentOneliner: { username: string; text: string; at: number } | null = null;
 
+// Keep idle chatter tied to very recent chat activity (85s).
 const RECENT_ONELINER_WINDOW_MS = 85_000;
+// Minimum gap between contextual goose dialogues (70s).
 const DIALOGUE_COOLDOWN_MS = 70_000;
 const ONELINER_DIALOGUES: string[][] = [
   ['"{line}" from {user}? Confirmasse!', "Scene approved. :D"],
