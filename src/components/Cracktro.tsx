@@ -258,14 +258,23 @@ const Cracktro = ({
     // Tall enough that wave displacement + glyph + shadow blur never clips.
     const CSS_H = 360;
 
+    const stageEl = canvas.parentElement;
+    const stageW = () => (stageEl ? stageEl.clientWidth : window.innerWidth);
     const resize = () => {
-      canvas.width = Math.floor(window.innerWidth * dpr);
+      const w = stageW();
+      canvas.width = Math.floor(w * dpr);
       canvas.height = Math.floor(CSS_H * dpr);
-      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.width = `${w}px`;
       canvas.style.height = `${CSS_H}px`;
     };
     resize();
-    window.addEventListener("resize", resize);
+    let ro: ResizeObserver | null = null;
+    if (stageEl) {
+      ro = new ResizeObserver(resize);
+      ro.observe(stageEl);
+    } else {
+      window.addEventListener("resize", resize);
+    }
 
     const fontSize = 64 * dpr;
     const fontStr = skin === "xm"
