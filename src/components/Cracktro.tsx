@@ -546,6 +546,16 @@ const Cracktro = ({
       {brownGooseOn && <FlyingGoose oneliners={oneliners} variant="brown" />}
       {boingOn && <BoingBall />}
 
+      <button
+        type="button"
+        onClick={() => onExitRef.current?.()}
+        className="absolute top-2 left-2 z-10 min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        aria-label="Exit Cracktro"
+        title="Exit Cracktro"
+      >
+        ✕ EXIT
+      </button>
+
       {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
       {scrollOn && (
         <canvas

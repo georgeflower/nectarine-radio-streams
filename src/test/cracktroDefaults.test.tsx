@@ -77,4 +77,13 @@ describe("Cracktro defaults and fullscreen behavior", () => {
     expect(screen.queryByText(/Cracktro — Windowed/i)).not.toBeInTheDocument();
     expect(onExit).not.toHaveBeenCalled();
   });
+
+  it("shows an exit button and calls onExit when clicked", async () => {
+    const onExit = vi.fn();
+    render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={onExit} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Exit Cracktro" }));
+
+    await waitFor(() => expect(onExit).toHaveBeenCalledTimes(1));
+  });
 });
