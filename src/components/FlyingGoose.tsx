@@ -680,8 +680,15 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           const ty = topY - SPRITE_H + sink;
           // Wrap: position only — no flipping, no rotation. Body stays put.
           wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
-          // Head: rotate + slight translate, pivoting at the neck base.
-          imgHead.style.transform = `translate(${lateral}px, ${neckBob}px) rotate(${yaw + wiggle}deg)`;
+          if (eatingMode) {
+            // Pecking at the food: rhythmic chew/peck instead of idle look.
+            const chew = Math.sin(elapsed / CHEW_CYCLE_MS) * CHEW_AMPLITUDE;
+            imgHead.style.transform = `translate(0px, ${chew}px) rotate(${chew * CHEW_ROTATION_FACTOR}deg)`;
+          } else {
+            // Head: rotate + slight translate, pivoting at the neck base.
+            imgHead.style.transform = `translate(${lateral}px, ${neckBob}px) rotate(${yaw + wiggle}deg)`;
+          }
+
           positionBubble(cx, topY);
           if (elapsed >= takeoffAt) takeoff();
           raf = requestAnimationFrame(tick);
