@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useStageSize } from "@/lib/stage";
 
 type Props = {
   id: string;
