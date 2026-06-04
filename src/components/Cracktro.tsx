@@ -216,7 +216,7 @@ const Cracktro = ({
       const v = localStorage.getItem("cracktro-skin-override") as Skin | "auto" | null;
       if (v && ["auto", "default", "amiga", "atari", "c64", "xm"].includes(v)) return v;
     } catch { /* ignore */ }
-    return "auto";
+    return "xm";
   });
   useEffect(() => {
     try { localStorage.setItem("cracktro-skin-override", skinOverride); } catch { /* ignore */ }
