@@ -598,11 +598,12 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       imgBody.style.opacity = "1";
       imgHead.style.opacity = "1";
       img.style.opacity = "0";
-      takeoffAt = elapsed + sitDuration();
+      takeoffAt = eatingMode ? Number.POSITIVE_INFINITY : elapsed + sitDuration();
       nextLookAt = elapsed + rand(700, 1600);
       x = cx;
       y = topY - SPRITE_H + sink + SPRITE_H / 2;
     };
+
 
     const startle = () => {
       mode = "startle";
