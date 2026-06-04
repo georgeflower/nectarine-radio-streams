@@ -763,7 +763,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
       let dh = ((targetHeading - heading + Math.PI) % (Math.PI * 2)) - Math.PI;
       if (dh < -Math.PI) dh += Math.PI * 2;
-      const turnRate = (reducedMotion ? 0.6 : mode === "approach" ? 2.2 : 1.4) * dt;
+      const turnRate = (reducedMotion ? 0.6 : chaseTarget ? 3.2 : mode === "approach" ? 2.2 : 1.4) * dt;
       heading += Math.max(-turnRate, Math.min(turnRate, dh));
 
       speed += (targetSpeed - speed) * Math.min(1, dt * 1.2);
