@@ -636,7 +636,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
 
       // ===== FLY / APPROACH =====
-      if (mode === "fly" && elapsed >= nextPerchAt) {
+      if (mode === "fly" && !away && elapsed >= nextPerchAt) {
         const p = pickPerch();
         if (p) {
           perchEl = p.el;
@@ -651,7 +651,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       }
 
       if (mode === "approach") {
-        if (!perchAlive()) {
+        if (!perchAlive() || away) {
           mode = "fly";
           nextPerchAt = elapsed + nextPerchDelay();
         } else {
@@ -672,23 +672,31 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
       // === Normal flying (also used during approach) ===
       if (mode === "fly") {
-        if (elapsed >= nextDriftAt) {
-          targetHeading += (Math.random() - 0.5) * 0.6;
-          nextDriftAt = elapsed + 400 + Math.random() * 500;
-        }
-        if (elapsed >= nextBankAt) {
-          const turn = (Math.PI / 180) * (60 + Math.random() * 80);
-          targetHeading += (Math.random() < 0.5 ? -1 : 1) * turn;
-          targetSpeed = 80 + Math.random() * 90;
-          nextBankAt = elapsed + 3500 + Math.random() * 5000;
-        }
+        if (away) {
+          // Beeline off-screen and stay there until the coordinator brings
+          // us back. Suppress drift, banking and the inward boundary nudge.
+          targetHeading = awayHeading;
+          targetSpeed = 180;
+          nextPerchAt = elapsed + 1e9;
+        } else {
+          if (elapsed >= nextDriftAt) {
+            targetHeading += (Math.random() - 0.5) * 0.6;
+            nextDriftAt = elapsed + 400 + Math.random() * 500;
+          }
+          if (elapsed >= nextBankAt) {
+            const turn = (Math.PI / 180) * (60 + Math.random() * 80);
+            targetHeading += (Math.random() < 0.5 ? -1 : 1) * turn;
+            targetSpeed = 80 + Math.random() * 90;
+            nextBankAt = elapsed + 3500 + Math.random() * 5000;
+          }
 
-        const margin = 80;
-        if (x < margin || x > w - margin || y < margin || y > h - margin) {
-          const cx = w / 2;
-          const cy = h / 2;
-          const inward = Math.atan2(cy - y, cx - x);
-          targetHeading = inward + (Math.random() - 0.5) * 0.4;
+          const margin = 80;
+          if (x < margin || x > w - margin || y < margin || y > h - margin) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const inward = Math.atan2(cy - y, cx - x);
+            targetHeading = inward + (Math.random() - 0.5) * 0.4;
+          }
         }
       }
 
