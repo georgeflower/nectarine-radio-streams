@@ -31,6 +31,40 @@ type AudioSnapshot = {
 const STAR_COUNT = 400;
 const MAX_DEPTH = 1000;
 const PARTICLE_COUNT = 220;
+// Keep a small reuse window so multiple rAF-driven hooks in the same visual frame
+// can share analyser data without adding noticeable latency.
+const FRAME_CACHE_WINDOW_MS = 4;
+type FreqFrame = { ts: number; buf: Uint8Array; bass: number; bEnd: number };
+const freqFrameCache = new WeakMap<AnalyserNode, FreqFrame>();
+
+const getFreqFrame = (analyser: AnalyserNode): FreqFrame => {
+  const now = performance.now();
+  const cached = freqFrameCache.get(analyser);
+  if (
+    cached &&
+    cached.buf.length === analyser.frequencyBinCount &&
+    now - cached.ts < FRAME_CACHE_WINDOW_MS
+  ) {
+    return cached;
+  }
+
+  const bufferSizeChanged = !cached || cached.buf.length !== analyser.frequencyBinCount;
+  const buf =
+    bufferSizeChanged
+      ? new Uint8Array(analyser.frequencyBinCount)
+      : cached.buf;
+  analyser.getByteFrequencyData(buf);
+
+  const bEnd =
+    cached && !bufferSizeChanged
+      ? cached.bEnd
+      : Math.max(1, Math.floor(buf.length * 0.08));
+  let sum = 0;
+  for (let i = 0; i < bEnd; i++) sum += buf[i];
+  const frame: FreqFrame = { ts: now, buf, bass: sum / bEnd / 255, bEnd };
+  freqFrameCache.set(analyser, frame);
+  return frame;
+};
 
 const Visualizer = ({ analyser, style }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -526,14 +560,9 @@ export const useAudioLevel = (analyser: AnalyserNode | null, enabled = true): nu
       setLevel(0);
       return;
     }
-    const buf = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>;
-    const bEnd = Math.max(1, Math.floor(buf.length * 0.08));
 
     const tick = () => {
-      analyser.getByteFrequencyData(buf);
-      let sum = 0;
-      for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
-      const bass = sum / bEnd / 255;
+      const { bass } = getFreqFrame(analyser);
       smoothRef.current = smoothRef.current * 0.7 + bass * 0.3;
       setLevel(smoothRef.current);
       rafRef.current = requestAnimationFrame(tick);
@@ -563,14 +592,9 @@ export const useBeat = (analyser: AnalyserNode | null, enabled = true): number =
       setPulse(0);
       return;
     }
-    const buf = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>;
-    const bEnd = Math.max(1, Math.floor(buf.length * 0.08));
 
     const tick = () => {
-      analyser.getByteFrequencyData(buf);
-      let sum = 0;
-      for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
-      const bass = sum / bEnd / 255;
+      const { bass } = getFreqFrame(analyser);
       const avg = avgRef.current;
       avgRef.current = avg * 0.92 + bass * 0.08;
       if (cooldownRef.current > 0) cooldownRef.current -= 1;
@@ -1102,7 +1126,3 @@ export const useBpm = (
 
   return state;
 };
-
-
-
-
