@@ -157,6 +157,7 @@ const BoingBall = () => {
 
       const r = R();
 
+      let squash = 0;
       const directive = getBallPlayDirective();
       // While the geese are playing, calm the ball down so it stays nearby
       // and the geese can actually catch up to it: less gravity, no lively
@@ -198,8 +199,8 @@ const BoingBall = () => {
       const nearFloor = Math.max(0, 1 - distToFloor / (r * 0.6));
       squash = Math.max(squash, nearFloor * 0.35);
 
-      const directive = getBallPlayDirective();
       if (directive) {
+
         const positions = getGoosePositions();
         const chaserPos = positions?.[directive.chaser];
         if (chaserPos) {
