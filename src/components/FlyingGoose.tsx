@@ -845,14 +845,15 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("resize", onResize);
+      if (ro) ro.disconnect();
+      else window.removeEventListener("resize", onResize);
       unregisterGoose();
     };
   }, [variant]);
 
   return (
     <div
-      className="fixed inset-0 pointer-events-none overflow-hidden"
+      className="absolute inset-0 pointer-events-none overflow-hidden"
       style={{ zIndex: 60 }}
       aria-hidden
     >
