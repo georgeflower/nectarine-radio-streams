@@ -96,6 +96,9 @@ const RECEIVE_LINES = ["Nice bump! :D", "My turn!", "I got next!"];
 // additional turns so the length varies naturally each time.
 const MIN_BALL_PASSES = 6;
 const RANDOM_EXTRA_PASSES = 3;
+const BUMP_TIMEOUT_BASE_MS = 1700;
+const BUMP_TIMEOUT_RANDOM_MS = 700;
+const BUMP_CHECK_INTERVAL_MS = 90;
 
 const LONELY_LINES = [
   "I'm so lonely... :(",
@@ -151,16 +154,8 @@ async function runBallPlay() {
   const pair = getPair();
   if (!pair) return;
   mood = "playing";
-  const waitForExpectedBump = async (expected: GooseRole, timeoutMs: number) => {
-    const start = Date.now();
-    const marker = lastBumpEvent?.at ?? 0;
-    while (Date.now() - start < timeoutMs) {
-      if (!getPair()) return false;
-      if (lastBumpEvent && lastBumpEvent.at > marker && lastBumpEvent.by === expected) return true;
-      await wait(70);
-    }
-    return false;
-  };
+  const bumpedSince = (expectedBumper: GooseRole, marker: number) =>
+    !!lastBumpEvent && lastBumpEvent.by === expectedBumper && lastBumpEvent.at > marker;
 
   const turns = MIN_BALL_PASSES + Math.floor(Math.random() * RANDOM_EXTRA_PASSES);
   let chaserIdx = Math.random() < 0.5 ? 0 : 1;
@@ -174,9 +169,10 @@ async function runBallPlay() {
       chaser.say(pick(CHASE_LINES), 900);
       await wait(500);
       chaser.say(pick(PLAY_LINES), 900);
-      const bumpTimeout = 1700 + Math.random() * 700;
+      const maxBumpDuration = BUMP_TIMEOUT_BASE_MS + Math.random() * BUMP_TIMEOUT_RANDOM_MS;
       const bumpStart = Date.now();
-      while (Date.now() - bumpStart < bumpTimeout) {
+      const bumpMarker = lastBumpEvent?.at ?? 0;
+      while (Date.now() - bumpStart < maxBumpDuration) {
         const latestPair = getPair();
         if (!latestPair) break;
         const latestChaser = latestPair[chaserIdx];
@@ -188,12 +184,12 @@ async function runBallPlay() {
           chaser: latestChaser.variant,
           bumpToward: latestReceiver.getPosition(),
         };
-        const bumped = await waitForExpectedBump(latestChaser.variant, 90);
-        if (bumped) {
+        if (bumpedSince(latestChaser.variant, bumpMarker)) {
           latestReceiver.say(pick(RECEIVE_LINES), 900);
           chaserIdx = 1 - chaserIdx;
           break;
         }
+        await wait(BUMP_CHECK_INTERVAL_MS);
       }
       await wait(550 + Math.random() * 220);
     }
@@ -245,8 +241,9 @@ async function runFlyAway() {
     staying.say(pick(LONELY_LINES), 2400);
   }
   await wait(1200);
-  leaving.setFoodBag(true);
   leaving.setAway(false);
+  await wait(320);
+  leaving.setFoodBag(true);
   await wait(2200);
   if (getPair()) {
     leaving.say(pick(FOOD_RETURN_LINES), 2200);

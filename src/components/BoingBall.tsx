@@ -39,6 +39,13 @@ const BoingBall = () => {
     let vy = 0;
     const gravity = 650; // px/s^2 — gentler so it bounces higher
     const bounce = 0.94;
+    // Goose sprites are visibly wider than the ball radius, so extend contact
+    // distance to keep bumps feeling sprite-to-ball instead of pixel-perfect.
+    const GOOSE_COLLISION_PADDING = 30;
+    const BUMP_COOLDOWN_MS = 260;
+    const BUMP_VELOCITY_X = 420;
+    const BUMP_VELOCITY_Y_SCALE = 300;
+    const BUMP_UPWARD_LIFT = 220;
     let spin = 0; // rotation around tilted axis (radians)
     let spinDir = 1;
     let lastGooseBumpAt = 0;
@@ -191,15 +198,15 @@ const BoingBall = () => {
           const dx = x - chaserPos.x;
           const dy = y - chaserPos.y;
           const dist = Math.hypot(dx, dy);
-          const collisionRadius = r + 30;
-          if (dist <= collisionRadius && now - lastGooseBumpAt > 260) {
+          const collisionRadius = r + GOOSE_COLLISION_PADDING;
+          if (dist <= collisionRadius && now - lastGooseBumpAt > BUMP_COOLDOWN_MS) {
             const tx = directive.bumpToward.x - chaserPos.x;
             const ty = directive.bumpToward.y - chaserPos.y;
             const mag = Math.hypot(tx, ty) || 1;
             const ux = tx / mag;
             const uy = ty / mag;
-            vx = ux * 420;
-            vy = uy * 300 - 220;
+            vx = ux * BUMP_VELOCITY_X;
+            vy = uy * BUMP_VELOCITY_Y_SCALE - BUMP_UPWARD_LIFT;
             x += ux * 5;
             y += uy * 5;
             spinDir = ux < 0 ? 1 : -1;

@@ -327,6 +327,9 @@ const HEART_SVG = (() => {
 })();
 
 type Mode = "fly" | "approach" | "land" | "startle" | "ground";
+const CHEW_CYCLE_MS = 180;
+const CHEW_AMPLITUDE = 1.2;
+const CHEW_ROTATION_FACTOR = 2.4;
 
 type Props = {
   oneliners?: OnelinerEntry[];
@@ -679,9 +682,9 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       if (mode === "ground") {
         const tx = x - SPRITE_W / 2;
         const ty = h - SPRITE_H - 10;
-        const chew = Math.sin(elapsed / 180) * 1.2;
+        const chew = Math.sin(elapsed / CHEW_CYCLE_MS) * CHEW_AMPLITUDE;
         wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
-        imgHead.style.transform = `translate(0px, ${chew}px) rotate(${chew * 2.4}deg)`;
+        imgHead.style.transform = `translate(0px, ${chew}px) rotate(${chew * CHEW_ROTATION_FACTOR}deg)`;
         positionBubble(x, y);
         raf = requestAnimationFrame(tick);
         return;
