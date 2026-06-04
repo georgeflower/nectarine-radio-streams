@@ -31,23 +31,36 @@ type AudioSnapshot = {
 const STAR_COUNT = 400;
 const MAX_DEPTH = 1000;
 const PARTICLE_COUNT = 220;
+// Keep a small reuse window so multiple rAF-driven hooks in the same visual frame
+// can share analyser data without adding noticeable latency.
+const FRAME_CACHE_WINDOW_MS = 4;
 type FreqFrame = { ts: number; buf: Uint8Array; bass: number; bEnd: number };
 const freqFrameCache = new WeakMap<AnalyserNode, FreqFrame>();
 
 const getFreqFrame = (analyser: AnalyserNode): FreqFrame => {
   const now = performance.now();
   const cached = freqFrameCache.get(analyser);
-  if (cached && now - cached.ts < 4) return cached;
+  if (
+    cached &&
+    cached.buf.length === analyser.frequencyBinCount &&
+    now - cached.ts < FRAME_CACHE_WINDOW_MS
+  ) {
+    return cached;
+  }
 
+  const bufferSizeChanged = !cached || cached.buf.length !== analyser.frequencyBinCount;
   const buf =
-    cached?.buf.length === analyser.frequencyBinCount
-      ? cached.buf
-      : (new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>);
+    bufferSizeChanged
+      ? new Uint8Array(analyser.frequencyBinCount)
+      : cached.buf;
   analyser.getByteFrequencyData(buf);
 
-  const bEnd = Math.max(1, Math.floor(analyser.frequencyBinCount * 0.08));
+  const bEnd =
+    cached && !bufferSizeChanged
+      ? cached.bEnd
+      : Math.max(1, Math.floor(buf.length * 0.08));
   let sum = 0;
-  for (let i = 0; i < bEnd; i++) sum += buf[i] ?? 0;
+  for (let i = 0; i < bEnd; i++) sum += buf[i];
   const frame: FreqFrame = { ts: now, buf, bass: sum / bEnd / 255, bEnd };
   freqFrameCache.set(analyser, frame);
   return frame;
@@ -1113,6 +1126,3 @@ export const useBpm = (
 
   return state;
 };
-
-
-
