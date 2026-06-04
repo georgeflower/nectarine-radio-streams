@@ -747,16 +747,20 @@ const Cracktro = ({
           title="Exit Cracktro"
         >
           Era: {sceneEraConfig.label}
-        </div>
-      )}
-      {fpsCounterOn && (
-        <div
-          className="absolute top-2 right-24 z-10 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground"
-          aria-live="polite"
-        >
-          FPS: {fps ?? "--"}{lowFpsDetected ? " · SLOW GPU" : ""}
-        </div>
-      )}
+        </button>
+        {sceneErasOn && (
+          <div className="sr-only" aria-label={`Scene Era: ${sceneEraConfig.label}`}>
+            Scene Era: {sceneEraConfig.label}
+          </div>
+        )}
+        {fpsCounterOn && (
+          <div
+            className="absolute top-2 right-24 z-10 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground"
+            aria-live="polite"
+          >
+            FPS: {fps ?? "--"}{lowFpsDetected ? " · SLOW GPU" : ""}
+          </div>
+        )}
 
         {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
         {scrollOn && (
@@ -969,20 +973,7 @@ const Cracktro = ({
           >
             ▲
           </button>
-          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">FPS</span>
-          <button
-            type="button"
-            onClick={() => setFpsCounterOn((v) => !v)}
-            className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-              fpsCounterOn
-                ? "border-primary bg-primary/20 text-foreground"
-                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-            }`}
-            aria-pressed={fpsCounterOn}
-            aria-label="Toggle FPS counter"
-          >
-            {fpsCounterOn ? "ON" : "OFF"}
-          </button>
+        )}
 
         {/* Bottom controls bar — opened only by explicit click. */}
         <div
@@ -1059,6 +1050,21 @@ const Cracktro = ({
               aria-pressed={infobarOn}
             >
               {infobarOn ? "ON" : "OFF"}
+            </button>
+
+            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">FPS</span>
+            <button
+              type="button"
+              onClick={() => setFpsCounterOn((v) => !v)}
+              className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                fpsCounterOn
+                  ? "border-primary bg-primary/20 text-foreground"
+                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+              }`}
+              aria-pressed={fpsCounterOn}
+              aria-label="Toggle FPS counter"
+            >
+              {fpsCounterOn ? "ON" : "OFF"}
             </button>
 
             <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Goose</span>
