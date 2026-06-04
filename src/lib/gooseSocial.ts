@@ -207,6 +207,9 @@ async function runBallPlay() {
   const pair = getPair();
   if (!pair) return;
   mood = "playing";
+  // Ensure neither goose is sitting when play begins.
+  pair[0].setSitting(false);
+  pair[1].setSitting(false);
   const bumpedSince = (expectedBumper: GooseRole, marker: number) =>
     !!lastBumpEvent && lastBumpEvent.by === expectedBumper && lastBumpEvent.at > marker;
 
