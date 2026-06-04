@@ -1,6 +1,11 @@
 import { useEffect, useRef } from "react";
 import { SMILEYS } from "@/lib/smileys";
-import { registerGoose, reactToOnelinerSmiley, type GooseAPI } from "@/lib/gooseSocial";
+import {
+  noteRecentOneliner,
+  registerGoose,
+  reactToOnelinerSmiley,
+  type GooseAPI,
+} from "@/lib/gooseSocial";
 import { getEatingLayoutForGoose, getSceneScale } from "@/lib/gooseScene";
 import {
   gooseIsRecovered,
@@ -14,6 +19,8 @@ import {
 } from "@/lib/gooseBehavior";
 import type { OnelinerEntry } from "@/lib/nectarine";
 import { detectOnelinerReaction } from "@/lib/onelinerReactions";
+import { detectGooseTriggerReaction } from "@/lib/gooseTriggerReactions";
+import { learnPhraseFromOneliner } from "@/lib/gooseLearnedPhrases";
 
 /**
  * Pixel-art goose drawn entirely in code (no image asset). Wanders the viewport
@@ -350,6 +357,8 @@ type Mode = GooseMode;
 const CHEW_CYCLE_MS = 180;
 const CHEW_AMPLITUDE = 1.2;
 const CHEW_ROTATION_FACTOR = 2.4;
+// Practical "indefinite" delay used to suppress random perching while busy.
+const INDEFINITE_PERCH_DELAY_MS = 1_000_000_000;
 
 type Props = {
   oneliners?: OnelinerEntry[];
@@ -367,6 +376,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
   // Imperative reaction state shared between effects.
   const reactionUntilRef = useRef<number>(0);
+  const panicUntilRef = useRef<number>(0);
+  const panicPhraseRef = useRef<string>("");
   const lastOnelinerKeyRef = useRef<string | null>(null);
   const gooseInstanceIdRef = useRef<number>(0);
 
@@ -387,6 +398,20 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     if (!bubble) return;
 
     const text = top.text || "";
+    if (variant === "white") {
+      learnPhraseFromOneliner(text, top.username);
+      noteRecentOneliner(top.username, text);
+    }
+    const triggerReaction = detectGooseTriggerReaction(text);
+    if (triggerReaction) {
+      bubble.innerHTML = renderGooseHTML(triggerReaction.echo);
+      bubble.style.opacity = "1";
+      bubble.style.transform = "scale(1)";
+      reactionUntilRef.current = performance.now() + 2800;
+      panicUntilRef.current = performance.now() + 2600;
+      panicPhraseRef.current = triggerReaction.echo;
+      return;
+    }
     const mentionsGoose = /\bgoose\b/i.test(text);
     const reaction = detectOnelinerReaction(text);
     const smileyUrl = firstSmileyUrl(text) || (reaction ? REACTION_SMILEY[reaction] : null);
@@ -514,8 +539,11 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let chaseTarget: { x: number; y: number } | null = null;
     let sittingForMeal = false;
     let eatingMode = false; // when true, lands and pecks indefinitely
+    let fetchingFood = false;
     let stamina = STAMINA_MAX;
     let restingFromTiredness = false;
+    let panicFlightUntil = 0;
+    let lastAppliedPanicUntil = 0;
 
 
     const wrap = wrapRef.current;
@@ -568,7 +596,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       },
       setChaseTarget: (target: { x: number; y: number } | null) => {
         chaseTarget = target;
-        if (target && !away && !sittingForMeal) {
+        if (target && !away && !sittingForMeal && !fetchingFood) {
           mode = "fly";
           perchEl = null;
           img.style.opacity = "1";
@@ -608,6 +636,24 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           if (mode === "ground" || mode === "land" || mode === "approach") takeoff();
         }
 
+      },
+      setFetchingFood: (fetching: boolean) => {
+        fetchingFood = fetching;
+        if (!fetching) {
+          nextPerchAt = Math.min(nextPerchAt, elapsed + rand(2500, 6500));
+          return;
+        }
+        chaseTarget = null;
+        if (mode === "ground" || mode === "land" || mode === "approach" || mode === "startle") {
+          mode = "fly";
+          perchEl = null;
+          heading = away ? awayHeading : heading;
+          targetHeading = away ? awayHeading : targetHeading;
+          img.style.opacity = "1";
+          imgBody.style.opacity = "0";
+          imgHead.style.opacity = "0";
+        }
+        nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
       },
     };
     const unregisterGoose = registerGoose(api);
@@ -660,8 +706,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       return { cx, topY: r.top, sink: WINDOW_PERCH_SINK };
     };
 
-    const showStartleBubble = () => {
-      bubble.innerHTML = "WHATTA!!";
+    const showStartleBubble = (text = "WHATTA!!") => {
+      bubble.innerHTML = renderGooseHTML(text);
       bubble.style.opacity = "1";
       bubble.style.transform = "scale(1)";
       reactionUntilRef.current = performance.now() + 1400;
@@ -690,13 +736,13 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     };
 
 
-    const startle = () => {
+    const startle = (bubbleText = "WHATTA!!", durationMs = 1400) => {
       mode = "startle";
-      startleEnd = elapsed + 1400;
+      startleEnd = elapsed + durationMs;
       imgBody.style.opacity = "1";
       imgHead.style.opacity = "1";
       img.style.opacity = "0";
-      showStartleBubble();
+      showStartleBubble(bubbleText);
     };
 
     const takeoff = () => {
@@ -727,6 +773,11 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       applyScaledStyles();
 
       hideBubbleIfExpired(now);
+      if (panicUntilRef.current > lastAppliedPanicUntil) {
+        lastAppliedPanicUntil = panicUntilRef.current;
+        panicFlightUntil = elapsed + 2400;
+        startle(panicPhraseRef.current || "WHATTA!", 1000);
+      }
 
       const perchAlive = () => {
         if (!perchEl || !perchEl.isConnected) return false;
@@ -850,7 +901,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
 
       // ===== FLY / APPROACH =====
-      if (!eatingMode && (mode === "fly" || mode === "approach") && gooseIsTired(stamina)) {
+      if (!fetchingFood && !eatingMode && (mode === "fly" || mode === "approach") && gooseIsTired(stamina)) {
         const nearestPerch = pickPerch({ x, y });
         if (nearestPerch) {
           perchEl = nearestPerch.el;
@@ -873,7 +924,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           targetSpeed = scale(115);
         }
       }
-      if (mode === "fly" && !away && !eatingMode && elapsed >= nextPerchAt) {
+      if (mode === "fly" && !away && !eatingMode && !fetchingFood && elapsed >= nextPerchAt) {
         const p = pickPerch();
         if (p) {
           perchEl = p.el;
@@ -887,8 +938,11 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         }
       }
       if (mode === "approach") {
-        if (!perchAlive() || (away && !restingFromTiredness && !eatingMode)) {
-          const replacement = away && !restingFromTiredness && !eatingMode ? null : pickPerch({ x, y });
+        if (!perchAlive() || (away && !restingFromTiredness && !eatingMode) || fetchingFood) {
+          const replacement =
+            (away && !restingFromTiredness && !eatingMode) || fetchingFood
+              ? null
+              : pickPerch({ x, y });
           if (replacement) {
             perchEl = replacement.el;
             perchChar = replacement.char;
@@ -921,16 +975,24 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           // us back. Suppress drift, banking and the inward boundary nudge.
           targetHeading = awayHeading;
           targetSpeed = scale(180);
-          nextPerchAt = elapsed + 1e9;
+          nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
         } else if (chaseTarget) {
           targetHeading = Math.atan2(chaseTarget.y - y, chaseTarget.x - x);
           targetSpeed = scale(290);
-          nextPerchAt = elapsed + 1e9;
+          nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
+        } else if (fetchingFood) {
+          targetSpeed = scale(220);
+          nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
+          targetHeading += (Math.random() - 0.5) * 0.45;
 
         } else {
           if (elapsed >= nextDriftAt) {
             targetHeading += (Math.random() - 0.5) * 0.6;
             nextDriftAt = elapsed + 400 + Math.random() * 500;
+          }
+          if (panicFlightUntil > elapsed) {
+            targetSpeed = Math.max(targetSpeed, scale(330));
+            targetHeading += (Math.random() - 0.5) * 0.8;
           }
           if (elapsed >= nextBankAt) {
             const turn = (Math.PI / 180) * (60 + Math.random() * 80);
