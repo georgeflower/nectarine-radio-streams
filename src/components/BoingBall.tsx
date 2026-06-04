@@ -34,10 +34,12 @@ const BoingBall = () => {
     let vy = 0;
     const gravity = 650; // px/s^2 — gentler so it bounces higher
     const bounce = 0.94;
-    // During goose-controlled passes, rapidly damp idle momentum so physics
-    // resumes smoothly once scripted control ends.
-    const SCRIPTED_VELOCITY_DAMPING = 0.86;
-    const SCRIPTED_SPIN_FACTOR = 0.35;
+    // During goose-controlled passes, rapidly damp idle momentum so that when
+    // scripted control ends the ball doesn't fly off at its pre-pass velocity.
+    const SCRIPTED_VELOCITY_DAMPING = 0.86; // multiplied each frame — higher = less damping
+    // Slow the spin during scripted passes so it matches the visible "hold" feel
+    // rather than continuing at full rotation speed.
+    const SCRIPTED_SPIN_FACTOR = 0.35; // fraction of normal spin rate applied per frame
     let spin = 0; // rotation around tilted axis (radians)
     let spinDir = 1;
 

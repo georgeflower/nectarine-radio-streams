@@ -4,6 +4,9 @@ import { detectOnelinerReaction } from "@/lib/onelinerReactions";
 describe("oneliner reaction detection", () => {
   it("detects hearts in emoji and ASCII forms", () => {
     expect(detectOnelinerReaction("you are great ❤️")).toBe("heart");
+    // Literal `<` (typed in chat) and HTML-entity `&lt;` (from HTML-encoded
+    // sources) are both supported so incoming chat text is handled regardless
+    // of encoding.
     expect(detectOnelinerReaction("love it <3!")).toBe("heart");
     expect(detectOnelinerReaction("still love this &lt;33")).toBe("heart");
     expect(detectOnelinerReaction("ouch </3")).toBe("heart");

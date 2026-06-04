@@ -70,6 +70,13 @@ const PLAY_LINES = [
 const HOLD_LINES = ["My turn!", "Ready!", "Here we go!"];
 const RECEIVE_LINES = ["Got it! :D", "Nice one!", "Caught it!"];
 const BALL_PASS_MIN_ARC_HEIGHT = 28;
+// Arc height = horizontal distance * ARC_HEIGHT_MULTIPLIER, so longer throws
+// curve higher and feel more like a real lob.
+const ARC_HEIGHT_MULTIPLIER = 0.12;
+// A ball-play session lasts MIN_BALL_PASSES plus up to RANDOM_EXTRA_PASSES
+// additional turns so the length varies naturally each time.
+const MIN_BALL_PASSES = 6;
+const RANDOM_EXTRA_PASSES = 3;
 
 const LONELY_LINES = [
   "I'm so lonely... :(",
@@ -120,7 +127,7 @@ async function runBallPlay() {
     const start = from.getPosition();
     const end = to.getPosition();
     // Higher/lower arc based on horizontal throw distance.
-    const lift = Math.max(BALL_PASS_MIN_ARC_HEIGHT, Math.abs(end.x - start.x) * 0.12);
+    const lift = Math.max(BALL_PASS_MIN_ARC_HEIGHT, Math.abs(end.x - start.x) * ARC_HEIGHT_MULTIPLIER);
     const startAt = Date.now();
     while (true) {
       const t = Math.min(1, (Date.now() - startAt) / durationMs);
@@ -134,7 +141,7 @@ async function runBallPlay() {
     }
   };
 
-  const turns = 6 + Math.floor(Math.random() * 3);
+  const turns = MIN_BALL_PASSES + Math.floor(Math.random() * RANDOM_EXTRA_PASSES);
   let holderIdx = Math.random() < 0.5 ? 0 : 1;
   try {
     setGooseBallPos(pair[holderIdx].getPosition());
