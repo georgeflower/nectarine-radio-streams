@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { setBallPos } from "@/lib/gooseSocial";
 
 /**
  * Classic Amiga "Boing" ball — checkered sphere bouncing across the screen.
