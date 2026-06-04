@@ -501,19 +501,38 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       setSitting: (sitting: boolean) => {
         sittingForMeal = sitting;
         if (sitting) {
-          mode = "ground";
-          perchEl = null;
-          const dir = variant === "white" ? -1 : 1;
-          x = w * 0.5 + dir * 60;
-          y = h - SPRITE_H / 2 - 16;
-          heading = variant === "white" ? 0 : Math.PI;
-          targetHeading = heading;
-          img.style.opacity = "0";
-          imgBody.style.opacity = "1";
-          imgHead.style.opacity = "1";
-        } else if (mode === "ground") {
-          takeoff();
+          // Prefer a real perch (window title bar or letter); fall back to a
+          // ground picnic at the screen center if nothing is available.
+          const p = pickPerch();
+          if (p) {
+            perchEl = p.el;
+            perchChar = p.char;
+            perchKind = p.kind;
+            perchOffset = p.offset;
+            mode = "approach";
+            eatingMode = true;
+            chaseTarget = null;
+            img.style.opacity = "1";
+            imgBody.style.opacity = "0";
+            imgHead.style.opacity = "0";
+          } else {
+            eatingMode = true;
+            mode = "ground";
+            perchEl = null;
+            const dir = variant === "white" ? -1 : 1;
+            x = w * 0.5 + dir * 60;
+            y = h - SPRITE_H / 2 - 16;
+            heading = variant === "white" ? 0 : Math.PI;
+            targetHeading = heading;
+            img.style.opacity = "0";
+            imgBody.style.opacity = "1";
+            imgHead.style.opacity = "1";
+          }
+        } else {
+          eatingMode = false;
+          if (mode === "ground" || mode === "land") takeoff();
         }
+
       },
     };
     const unregisterGoose = registerGoose(api);
