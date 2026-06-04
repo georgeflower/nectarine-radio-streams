@@ -971,12 +971,10 @@ const Cracktro = ({
                 </button>
               ))}
             </div>
-            <span className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground ml-2">
-              ESC to exit
-            </span>
           </div>
         )}
       </div>
+      </StageProvider>
     </div>
   );
 };
