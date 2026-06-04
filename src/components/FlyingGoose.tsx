@@ -233,6 +233,8 @@ const NECK_PIVOT_X_PX = 11.5 * PIXEL;
 const NECK_PIVOT_Y_PX = 10 * PIXEL;
 const BEAK_OFFSET_X_RATIO = 0.34;
 const BEAK_OFFSET_Y_RATIO = -0.12;
+const LETTER_PERCH_SINK = 10;
+const WINDOW_PERCH_SINK = 2;
 
 const eatingGooseIds = new Set<number>();
 let nextGooseInstanceId = 1;
@@ -456,7 +458,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       if (perchedOrApproaching && perchAlive) {
         const r = perchEl.getBoundingClientRect();
         const cx = r.left + r.width * perchOffset;
-        const sink = perchKind === "letter" ? 10 : 2;
+        const sink = perchKind === "letter" ? LETTER_PERCH_SINK : WINDOW_PERCH_SINK;
         x = cx;
         y = r.top - spriteH() + sink + spriteH() / 2;
       } else {
@@ -653,10 +655,10 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       const cx = r.left + r.width * perchOffset;
       if (perchKind === "letter") {
         // Letter rect top sits above the visible cap because of line-height.
-        return { cx, topY: r.top, sink: 10 };
+        return { cx, topY: r.top, sink: LETTER_PERCH_SINK };
       }
       // Window title bar — feet rest right on the top edge.
-      return { cx, topY: r.top, sink: 2 };
+      return { cx, topY: r.top, sink: WINDOW_PERCH_SINK };
     };
 
     const showStartleBubble = () => {
