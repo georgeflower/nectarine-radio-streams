@@ -183,6 +183,30 @@ describe("gooseSocial game flows", () => {
     randomSpy.mockRestore();
   });
 
+  it("prioritizes emphatic learned triggers for dialogue", async () => {
+    const social = await import("@/lib/gooseSocial");
+    const phrases = await import("@/lib/gooseLearnedPhrases");
+    social.__testing.resetStateForTests();
+
+    phrases.learnPhraseFromOneliner("Mega scene boom", "scener");
+    social.noteRecentOneliner("SceneUser", "MEGA SCENE BOOM!!!");
+    const dialogue = social.__testing.buildContextualDialogueForTests(Date.now());
+
+    expect(dialogue).not.toBeNull();
+    expect(dialogue?.[0]).toContain("Mega scene boom");
+  });
+
+  it("falls back to lexicon-built short chatter before static lines", async () => {
+    const social = await import("@/lib/gooseSocial");
+    social.__testing.resetStateForTests();
+
+    social.noteRecentOneliner("Lexi", "hello scene lol <3 !!!");
+    const dialogue = social.__testing.buildContextualDialogueForTests(Date.now());
+
+    expect(dialogue).not.toBeNull();
+    expect(dialogue?.[0]).toContain("Lexi vibe:");
+  });
+
   it("has a large set of oneliner reaction responses", async () => {
     const social = await import("@/lib/gooseSocial");
     social.__testing.resetStateForTests();

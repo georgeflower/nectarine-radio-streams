@@ -4,7 +4,14 @@
 // sequences. The BoingBall publishes its position so the geese can react
 // to it.
 
-import { pickLearnedPhrase } from "@/lib/gooseLearnedPhrases";
+import {
+  buildBirdUtterance,
+  deriveOnelinerMood,
+  learnLexiconFromOneliner,
+  type LexiconMood,
+} from "@/lib/gooseLearnedLexicon";
+import { findLearnedTrigger, pickLearnedPhrase } from "@/lib/gooseLearnedPhrases";
+import type { GooseSceneEra } from "@/lib/gooseSceneEra";
 
 export type GooseRole = "white" | "brown";
 
@@ -42,10 +49,18 @@ export function setBallPos(p: { x: number; y: number } | null) {
 function buildContextualDialogue(now: number): string[] | null {
   if (!recentOneliner || now - recentOneliner.at > RECENT_ONELINER_WINDOW_MS) return null;
   const user = recentOneliner.username || "someone";
-  const learned = pickLearnedPhrase();
-  if (learned && Math.random() < 0.3) {
-    return [`${user} just unlocked: "${learned}"`, "Chatline certified. Confirmasse!"];
+  const triggered = findLearnedTrigger(recentOneliner.text);
+  if (triggered) {
+    return [`${user} triggered: "${triggered}"`, "Echo lock engaged. Confirmasse!"];
   }
+  const mood = applyEraMood(deriveOnelinerMood(recentOnelinerTrail), sceneEra);
+  const lexiconLine = buildBirdUtterance({ mood, maxLen: 34 });
+  if (lexiconLine) {
+    return [`${user} vibe: ${lexiconLine}`, pick(LEXICON_DIALOGUE_LINES)];
+  }
+  // Keep learned whole-phrase replay as a fallback after lexicon synthesis.
+  const learned = pickLearnedPhrase();
+  if (learned) return [`${user} just unlocked: "${learned}"`, "Chatline certified. Confirmasse!"];
   const line = recentOneliner.text.length > 56 ? `${recentOneliner.text.slice(0, 53)}...` : recentOneliner.text;
   return pick(ONELINER_DIALOGUES).map((entry) =>
     entry.replaceAll("{user}", user).replaceAll("{line}", line),
@@ -56,9 +71,18 @@ export function getBallPos() {
 }
 
 export function noteRecentOneliner(username: string, text: string) {
-  if (!text.trim()) return;
+  const clean = text.trim();
+  if (!clean) return;
   // Keep only the latest line so chatter reacts to what just happened on screen.
-  recentOneliner = { username, text: text.trim(), at: Date.now() };
+  recentOneliner = { username, text: clean, at: Date.now() };
+  recentOnelinerTrail.push({ username, text: clean });
+  while (recentOnelinerTrail.length > MAX_ONELINER_TRAIL) recentOnelinerTrail.shift();
+  learnLexiconFromOneliner(clean, username);
+}
+
+let sceneEra: GooseSceneEra = "intro";
+export function setGooseSceneEra(nextEra: GooseSceneEra) {
+  sceneEra = nextEra;
 }
 
 type BallPlayDirective = {
@@ -94,11 +118,30 @@ let lastFlyAwayAt = 0;
 let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
 let recentOneliner: { username: string; text: string; at: number } | null = null;
+let recentOnelinerTrail: Array<{ username?: string; text: string }> = [];
+const MAX_ONELINER_TRAIL = 14;
 
 // Keep idle chatter tied to very recent chat activity (85s).
 const RECENT_ONELINER_WINDOW_MS = 85_000;
 // Minimum gap between contextual goose dialogues (70s).
 const DIALOGUE_COOLDOWN_MS = 70_000;
+const DIALOGUE_COOLDOWN_BY_ERA: Record<GooseSceneEra, number> = {
+  intro: DIALOGUE_COOLDOWN_MS,
+  // Gradual cooldown reduction (~11-34%) so later eras feel livelier without spam.
+  warmed: 62_000,
+  party: 54_000,
+  veteran: 46_000,
+};
+const LEXICON_DIALOGUE_LINES = [
+  "Local lexicon synced.",
+  "Scene mood sampled.",
+  "Shortline style loaded.",
+  "Browser chatter calibrated.",
+];
+const ERA_MOOD_OVERRIDES: Partial<Record<GooseSceneEra, Partial<Record<LexiconMood, LexiconMood>>>> = {
+  party: { calm: "hype" },
+  veteran: { calm: "chaotic", friendly: "chaotic" },
+};
 const ONELINER_DIALOGUES: string[][] = [
   ['"{line}" from {user}? Confirmasse!', "Scene approved. :D"],
   ["{user} dropped fire in oneliner", "Reset the counters, this is elite!"],
@@ -219,6 +262,12 @@ const FOOD_RESUME_LINES = ["Alright, back to the ball!", "Round two, let's bump!
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+function applyEraMood(mood: LexiconMood, era: GooseSceneEra): LexiconMood {
+  return ERA_MOOD_OVERRIDES[era]?.[mood] ?? mood;
+}
+function getDialogueCooldownMs() {
+  return DIALOGUE_COOLDOWN_BY_ERA[sceneEra] ?? DIALOGUE_COOLDOWN_MS;
 }
 function wait(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
@@ -403,7 +452,7 @@ async function step() {
     } else if (ballPos && now - lastBallPlayAt > 180_000) {
       lastBallPlayAt = now;
       await runBallPlay();
-    } else if (now - lastDialogueAt > DIALOGUE_COOLDOWN_MS) {
+    } else if (now - lastDialogueAt > getDialogueCooldownMs()) {
       const dialogue = buildContextualDialogue(now);
       if (dialogue) {
         lastDialogueAt = now;
@@ -475,6 +524,8 @@ export const __testing = {
     lastFlyAwayAt = 0;
     lastBumpEvent = null;
     recentOneliner = null;
+    recentOnelinerTrail = [];
+    sceneEra = "intro";
     running = false;
     if (schedulerTimer) {
       clearTimeout(schedulerTimer);

@@ -8,6 +8,8 @@ import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/li
 import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl } from "@/lib/nectarine";
 import { StageProvider } from "@/lib/stage";
 import { renderBBCode } from "@/lib/bbcode";
+import { getSceneEraConfig, getSceneEraFromListeningMs } from "@/lib/gooseSceneEra";
+import { setGooseSceneEra } from "@/lib/gooseSocial";
 import Flag from "./Flag";
 
 type OnlineUser = { name: string; flag: string };
@@ -57,6 +59,8 @@ const MODES: { id: ScrollMode; label: string }[] = [
 const STORAGE_MODE = "cracktro-scroll-mode";
 const STORAGE_ON = "cracktro-scroll-on";
 const STORAGE_INFOBAR = "cracktro-infobar-on";
+const STORAGE_SCENE_ERAS = "cracktro-scene-eras";
+const STORAGE_SCENE_ERA_LISTEN_MS = "cracktro-scene-era-listen-ms";
 
 type PanelId = "oneliner" | "online" | "queue" | "history";
 const PANELS: { id: PanelId; label: string }[] = [
@@ -282,6 +286,69 @@ const Cracktro = ({
   useEffect(() => {
     try { localStorage.setItem("cracktro-boing", boingOn ? "1" : "0"); } catch { /* ignore */ }
   }, [boingOn]);
+  const [sceneErasOn, setSceneErasOn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(STORAGE_SCENE_ERAS) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_SCENE_ERAS, sceneErasOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [sceneErasOn]);
+  const [listeningMs, setListeningMs] = useState<number>(() => {
+    try {
+      const raw = Number(localStorage.getItem(STORAGE_SCENE_ERA_LISTEN_MS));
+      return Number.isFinite(raw) ? Math.max(0, raw) : 0;
+    } catch {
+      return 0;
+    }
+  });
+  const listeningMsRef = useRef(listeningMs);
+  const lastEraTickAtRef = useRef<number | null>(null);
+  const lastPersistedMinuteRef = useRef(Math.floor(listeningMs / 60_000));
+  useEffect(() => {
+    listeningMsRef.current = listeningMs;
+  }, [listeningMs]);
+  useEffect(() => {
+    const minuteBucket = Math.floor(listeningMs / 60_000);
+    if (minuteBucket === lastPersistedMinuteRef.current) return;
+    lastPersistedMinuteRef.current = minuteBucket;
+    try { localStorage.setItem(STORAGE_SCENE_ERA_LISTEN_MS, String(Math.floor(listeningMs))); } catch { /* ignore */ }
+  }, [listeningMs]);
+  // Persist once per minute during runtime plus one final write on unmount.
+  useEffect(() => () => {
+    try { localStorage.setItem(STORAGE_SCENE_ERA_LISTEN_MS, String(Math.floor(listeningMsRef.current))); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    if (!sceneErasOn) return;
+    lastEraTickAtRef.current = Date.now();
+    const interval = window.setInterval(() => {
+      // Approximation: listening time advances while cracktro view stays open.
+      const now = Date.now();
+      const prev = lastEraTickAtRef.current ?? now;
+      lastEraTickAtRef.current = now;
+      const deltaMs = Math.min(60_000, Math.max(5_000, now - prev));
+      setListeningMs((v) => v + deltaMs);
+    }, 15_000);
+    return () => {
+      lastEraTickAtRef.current = null;
+      window.clearInterval(interval);
+    };
+  }, [sceneErasOn]);
+  const sceneEra = sceneErasOn ? getSceneEraFromListeningMs(listeningMs) : "intro";
+  const sceneEraConfig = getSceneEraConfig(sceneEra);
+  useEffect(() => {
+    setGooseSceneEra(sceneEra);
+    return () => setGooseSceneEra("intro");
+  }, [sceneEra]);
+  const effectiveStyle = useMemo<VisualizerStyle>(() => {
+    if (style !== "off") return style;
+    if (sceneEra === "warmed") return "starfield";
+    if (sceneEra === "party") return "rings";
+    if (sceneEra === "veteran") return "particles";
+    return "tunnel";
+  }, [sceneEra, style]);
 
 
 
@@ -521,7 +588,7 @@ const Cracktro = ({
         x += cw;
       }
 
-      offset += 3 * dpr;
+      offset += 3 * dpr * sceneEraConfig.scrollerSpeed;
       t += 0.05;
       raf = requestAnimationFrame(tick);
     };
@@ -531,7 +598,7 @@ const Cracktro = ({
       if (ro) ro.disconnect();
       else window.removeEventListener("resize", resize);
     };
-  }, [text, mode, scrollOn, skin]);
+  }, [text, mode, scrollOn, skin, sceneEraConfig.scrollerSpeed]);
 
 
   const scrollerBottomOffset = 40; // px, leaves room for the controls bar
@@ -541,7 +608,7 @@ const Cracktro = ({
       className="fixed inset-0 z-[9999] bg-background overflow-hidden"
     >
       <StageProvider element={stageEl}>
-      <Visualizer analyser={analyser} style={style === "off" ? "tunnel" : style} />
+      <Visualizer analyser={analyser} style={effectiveStyle} />
       <BeatOverlay analyser={analyser} enabled />
       {gooseOn && <FlyingGoose oneliners={oneliners} />}
       {brownGooseOn && <FlyingGoose oneliners={oneliners} variant="brown" />}
@@ -558,6 +625,14 @@ const Cracktro = ({
       >
         ✕ EXIT
       </button>
+      {sceneErasOn && (
+        <div
+          className="absolute top-2 left-24 z-10 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground"
+          aria-label={`Scene Era: ${sceneEraConfig.label}`}
+        >
+          Era: {sceneEraConfig.label}
+        </div>
+      )}
 
       {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
       {scrollOn && (
@@ -576,7 +651,7 @@ const Cracktro = ({
           style={{
             bottom: scrollerBottomOffset,
             zIndex: 5,
-            background: "linear-gradient(to top, hsla(20,25%,4%,0.85), hsla(20,25%,4%,0))",
+            background: `linear-gradient(to top, hsla(20,25%,4%,${sceneEraConfig.infoBarOpacity}), hsla(20,25%,4%,0))`,
             paddingTop: "1.5rem",
             paddingBottom: "1.5rem",
           }}
@@ -889,6 +964,20 @@ const Cracktro = ({
             title="Toggle Amiga boing ball"
           >
             {boingOn ? "ON" : "OFF"}
+          </button>
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Scene Eras</span>
+          <button
+            type="button"
+            onClick={() => setSceneErasOn((v) => !v)}
+            className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              sceneErasOn
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-pressed={sceneErasOn}
+            title="Evolve scene style over long cracktro sessions"
+          >
+            {sceneErasOn ? "ON" : "OFF"}
           </button>
         </div>
 

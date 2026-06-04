@@ -12,7 +12,8 @@ This app combines live stream playback, Demovibes XML panels, visualizers, and a
 - Infamous OneLiner + online users panels
 - Multiple visualizer styles and beat overlay
 - Fullscreen cracktro mode with floating windows, scroller, info bar, geese, and boing ball
-- Browser-local phrase learning used by goose reactions
+- Browser-local goose learning with phrase memory + lexicon-based chatter
+- Optional scene eras that evolve cracktro visuals over long sessions (toggleable)
 - Optional per-station now-playing metadata polling for Media Session metadata
 
 ## Tech stack
@@ -87,7 +88,9 @@ Most cracktro toggles persist in `localStorage`.
 
 `src/lib/gooseLearnedPhrases.ts` stores safe short phrases from oneliners in browser `localStorage`, tracks frequency/recency/users, and provides weighted picks plus emphatic trigger detection.
 
-`src/lib/gooseLearnedLexicon.ts` (design deliverable) extends this idea to a token/category/mood lexicon system without AI.
+`src/lib/gooseLearnedLexicon.ts` extends this idea to a token/category/mood lexicon system without AI, and goose chatter uses lexicon output as a short-form fallback before static lines.
+
+`src/lib/gooseSceneEra.ts` defines optional long-session scene eras. Era progression is browser-local and approximated from cracktro-open listening time when the feature is enabled.
 
 ## Setup
 
