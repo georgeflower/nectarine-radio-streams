@@ -291,9 +291,10 @@ type Mode = "fly" | "approach" | "land" | "startle";
 
 type Props = {
   oneliners?: OnelinerEntry[];
+  variant?: GooseVariant;
 };
 
-const FlyingGoose = ({ oneliners = [] }: Props) => {
+const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const imgStandBodyRef = useRef<HTMLImageElement | null>(null);
