@@ -58,6 +58,7 @@ function buildContextualDialogue(now: number): string[] | null {
   if (lexiconLine) {
     return [`${user} vibe: ${lexiconLine}`, pick(LEXICON_DIALOGUE_LINES)];
   }
+  // Keep learned whole-phrase replay as a fallback after lexicon synthesis.
   const learned = pickLearnedPhrase();
   if (learned) return [`${user} just unlocked: "${learned}"`, "Chatline certified. Confirmasse!"];
   const line = recentOneliner.text.length > 56 ? `${recentOneliner.text.slice(0, 53)}...` : recentOneliner.text;
@@ -75,7 +76,7 @@ export function noteRecentOneliner(username: string, text: string) {
   // Keep only the latest line so chatter reacts to what just happened on screen.
   recentOneliner = { username, text: clean, at: Date.now() };
   recentOnelinerTrail.push({ username, text: clean });
-  while (recentOnelinerTrail.length > 14) recentOnelinerTrail.shift();
+  while (recentOnelinerTrail.length > MAX_ONELINER_TRAIL) recentOnelinerTrail.shift();
   learnLexiconFromOneliner(clean, username);
 }
 
@@ -118,6 +119,7 @@ let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
 let recentOneliner: { username: string; text: string; at: number } | null = null;
 let recentOnelinerTrail: Array<{ username?: string; text: string }> = [];
+const MAX_ONELINER_TRAIL = 14;
 
 // Keep idle chatter tied to very recent chat activity (85s).
 const RECENT_ONELINER_WINDOW_MS = 85_000;
@@ -125,6 +127,7 @@ const RECENT_ONELINER_WINDOW_MS = 85_000;
 const DIALOGUE_COOLDOWN_MS = 70_000;
 const DIALOGUE_COOLDOWN_BY_ERA: Record<GooseSceneEra, number> = {
   intro: DIALOGUE_COOLDOWN_MS,
+  // Gradual cooldown reduction (~11-34%) so later eras feel livelier without spam.
   warmed: 62_000,
   party: 54_000,
   veteran: 46_000,
@@ -135,6 +138,10 @@ const LEXICON_DIALOGUE_LINES = [
   "Shortline style loaded.",
   "Browser chatter calibrated.",
 ];
+const ERA_MOOD_OVERRIDES: Partial<Record<GooseSceneEra, Partial<Record<LexiconMood, LexiconMood>>>> = {
+  party: { calm: "hype" },
+  veteran: { calm: "chaotic", friendly: "chaotic" },
+};
 const ONELINER_DIALOGUES: string[][] = [
   ['"{line}" from {user}? Confirmasse!', "Scene approved. :D"],
   ["{user} dropped fire in oneliner", "Reset the counters, this is elite!"],
@@ -257,9 +264,7 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 function applyEraMood(mood: LexiconMood, era: GooseSceneEra): LexiconMood {
-  if (era === "party" && mood === "calm") return "hype";
-  if (era === "veteran" && (mood === "calm" || mood === "friendly")) return "chaotic";
-  return mood;
+  return ERA_MOOD_OVERRIDES[era]?.[mood] ?? mood;
 }
 function getDialogueCooldownMs() {
   return DIALOGUE_COOLDOWN_BY_ERA[sceneEra] ?? DIALOGUE_COOLDOWN_MS;

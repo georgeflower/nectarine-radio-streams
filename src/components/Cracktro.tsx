@@ -304,16 +304,37 @@ const Cracktro = ({
       return 0;
     }
   });
+  const listeningMsRef = useRef(listeningMs);
+  const lastEraTickAtRef = useRef<number | null>(null);
+  const lastPersistedMinuteRef = useRef(Math.floor(listeningMs / 60_000));
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_SCENE_ERA_LISTEN_MS, String(Math.max(0, Math.floor(listeningMs)))); } catch { /* ignore */ }
+    listeningMsRef.current = listeningMs;
   }, [listeningMs]);
   useEffect(() => {
+    const minuteBucket = Math.floor(listeningMs / 60_000);
+    if (minuteBucket === lastPersistedMinuteRef.current) return;
+    lastPersistedMinuteRef.current = minuteBucket;
+    try { localStorage.setItem(STORAGE_SCENE_ERA_LISTEN_MS, String(Math.floor(listeningMs))); } catch { /* ignore */ }
+  }, [listeningMs]);
+  // Persist once per minute during runtime plus one final write on unmount.
+  useEffect(() => () => {
+    try { localStorage.setItem(STORAGE_SCENE_ERA_LISTEN_MS, String(Math.floor(listeningMsRef.current))); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
     if (!sceneErasOn) return;
+    lastEraTickAtRef.current = Date.now();
     const interval = window.setInterval(() => {
       // Approximation: listening time advances while cracktro view stays open.
-      setListeningMs((v) => v + 15_000);
+      const now = Date.now();
+      const prev = lastEraTickAtRef.current ?? now;
+      lastEraTickAtRef.current = now;
+      const deltaMs = Math.min(60_000, Math.max(5_000, now - prev));
+      setListeningMs((v) => v + deltaMs);
     }, 15_000);
-    return () => window.clearInterval(interval);
+    return () => {
+      lastEraTickAtRef.current = null;
+      window.clearInterval(interval);
+    };
   }, [sceneErasOn]);
   const sceneEra = sceneErasOn ? getSceneEraFromListeningMs(listeningMs) : "intro";
   const sceneEraConfig = getSceneEraConfig(sceneEra);
