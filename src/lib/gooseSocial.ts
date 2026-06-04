@@ -12,6 +12,7 @@ import {
 } from "@/lib/gooseLearnedLexicon";
 import { findLearnedTrigger, pickLearnedPhrase } from "@/lib/gooseLearnedPhrases";
 import type { GooseSceneEra } from "@/lib/gooseSceneEra";
+import { GOOSE_DIALOGUES } from "@/lib/gooseDialogues";
 
 export type GooseRole = "white" | "brown";
 
@@ -164,13 +165,7 @@ const ONELINER_DIALOGUES: string[][] = [
   ["Scene meter after {user}: 100%", "No notes. Just honks."],
   ["{user} just made the demo gods smile", "Respect and raster love."],
 ];
-const IDLE_DIALOGUE_FALLBACKS: string[][] = [
-  ["Signal check?", "Loud and clear. :D"],
-  ["Any fresh modules in the queue?", "Always buffering scene magic."],
-  ["Still flying?", "Always. Confirmasse!"],
-  ["Sync pulse stable?", "Stable and shiny."],
-  ["Boing break soon?", "After one more lap!"],
-];
+const IDLE_DIALOGUE_FALLBACKS: string[][] = GOOSE_DIALOGUES;
 const LOW_FPS_DIALOGUES: string[][] = [
   ["Yo... this is a SLOW PC with a bad GPU :( :(", "We can hear every dropped frame."],
   ["Scroller lag detected — bad GPU vibes today. :(", "We'll keep honking through the stutter!"],
