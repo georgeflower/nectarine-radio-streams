@@ -252,7 +252,8 @@ const BoingBall = () => {
 
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize);
+      if (ro) ro.disconnect();
+      else window.removeEventListener("resize", resize);
       setBallPos(null);
     };
   }, []);
@@ -261,7 +262,7 @@ const BoingBall = () => {
     <canvas
       ref={canvasRef}
       aria-hidden="true"
-      className="fixed inset-0 pointer-events-none"
+      className="absolute inset-0 pointer-events-none"
       style={{ zIndex: 6 }}
     />
   );
