@@ -426,6 +426,10 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let lookScale = 1; // animated -1..1, smoothly tweens toward lookDir while standing
     let startleEnd = 0;
 
+    // Away-mode (fly off-screen) state, driven by the social coordinator.
+    let away = false;
+    let awayHeading = 0;
+
     const wrap = wrapRef.current;
     const img = imgRef.current;
     const imgBody = imgStandBodyRef.current;
@@ -435,6 +439,37 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     img.src = frames[0];
     imgBody.src = frames[STAND_BODY];
     imgHead.src = frames[STAND_HEAD];
+
+    // Imperative API exposed to the social coordinator so the partner goose
+    // (and the BoingBall) can trigger speech bubbles and fly-away behavior.
+    const api: GooseAPI = {
+      variant,
+      say: (text: string, durationMs = 2400) => {
+        bubble.innerHTML = renderGooseHTML(text);
+        bubble.style.opacity = "1";
+        bubble.style.transform = "scale(1)";
+        reactionUntilRef.current = performance.now() + durationMs;
+      },
+      setAway: (a: boolean) => {
+        away = a;
+        if (a) {
+          // Head toward the nearest horizontal edge.
+          awayHeading = x < w / 2 ? Math.PI : 0;
+          // Force takeoff if currently perched.
+          if (mode === "land") {
+            // Skip the startle; just leap off.
+            mode = "fly";
+            perchEl = null;
+            heading = awayHeading;
+            targetHeading = awayHeading;
+            img.style.opacity = "1";
+            imgBody.style.opacity = "0";
+            imgHead.style.opacity = "0";
+          }
+        }
+      },
+    };
+    const unregisterGoose = registerGoose(api);
 
 
 
