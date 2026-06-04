@@ -460,7 +460,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         const cx = r.left + r.width * perchOffset;
         const sink = perchKind === "letter" ? LETTER_PERCH_SINK : WINDOW_PERCH_SINK;
         x = cx;
-        y = r.top - spriteH() + sink + spriteH() / 2;
+        y = r.top + sink - spriteH() / 2;
       } else {
         x *= sx;
         y *= sy;
@@ -687,7 +687,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       takeoffAt = eatingMode || restingFromTiredness ? Number.POSITIVE_INFINITY : elapsed + sitDuration();
       nextLookAt = elapsed + rand(700, 1600);
       x = cx;
-      y = topY - spriteH() + sink + spriteH() / 2;
+      y = topY + sink - spriteH() / 2;
     };
 
 
