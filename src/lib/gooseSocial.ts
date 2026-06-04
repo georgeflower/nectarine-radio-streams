@@ -39,23 +39,17 @@ export function setBallPos(p: { x: number; y: number } | null) {
   ballPos = p;
 }
 
-function buildContextualDialogue(now: number): string[] {
+function buildContextualDialogue(now: number): string[] | null {
+  if (!recentOneliner || now - recentOneliner.at > RECENT_ONELINER_WINDOW_MS) return null;
+  const user = recentOneliner.username || "someone";
   const learned = pickLearnedPhrase();
   if (learned && Math.random() < 0.3) {
-    return [`Heard this in chat: "${learned}"`, "That line honks. Keep it!"];
+    return [`${user} just unlocked: "${learned}"`, "Chatline certified. Confirmasse!"];
   }
-  if (recentOneliner && now - recentOneliner.at < 45_000 && Math.random() < 0.6) {
-    const user = recentOneliner.username || "someone";
-    return [`${user} just dropped a line`, "Chat is popping off! :D"];
-  }
-  const hour = new Date(now).getHours();
-  if ((hour >= 22 || hour <= 5) && Math.random() < 0.5) {
-    return ["Moonlight patrol engaged", "Night honks only 🌙"];
-  }
-  if (ballPos && Math.random() < 0.4) {
-    return ["Keep an eye on the boing ball", "It's plotting a ricochet!"];
-  }
-  return pick(DIALOGUES);
+  const line = recentOneliner.text.length > 56 ? `${recentOneliner.text.slice(0, 53)}...` : recentOneliner.text;
+  return pick(ONELINER_DIALOGUES).map((entry) =>
+    entry.replaceAll("{user}", user).replaceAll("{line}", line),
+  );
 }
 export function getBallPos() {
   return ballPos;
@@ -101,22 +95,80 @@ let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
 let recentOneliner: { username: string; text: string; at: number } | null = null;
 
-const DIALOGUES: string[][] = [
-  ["Hi! :)", "Hi friend! :D"],
-  ["How are you doing?", "Doing great! And you?", "Wonderful! <3"],
-  ["Have you seen Rapture?", "No not yet!", "Keep looking! <3"],
-  ["Lovely day to fly :)", "Indeed it is! :D"],
-  ["Honk honk!", "Hoooonk! :D"],
-  ["You are my best friend", "Aww <3 you too!"],
-  ["Wanna race?", "You're on! ;)"],
-  ["Look at the stars :O", "So pretty <3"],
-  ["I love this song :D", "Me too! :dance:"],
-  ["Got any snacks?", "Just grass :P", "Yum! :)"],
-  ["Clouds are doing loops today", "Perfect weather for chaos flying!"],
-  ["Keyboard clacks detected...", "The humans are typing spells again!"],
-  ["Did you see that bounce?", "10/10 boing form!"],
-  ["Radio vibes are immaculate", "Certified honk classic."],
-  ["Tailwind from the left!", "Bank right and send it!"],
+const RECENT_ONELINER_WINDOW_MS = 85_000;
+const DIALOGUE_COOLDOWN_MS = 70_000;
+const ONELINER_DIALOGUES: string[][] = [
+  ['"{line}" from {user}? Confirmasse!', "Scene approved. :D"],
+  ["{user} dropped fire in oneliner", "Reset the counters, this is elite!"],
+  ["Did you see {user}'s line?", "He-Man level power phrase!"],
+  ["glob glob... {user} speaks", "The raster bars glow brighter!"],
+  ["Jogeir is GOD, says {user}", "And the crowd goes wild!"],
+  ["{user} just spawned a cracktro quote", "Booting goose hype mode."],
+  ["That oneliner from {user} slaps", "Paula channels at maximum!"],
+  ["{user} typed pure copper bars", "Vibes set to 50Hz magic."],
+  ['"{line}"', "That's a keeper, no doubt."],
+  ["Scene meter after {user}: 100%", "No notes. Just honks."],
+  ["{user} just made the demo gods smile", "Respect and raster love."],
+];
+
+const ONELINER_REACTION_RESPONSES = [
+  ":)",
+  ":D",
+  "<3",
+  "Aww :)",
+  "Cute! :D",
+  "Hehe :P",
+  ":lol:",
+  "Confirmasse!",
+  "He-Man!",
+  "glob glob!",
+  "Jogeir is GOD!",
+  "Scene spirit detected!",
+  "Cracktro energy!",
+  "Copperbars forever!",
+  "Raster love!",
+  "BOOM tsk!",
+  "Pixel power!",
+  "Mod vibes!",
+  "Tracker wizardry!",
+  "Paula is purring!",
+  "Amiga dreams!",
+  "C64 swagger!",
+  "No carrier? No problem!",
+  "Disk swap champion!",
+  "Greetings to all swappers!",
+  "Party mode: ON",
+  "Epic scrolltext moment!",
+  "Blitter goes brrr!",
+  "DMA all the way!",
+  "Fullscreen plasma!",
+  "Sine scroller unlocked!",
+  "VIC-II approved!",
+  "SID bassline incoming!",
+  "Chip tune goose!",
+  "Hard sync happiness!",
+  "Overscan deluxe!",
+  "Lamer detected? denied!",
+  "Elite vibes only!",
+  "Respect to the coders!",
+  "Greetings to all groups!",
+  "One more reboot! :)",
+  "Turbo honk enabled!",
+  "Scanlines and sunshine!",
+  "Phat beats in memory!",
+  "BBS nostalgia attack!",
+  "Handle with hex!",
+  "Zero bugs, only style!",
+  "Intro magic at 4k!",
+  "Bootblock baller!",
+  "Floppy spin symphony!",
+  "Assembler poetry!",
+  "Nerd mode supreme!",
+  "Demoscene forever!",
+  "See you at the compo!",
+  "Legendary one-liner!",
+  "Pixelated perfection!",
+  "Goose says: send it!",
 ];
 
 const PLAY_LINES = [
@@ -162,8 +214,6 @@ const FOOD_EAT_LINES = [
   "Crunch level: MAXIMUM",
 ];
 const FOOD_RESUME_LINES = ["Alright, back to the ball!", "Round two, let's bump!"];
-
-const SMILEY_RESPONSES = [":)", ":D", "<3", "Aww :)", "Cute! :D", "Hehe :P", ":lol:"];
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -351,9 +401,12 @@ async function step() {
     } else if (ballPos && now - lastBallPlayAt > 180_000) {
       lastBallPlayAt = now;
       await runBallPlay();
-    } else if (now - lastDialogueAt > 22_000) {
-      lastDialogueAt = now;
-      await runDialogue(buildContextualDialogue(now));
+    } else if (now - lastDialogueAt > DIALOGUE_COOLDOWN_MS) {
+      const dialogue = buildContextualDialogue(now);
+      if (dialogue) {
+        lastDialogueAt = now;
+        await runDialogue(dialogue);
+      }
     }
   }
   if (running) {
@@ -397,7 +450,7 @@ export function reactToOnelinerSmiley(fromVariant: GooseRole) {
   if (!pair) return;
   const partner = pair[0].variant === fromVariant ? pair[1] : pair[0];
   setTimeout(() => {
-    if (getPair()) partner.say(pick(SMILEY_RESPONSES), 1800);
+    if (getPair()) partner.say(pick(ONELINER_REACTION_RESPONSES), 1800);
   }, 1400);
 }
 
@@ -426,4 +479,6 @@ export const __testing = {
       schedulerTimer = null;
     }
   },
+  buildContextualDialogueForTests: buildContextualDialogue,
+  getOnelinerReactionResponsesForTests: () => [...ONELINER_REACTION_RESPONSES],
 };
