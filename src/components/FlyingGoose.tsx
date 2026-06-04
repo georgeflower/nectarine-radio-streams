@@ -357,6 +357,8 @@ type Mode = GooseMode;
 const CHEW_CYCLE_MS = 180;
 const CHEW_AMPLITUDE = 1.2;
 const CHEW_ROTATION_FACTOR = 2.4;
+// Practical "indefinite" delay used to suppress random perching while busy.
+const INDEFINITE_PERCH_DELAY_MS = 1_000_000_000;
 
 type Props = {
   oneliners?: OnelinerEntry[];
@@ -651,7 +653,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           imgBody.style.opacity = "0";
           imgHead.style.opacity = "0";
         }
-        nextPerchAt = elapsed + 1e9;
+        nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
       },
     };
     const unregisterGoose = registerGoose(api);
@@ -774,7 +776,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       if (panicUntilRef.current > lastAppliedPanicUntil) {
         lastAppliedPanicUntil = panicUntilRef.current;
         panicFlightUntil = elapsed + 2400;
-        startle(`${panicPhraseRef.current || "WHATTA!"}!`, 1000);
+        startle(panicPhraseRef.current || "WHATTA!", 1000);
       }
 
       const perchAlive = () => {
@@ -938,11 +940,9 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       if (mode === "approach") {
         if (!perchAlive() || (away && !restingFromTiredness && !eatingMode) || fetchingFood) {
           const replacement =
-            away && !restingFromTiredness && !eatingMode
+            (away && !restingFromTiredness && !eatingMode) || fetchingFood
               ? null
-              : fetchingFood
-                ? null
-                : pickPerch({ x, y });
+              : pickPerch({ x, y });
           if (replacement) {
             perchEl = replacement.el;
             perchChar = replacement.char;
@@ -975,14 +975,14 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           // us back. Suppress drift, banking and the inward boundary nudge.
           targetHeading = awayHeading;
           targetSpeed = scale(180);
-          nextPerchAt = elapsed + 1e9;
+          nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
         } else if (chaseTarget) {
           targetHeading = Math.atan2(chaseTarget.y - y, chaseTarget.x - x);
           targetSpeed = scale(290);
-          nextPerchAt = elapsed + 1e9;
+          nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
         } else if (fetchingFood) {
           targetSpeed = scale(220);
-          nextPerchAt = elapsed + 1e9;
+          nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
           targetHeading += (Math.random() - 0.5) * 0.45;
 
         } else {

@@ -2,6 +2,8 @@ const STORAGE_KEY = "goose-learned-phrases.json";
 const MAX_PHRASES = 120;
 const MAX_TEXT_LEN = 90;
 const MIN_TEXT_LEN = 3;
+const MAX_PHRASE_WEIGHT = 4;
+const TRAILING_EMPHASIS_RE = /[!?.\s]+$/;
 
 type LearnedPhrase = {
   phrase: string;
@@ -118,23 +120,26 @@ export function getLearnedPhrases(): string[] {
 export function pickLearnedPhrase(): string | null {
   const phrases = readStore().phrases;
   if (!phrases.length) return null;
-  const weighted = phrases.flatMap((entry) => Array(Math.min(4, entry.seen)).fill(entry.phrase));
+  const weighted = phrases.flatMap((entry) =>
+    Array(Math.min(MAX_PHRASE_WEIGHT, entry.seen)).fill(entry.phrase),
+  );
   return weighted[Math.floor(Math.random() * weighted.length)] ?? phrases[0].phrase;
 }
 
 export function isEmphaticLine(text: string): boolean {
   if (!text) return false;
   if (/!{2,}|\?{2,}/.test(text)) return true;
-  if (/[A-Z]{4,}/.test(text) && /[a-z]/.test(text)) return true;
+  const lettersOnly = text.replace(/[^a-z]/gi, "");
+  if (lettersOnly.length >= 4 && lettersOnly === lettersOnly.toUpperCase()) return true;
   return /!/.test(text);
 }
 
 export function findLearnedTrigger(text: string): string | null {
   const phrase = sanitizeCandidate(text);
   if (!phrase || !isEmphaticLine(text)) return null;
-  const normalized = normalizePhrase(phrase).replace(/[!?.\s]+$/g, "");
+  const normalized = normalizePhrase(phrase).replace(TRAILING_EMPHASIS_RE, "");
   for (const learned of readStore().phrases) {
-    const learnedNorm = learned.normalized.replace(/[!?.\s]+$/g, "");
+    const learnedNorm = learned.normalized.replace(TRAILING_EMPHASIS_RE, "");
     if (!learnedNorm) continue;
     if (normalized === learnedNorm) return learned.phrase;
   }

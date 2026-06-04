@@ -60,6 +60,7 @@ export function getBallPos() {
 
 export function noteRecentOneliner(username: string, text: string) {
   if (!text.trim()) return;
+  // Keep only the latest line so chatter reacts to what just happened on screen.
   recentOneliner = { username, text: text.trim(), at: Date.now() };
 }
 
