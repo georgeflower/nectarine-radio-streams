@@ -16,24 +16,47 @@ export type GooseAPI = {
   // Toggle "flying away" mode — the goose heads off-screen and stays
   // gone until set back to false.
   setAway: (away: boolean) => void;
+  // Steer this goose toward an active chase target while ball-play is on.
+  setChaseTarget: (target: { x: number; y: number } | null) => void;
+  // Toggle a tiny snack bag attached near the beak.
+  setFoodBag: (carrying: boolean) => void;
+  // Keep the goose seated on the ground for snack breaks.
+  setSitting: (sitting: boolean) => void;
 };
 
 const geese = new Map<number, GooseAPI>();
 let nextId = 1;
 
 let ballPos: { x: number; y: number } | null = null;
-let gooseBallPos: { x: number; y: number } | null = null;
 export function setBallPos(p: { x: number; y: number } | null) {
   ballPos = p;
 }
 export function getBallPos() {
   return ballPos;
 }
-export function setGooseBallPos(p: { x: number; y: number } | null) {
-  gooseBallPos = p;
+
+type BallPlayDirective = {
+  chaser: GooseRole;
+  bumpToward: { x: number; y: number };
+};
+let ballPlayDirective: BallPlayDirective | null = null;
+let lastBumpEvent: { by: GooseRole; at: number } | null = null;
+
+export function getBallPlayDirective() {
+  return ballPlayDirective;
 }
-export function getGooseBallPos() {
-  return gooseBallPos;
+
+export function getGoosePositions() {
+  const pair = getPair();
+  if (!pair) return null;
+  return {
+    [pair[0].variant]: pair[0].getPosition(),
+    [pair[1].variant]: pair[1].getPosition(),
+  } as Record<GooseRole, { x: number; y: number }>;
+}
+
+export function reportBallBump(by: GooseRole) {
+  lastBumpEvent = { by, at: Date.now() };
 }
 
 type Mood = "idle" | "playing" | "sleeping" | "away";
@@ -59,24 +82,23 @@ const DIALOGUES: string[][] = [
 ];
 
 const PLAY_LINES = [
-  "Pass it!",
-  "Catch! :)",
+  "Bump time!",
+  "Nudge it! :)",
   "Over here!",
-  "Your turn!",
-  "Heads up!",
+  "Your bump!",
+  "Line it up!",
   "Boing! :D",
   "Incoming!",
 ];
-const HOLD_LINES = ["My turn!", "Ready!", "Here we go!"];
-const RECEIVE_LINES = ["Got it! :D", "Nice one!", "Caught it!"];
-const BALL_PASS_MIN_ARC_HEIGHT = 28;
-// Arc height = horizontal distance * ARC_HEIGHT_MULTIPLIER, so longer throws
-// curve higher and feel more like a real lob.
-const ARC_HEIGHT_MULTIPLIER = 0.12;
+const CHASE_LINES = ["On it!", "After the ball! :D", "Chasing!"];
+const RECEIVE_LINES = ["Nice bump! :D", "My turn!", "I got next!"];
 // A ball-play session lasts MIN_BALL_PASSES plus up to RANDOM_EXTRA_PASSES
 // additional turns so the length varies naturally each time.
 const MIN_BALL_PASSES = 6;
 const RANDOM_EXTRA_PASSES = 3;
+const BUMP_TIMEOUT_BASE_MS = 1700;
+const BUMP_TIMEOUT_RANDOM_MS = 700;
+const BUMP_CHECK_INTERVAL_MS = 90;
 
 const LONELY_LINES = [
   "I'm so lonely... :(",
@@ -88,7 +110,16 @@ const LONELY_LINES = [
 ];
 
 const SLEEPY_LINES = ["Zzz..", "Zzz...", "..Zzz", "Zzzz~"];
-const BYE_LINES = ["See ya laterz!", "GtG!", "Bye bye! :)", "Catch ya later!"];
+const FOOD_FETCH_LINES = ["Brb, snack run! 🥖", "Off to the bakery!", "Food fetch incoming..."];
+const FOOD_RETURN_LINES = ["Got the goods! 🍞", "Snack delivery!", "Dinner is served, flock!"];
+const FOOD_EAT_LINES = [
+  "Nom nom nom 😋",
+  "Best halftime ever",
+  "Carb-loading for round two",
+  "Munch munch",
+  "Refueling the engines",
+];
+const FOOD_RESUME_LINES = ["Alright, back to the ball!", "Round two, let's bump!"];
 
 const SMILEY_RESPONSES = [":)", ":D", "<3", "Aww :)", "Cute! :D", "Hehe :P", ":lol:"];
 
@@ -108,6 +139,19 @@ function getPair(): [GooseAPI, GooseAPI] | null {
   return a && b ? [a, b] : null;
 }
 
+function clearBallPlayState() {
+  ballPlayDirective = null;
+  for (const g of geese.values()) g.setChaseTarget(null);
+}
+
+function clearFlyAwayState() {
+  for (const g of geese.values()) {
+    g.setAway(false);
+    g.setFoodBag(false);
+    g.setSitting(false);
+  }
+}
+
 async function runDialogue(lines: string[]) {
   const pair = getPair();
   if (!pair) return;
@@ -123,48 +167,48 @@ async function runBallPlay() {
   const pair = getPair();
   if (!pair) return;
   mood = "playing";
-  const animateBallPass = async (from: GooseAPI, to: GooseAPI, durationMs: number) => {
-    const start = from.getPosition();
-    const end = to.getPosition();
-    // Higher/lower arc based on horizontal throw distance.
-    const lift = Math.max(BALL_PASS_MIN_ARC_HEIGHT, Math.abs(end.x - start.x) * ARC_HEIGHT_MULTIPLIER);
-    const startAt = Date.now();
-    while (true) {
-      const t = Math.min(1, (Date.now() - startAt) / durationMs);
-      setGooseBallPos({
-        x: start.x + (end.x - start.x) * t,
-        y: start.y + (end.y - start.y) * t - Math.sin(Math.PI * t) * lift,
-      });
-      if (t >= 1) return true;
-      await wait(16);
-      if (!getPair()) return false;
-    }
-  };
+  const bumpedSince = (expectedBumper: GooseRole, marker: number) =>
+    !!lastBumpEvent && lastBumpEvent.by === expectedBumper && lastBumpEvent.at > marker;
 
   const turns = MIN_BALL_PASSES + Math.floor(Math.random() * RANDOM_EXTRA_PASSES);
-  let holderIdx = Math.random() < 0.5 ? 0 : 1;
+  let chaserIdx = Math.random() < 0.5 ? 0 : 1;
   try {
-    setGooseBallPos(pair[holderIdx].getPosition());
     for (let i = 0; i < turns; i++) {
       const activePair = getPair();
       if (!activePair) break;
-      const holder = activePair[holderIdx];
-      const receiver = activePair[1 - holderIdx];
+      const chaser = activePair[chaserIdx];
+      const receiver = activePair[1 - chaserIdx];
 
-      setGooseBallPos(holder.getPosition());
-      holder.say(pick(HOLD_LINES), 900);
-      await wait(700);
-
-      holder.say(pick(PLAY_LINES), 900);
-      const moved = await animateBallPass(holder, receiver, 850 + Math.random() * 250);
-      if (!moved) break;
-
-      receiver.say(pick(RECEIVE_LINES), 900);
-      holderIdx = 1 - holderIdx;
+      chaser.say(pick(CHASE_LINES), 900);
+      await wait(500);
+      chaser.say(pick(PLAY_LINES), 900);
+      const maxBumpDuration = BUMP_TIMEOUT_BASE_MS + Math.random() * BUMP_TIMEOUT_RANDOM_MS;
+      const bumpStart = Date.now();
+      const bumpMarker = lastBumpEvent?.at ?? 0;
+      while (Date.now() - bumpStart < maxBumpDuration) {
+        const latestPair = getPair();
+        if (!latestPair) break;
+        const latestChaser = latestPair[chaserIdx];
+        const latestReceiver = latestPair[1 - chaserIdx];
+        const ball = getBallPos();
+        latestChaser.setChaseTarget(ball);
+        latestReceiver.setChaseTarget(null);
+        ballPlayDirective = {
+          chaser: latestChaser.variant,
+          bumpToward: latestReceiver.getPosition(),
+        };
+        if (bumpedSince(latestChaser.variant, bumpMarker)) {
+          latestReceiver.say(pick(RECEIVE_LINES), 900);
+          chaserIdx = 1 - chaserIdx;
+          break;
+        }
+        await wait(BUMP_CHECK_INTERVAL_MS);
+      }
+      clearBallPlayState();
       await wait(550 + Math.random() * 220);
     }
   } finally {
-    setGooseBallPos(null);
+    clearBallPlayState();
   }
 
   const pairAfterPlay = getPair();
@@ -195,29 +239,49 @@ async function runFlyAway() {
   const whichIdx = Math.random() < 0.5 ? 0 : 1;
   const leaving = pair[whichIdx];
   const staying = pair[1 - whichIdx];
-  leaving.say(pick(BYE_LINES), 2400);
-  await wait(1400);
-  if (!getPair()) {
+  try {
+    leaving.say(pick(FOOD_FETCH_LINES), 2400);
+    await wait(1400);
+    if (!getPair()) return;
+    leaving.setAway(true);
+    // Lonely partner chatters while the other goose fetches snacks.
+    const lonelyRounds = 4 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < lonelyRounds; i++) {
+      await wait(3500 + Math.random() * 2500);
+      if (!getPair()) break;
+      staying.say(pick(LONELY_LINES), 2400);
+    }
+    await wait(1200);
+    leaving.setAway(false);
+    await wait(320);
+    leaving.setFoodBag(true);
+    await wait(2200);
+    if (getPair()) {
+      leaving.say(pick(FOOD_RETURN_LINES), 2200);
+      await wait(2000);
+      if (getPair()) staying.say("Yum, perfect timing! :D", 2200);
+    }
+
+    if (getPair()) {
+      for (const g of geese.values()) g.setSitting(true);
+      await wait(700);
+      const rounds = 3 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < rounds; i++) {
+        const activePair = getPair();
+        if (!activePair) break;
+        activePair[i % 2].say(pick(FOOD_EAT_LINES), 2200);
+        await wait(2200);
+      }
+      if (getPair()) {
+        await wait(700);
+        const pairAfterSnack = getPair();
+        if (pairAfterSnack) pairAfterSnack[0].say(pick(FOOD_RESUME_LINES), 2200);
+      }
+    }
+  } finally {
+    clearFlyAwayState();
     mood = "idle";
-    return;
   }
-  leaving.setAway(true);
-  // Lonely partner chatters for ~20-30 seconds
-  const lonelyRounds = 4 + Math.floor(Math.random() * 3);
-  for (let i = 0; i < lonelyRounds; i++) {
-    await wait(3500 + Math.random() * 2500);
-    if (!getPair()) break;
-    staying.say(pick(LONELY_LINES), 2400);
-  }
-  await wait(2500);
-  leaving.setAway(false);
-  await wait(2200);
-  if (getPair()) {
-    staying.say("You're back! <3", 2200);
-    await wait(2000);
-    if (getPair()) leaving.say("Missed you! :)", 2200);
-  }
-  mood = "idle";
 }
 
 async function step() {
@@ -257,7 +321,7 @@ function stopSchedulerIfEmpty() {
       schedulerTimer = null;
     }
     mood = "idle";
-    setGooseBallPos(null);
+    ballPlayDirective = null;
   }
 }
 
@@ -281,3 +345,29 @@ export function reactToOnelinerSmiley(fromVariant: GooseRole) {
     if (getPair()) partner.say(pick(SMILEY_RESPONSES), 1800);
   }, 1400);
 }
+
+export const __testing = {
+  runBallPlay,
+  runFlyAway,
+  registerGooseForTests: (api: GooseAPI) => {
+    const id = nextId++;
+    geese.set(id, api);
+    return () => geese.delete(id);
+  },
+  resetStateForTests: () => {
+    geese.clear();
+    nextId = 1;
+    ballPos = null;
+    ballPlayDirective = null;
+    mood = "idle";
+    lastDialogueAt = 0;
+    lastBallPlayAt = 0;
+    lastFlyAwayAt = 0;
+    lastBumpEvent = null;
+    running = false;
+    if (schedulerTimer) {
+      clearTimeout(schedulerTimer);
+      schedulerTimer = null;
+    }
+  },
+};
