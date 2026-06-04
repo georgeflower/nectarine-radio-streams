@@ -342,7 +342,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
   }, [oneliners]);
 
   useEffect(() => {
-    const frames = buildFrameSvgs().map(
+    const frames = buildFrameSvgs(variant).map(
       (svg) => "data:image/svg+xml;utf8," + encodeURIComponent(svg),
     );
 
