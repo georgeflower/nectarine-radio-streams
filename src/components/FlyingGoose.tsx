@@ -737,7 +737,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           foodBag.style.transform = "translate(-50%, -100%) rotate(0deg)";
           return;
         }
-        if (carryingFoodBag || eatingMode) {
+        if (carryingFoodBag || (eatingMode && mode !== "land")) {
           const beakOffsetX = spriteW() * BEAK_OFFSET_X_RATIO;
           const beakOffsetY = spriteH() * BEAK_OFFSET_Y_RATIO;
           const facingLeft = Math.cos(heading) < 0;
