@@ -442,6 +442,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let awayHeading = 0;
     let chaseTarget: { x: number; y: number } | null = null;
     let sittingForMeal = false;
+    let eatingMode = false; // when true, lands and pecks indefinitely
+
 
     const wrap = wrapRef.current;
     const img = imgRef.current;
