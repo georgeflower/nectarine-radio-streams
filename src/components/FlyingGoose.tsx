@@ -444,8 +444,25 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       const sx = w / prevW;
       const sy = h / prevH;
       const sv = sceneScale / Math.max(prevScale, 0.0001);
-      x *= sx;
-      y *= sy;
+      const perchedOrApproaching =
+        mode === "land" || mode === "approach" || mode === "startle";
+      const perchAlive =
+        perchEl &&
+        perchEl.isConnected &&
+        (perchKind === "letter"
+          ? (perchEl.getAttribute("data-goose-letter") || "") === perchChar &&
+            perchEl.textContent === perchChar
+          : perchEl.hasAttribute("data-goose-perch"));
+      if (perchedOrApproaching && perchAlive) {
+        const r = perchEl.getBoundingClientRect();
+        const cx = r.left + r.width * perchOffset;
+        const sink = perchKind === "letter" ? 10 : 2;
+        x = cx;
+        y = r.top - spriteH() + sink + spriteH() / 2;
+      } else {
+        x *= sx;
+        y *= sy;
+      }
       speed *= sv;
       targetSpeed *= sv;
     };
