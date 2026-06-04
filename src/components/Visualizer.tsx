@@ -49,10 +49,10 @@ const getFreqFrame = (analyser: AnalyserNode): FreqFrame => {
   }
 
   const bufferSizeChanged = !cached || cached.buf.length !== analyser.frequencyBinCount;
-  const buf =
+  const buf: Uint8Array<ArrayBuffer> =
     bufferSizeChanged
-      ? new Uint8Array(analyser.frequencyBinCount)
-      : cached.buf;
+      ? new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount))
+      : (cached.buf as Uint8Array<ArrayBuffer>);
   analyser.getByteFrequencyData(buf);
 
   const bEnd =
