@@ -2,6 +2,16 @@ import { useEffect, useRef } from "react";
 import { SMILEYS } from "@/lib/smileys";
 import { registerGoose, reactToOnelinerSmiley, type GooseAPI } from "@/lib/gooseSocial";
 import { getEatingLayoutForGoose, getSceneScale } from "@/lib/gooseScene";
+import {
+  gooseIsRecovered,
+  gooseIsTired,
+  pickPerchCandidate,
+  type PerchCandidate,
+  type PerchKind,
+  STAMINA_MAX,
+  updateGooseStamina,
+  type GooseMode,
+} from "@/lib/gooseBehavior";
 import type { OnelinerEntry } from "@/lib/nectarine";
 import { detectOnelinerReaction } from "@/lib/onelinerReactions";
 
@@ -334,7 +344,7 @@ const HEART_SVG = (() => {
   return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
 })();
 
-type Mode = "fly" | "approach" | "land" | "startle" | "ground";
+type Mode = GooseMode;
 const CHEW_CYCLE_MS = 180;
 const CHEW_AMPLITUDE = 1.2;
 const CHEW_ROTATION_FACTOR = 2.4;
@@ -471,7 +481,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let mode: Mode = "fly";
     let perchEl: HTMLElement | null = null;
     let perchChar = "";
-    let perchKind: "letter" | "window" = "letter";
+    let perchKind: PerchKind = "letter";
     let perchOffset = 0.5; // horizontal position along perch (0..1)
     let nextPerchAt = nextPerchDelay();
     let takeoffAt = 0;
@@ -486,6 +496,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let chaseTarget: { x: number; y: number } | null = null;
     let sittingForMeal = false;
     let eatingMode = false; // when true, lands and pecks indefinitely
+    let stamina = STAMINA_MAX;
+    let restingFromTiredness = false;
 
 
     const wrap = wrapRef.current;
@@ -554,23 +566,28 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         if (sitting) {
           eatingGooseIds.add(gooseId);
           eatingMode = true;
-          mode = "ground";
-          perchEl = null;
           chaseTarget = null;
-          const layout = getEatingLayout();
-          x = layout.x;
-          y = layout.y;
-          heading = layout.heading;
-          targetHeading = heading;
-          speed = 0;
-          targetSpeed = 0;
-          img.style.opacity = "0";
-          imgBody.style.opacity = "1";
-          imgHead.style.opacity = "1";
+          restingFromTiredness = false;
+          const p = pickPerch({ x, y });
+          if (p) {
+            perchEl = p.el;
+            perchChar = p.char;
+            perchKind = p.kind;
+            perchOffset = p.offset;
+            mode = "approach";
+            targetSpeed = scale(115);
+            img.style.opacity = "1";
+            imgBody.style.opacity = "0";
+            imgHead.style.opacity = "0";
+          } else {
+            mode = "fly";
+            perchEl = null;
+            nextPerchAt = elapsed;
+          }
         } else {
           eatingGooseIds.delete(gooseId);
           eatingMode = false;
-          if (mode === "ground" || mode === "land") takeoff();
+          if (mode === "ground" || mode === "land" || mode === "approach") takeoff();
         }
 
       },
@@ -579,26 +596,36 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
 
 
-    const pickPerch = ():
+    const pickPerch = (from: { x: number; y: number } | null = null):
       | { el: HTMLElement; char: string; kind: "letter" | "window"; offset: number }
       | null => {
       const candidates = Array.from(
         document.querySelectorAll<HTMLElement>(
           "[data-goose-letter], [data-goose-perch]",
         ),
-      ).filter((el) => {
-        const r = el.getBoundingClientRect();
-        return r.width > 6 && r.height > 6 && r.top > 40 && r.bottom < h - 20;
-      });
-      if (candidates.length === 0) return null;
-      const el = candidates[Math.floor(Math.random() * candidates.length)];
-      const isLetter = el.hasAttribute("data-goose-letter");
+      )
+        .map((el): PerchCandidate<HTMLElement> | null => {
+          const r = el.getBoundingClientRect();
+          if (!(r.width > 6 && r.height > 6 && r.top > 40 && r.bottom < h - 20)) return null;
+          const isLetter = el.hasAttribute("data-goose-letter");
+          return {
+            ref: el,
+            char: isLetter ? el.getAttribute("data-goose-letter") || "" : "",
+            kind: isLetter ? "letter" : "window",
+            left: r.left,
+            top: r.top,
+            width: r.width,
+          };
+        })
+        .filter((candidate): candidate is PerchCandidate<HTMLElement> => candidate !== null);
+
+      const selected = pickPerchCandidate(candidates, from);
+      if (!selected) return null;
       return {
-        el,
-        char: isLetter ? el.getAttribute("data-goose-letter") || "" : "",
-        kind: isLetter ? "letter" : "window",
-        // Letters: dead-center. Windows: random spot along the bar.
-        offset: isLetter ? 0.5 : 0.15 + Math.random() * 0.7,
+        el: selected.ref,
+        char: selected.char,
+        kind: selected.kind,
+        offset: selected.offset,
       };
     };
 
@@ -638,7 +665,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       imgBody.style.opacity = "1";
       imgHead.style.opacity = "1";
       img.style.opacity = "0";
-      takeoffAt = eatingMode ? Number.POSITIVE_INFINITY : elapsed + sitDuration();
+      takeoffAt = eatingMode || restingFromTiredness ? Number.POSITIVE_INFINITY : elapsed + sitDuration();
       nextLookAt = elapsed + rand(700, 1600);
       x = cx;
       y = topY - spriteH() + sink + spriteH() / 2;
@@ -656,6 +683,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
     const takeoff = () => {
       mode = "fly";
+      restingFromTiredness = false;
       perchEl = null;
       heading = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
       targetHeading = heading;
@@ -677,6 +705,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       last = now;
       const dt = dtMs / 1000;
       elapsed += dtMs;
+      stamina = updateGooseStamina(stamina, mode, dt);
       applyScaledStyles();
 
       hideBubbleIfExpired(now);
@@ -701,14 +730,14 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
       const positionFoodBag = () => {
         foodBag.style.opacity = eatingMode || carryingFoodBag ? "1" : "0";
-        if (eatingMode) {
-          const layout = getEatingLayout();
-          foodBag.style.left = `${layout.foodX}px`;
-          foodBag.style.top = `${layout.foodY}px`;
-          foodBag.style.transform = "translate(-50%, -50%) rotate(0deg)";
+        if (eatingMode && mode === "land" && perchEl) {
+          const { cx, topY } = perchTarget();
+          foodBag.style.left = `${cx}px`;
+          foodBag.style.top = `${topY - scale(6)}px`;
+          foodBag.style.transform = "translate(-50%, -100%) rotate(0deg)";
           return;
         }
-        if (carryingFoodBag) {
+        if (carryingFoodBag || eatingMode) {
           const beakOffsetX = spriteW() * BEAK_OFFSET_X_RATIO;
           const beakOffsetY = spriteH() * BEAK_OFFSET_Y_RATIO;
           const facingLeft = Math.cos(heading) < 0;
@@ -755,6 +784,10 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
           positionBubble(cx, topY);
           positionFoodBag();
+          if (restingFromTiredness && gooseIsRecovered(stamina)) {
+            restingFromTiredness = false;
+            takeoffAt = Math.min(takeoffAt, elapsed + rand(400, 1200));
+          }
           if (elapsed >= takeoffAt) takeoff();
           raf = requestAnimationFrame(tick);
           return;
@@ -799,7 +832,30 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
 
       // ===== FLY / APPROACH =====
-      if (mode === "fly" && !away && elapsed >= nextPerchAt) {
+      if (!eatingMode && (mode === "fly" || mode === "approach") && gooseIsTired(stamina)) {
+        const nearestPerch = pickPerch({ x, y });
+        if (nearestPerch) {
+          perchEl = nearestPerch.el;
+          perchChar = nearestPerch.char;
+          perchKind = nearestPerch.kind;
+          perchOffset = nearestPerch.offset;
+          mode = "approach";
+          restingFromTiredness = true;
+          targetSpeed = scale(105);
+        }
+      }
+      if (mode === "fly" && eatingMode && !away) {
+        const mealPerch = pickPerch({ x, y });
+        if (mealPerch) {
+          perchEl = mealPerch.el;
+          perchChar = mealPerch.char;
+          perchKind = mealPerch.kind;
+          perchOffset = mealPerch.offset;
+          mode = "approach";
+          targetSpeed = scale(115);
+        }
+      }
+      if (mode === "fly" && !away && !eatingMode && elapsed >= nextPerchAt) {
         const p = pickPerch();
         if (p) {
           perchEl = p.el;
@@ -812,11 +868,18 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           nextPerchAt = elapsed + rand(4000, 9000);
         }
       }
-
       if (mode === "approach") {
-        if (!perchAlive() || away) {
-          mode = "fly";
-          nextPerchAt = elapsed + nextPerchDelay();
+        if (!perchAlive() || (away && !restingFromTiredness && !eatingMode)) {
+          const replacement = away && !restingFromTiredness && !eatingMode ? null : pickPerch({ x, y });
+          if (replacement) {
+            perchEl = replacement.el;
+            perchChar = replacement.char;
+            perchKind = replacement.kind;
+            perchOffset = replacement.offset;
+          } else {
+            mode = "fly";
+            nextPerchAt = elapsed + nextPerchDelay();
+          }
         } else {
           const { cx, topY, sink } = perchTarget();
           const tx = cx;
