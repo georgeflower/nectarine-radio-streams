@@ -182,6 +182,9 @@ const BoingBall = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBall(x, y, r, squash);
 
+      // Publish position so the geese can react to / play with the ball.
+      setBallPos({ x, y });
+
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
