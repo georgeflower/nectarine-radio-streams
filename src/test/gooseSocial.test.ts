@@ -234,4 +234,25 @@ describe("gooseSocial game flows", () => {
     expect(responses).toContain("glob glob!");
     expect(responses).toContain("Jogeir is GOD!");
   });
+
+  it("keeps expanded oneliner dialogues free of duplicate prompts", async () => {
+    const social = await import("@/lib/gooseSocial");
+    social.__testing.resetStateForTests();
+
+    const dialogues = social.__testing.getOnelinerDialoguesForTests();
+    const normalizePrompt = (line: string) =>
+      line
+        .toLowerCase()
+        .replaceAll("{user}", "")
+        .replaceAll("{line}", "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+
+    const normalizedPrompts = dialogues.map(([prompt]) => normalizePrompt(prompt));
+
+    expect(dialogues.length).toBeGreaterThanOrEqual(100);
+    expect(new Set(normalizedPrompts).size).toBe(dialogues.length);
+    expect(dialogues.filter(([prompt]) => prompt.toLowerCase().includes("scrolltext"))).toHaveLength(1);
+    expect(dialogues.filter(([prompt]) => prompt === "Compo goose?")).toHaveLength(1);
+  });
 });
