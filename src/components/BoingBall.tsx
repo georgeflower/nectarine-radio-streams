@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { setBallPos } from "@/lib/gooseSocial";
+import { getGooseBallPos, setBallPos } from "@/lib/gooseSocial";
 
 /**
  * Classic Amiga "Boing" ball — checkered sphere bouncing across the screen.
@@ -34,6 +34,12 @@ const BoingBall = () => {
     let vy = 0;
     const gravity = 650; // px/s^2 — gentler so it bounces higher
     const bounce = 0.94;
+    // During goose-controlled passes, rapidly damp idle momentum so that when
+    // scripted control ends the ball doesn't fly off at its pre-pass velocity.
+    const SCRIPTED_VELOCITY_DAMPING = 0.86; // multiplied each frame — higher = less damping
+    // Slow the spin during scripted passes so it matches the visible "hold" feel
+    // rather than continuing at full rotation speed.
+    const SCRIPTED_SPIN_FACTOR = 0.35; // fraction of normal spin rate applied per frame
     let spin = 0; // rotation around tilted axis (radians)
     let spinDir = 1;
 
@@ -144,40 +150,50 @@ const BoingBall = () => {
 
       const r = R();
 
-      // Physics
-      vy += gravity * dt;
-      x += vx * dt;
-      y += vy * dt;
-
-      const floor = window.innerHeight - 8;
       let squash = 0;
-      if (x - r < 0) {
-        x = r;
-        vx = Math.abs(vx);
-        spinDir = -1;
-      } else if (x + r > window.innerWidth) {
-        x = window.innerWidth - r;
-        vx = -Math.abs(vx);
-        spinDir = 1;
-      }
-      if (y + r > floor) {
-        y = floor - r;
-        vy = -Math.abs(vy) * bounce;
-        if (Math.abs(vy) < 120) vy = -900; // keep it lively, big bounces
-        squash = 0.6;
-      }
-      if (y - r < 0) {
-        y = r;
-        vy = Math.abs(vy);
-      }
+      const scriptedPos = getGooseBallPos();
+      if (scriptedPos) {
+        const dx = scriptedPos.x - x;
+        x = scriptedPos.x;
+        y = scriptedPos.y;
+        vx *= SCRIPTED_VELOCITY_DAMPING;
+        vy *= SCRIPTED_VELOCITY_DAMPING;
+        spin += (dx / Math.max(1, r)) * SCRIPTED_SPIN_FACTOR;
+      } else {
+        // Physics
+        vy += gravity * dt;
+        x += vx * dt;
+        y += vy * dt;
 
-      // Squash decays
-      // (approximation: based on vy magnitude near floor)
-      const distToFloor = floor - (y + r);
-      const nearFloor = Math.max(0, 1 - distToFloor / (r * 0.6));
-      squash = Math.max(squash, nearFloor * 0.35);
+        const floor = window.innerHeight - 8;
+        if (x - r < 0) {
+          x = r;
+          vx = Math.abs(vx);
+          spinDir = -1;
+        } else if (x + r > window.innerWidth) {
+          x = window.innerWidth - r;
+          vx = -Math.abs(vx);
+          spinDir = 1;
+        }
+        if (y + r > floor) {
+          y = floor - r;
+          vy = -Math.abs(vy) * bounce;
+          if (Math.abs(vy) < 120) vy = -900; // keep it lively, big bounces
+          squash = 0.6;
+        }
+        if (y - r < 0) {
+          y = r;
+          vy = Math.abs(vy);
+        }
 
-      spin += spinDir * 1.8 * dt;
+        // Squash decays
+        // (approximation: based on vy magnitude near floor)
+        const distToFloor = floor - (y + r);
+        const nearFloor = Math.max(0, 1 - distToFloor / (r * 0.6));
+        squash = Math.max(squash, nearFloor * 0.35);
+
+        spin += spinDir * 1.8 * dt;
+      }
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBall(x, y, r, squash);

@@ -11,6 +11,8 @@ export type GooseAPI = {
   // Show a text bubble. Text may contain smiley codes (e.g. ":)") which
   // will be rendered as smiley images inside the bubble.
   say: (text: string, durationMs?: number) => void;
+  // Current screen-space position used for coordinated interactions.
+  getPosition: () => { x: number; y: number };
   // Toggle "flying away" mode — the goose heads off-screen and stays
   // gone until set back to false.
   setAway: (away: boolean) => void;
@@ -20,11 +22,18 @@ const geese = new Map<number, GooseAPI>();
 let nextId = 1;
 
 let ballPos: { x: number; y: number } | null = null;
+let gooseBallPos: { x: number; y: number } | null = null;
 export function setBallPos(p: { x: number; y: number } | null) {
   ballPos = p;
 }
 export function getBallPos() {
   return ballPos;
+}
+export function setGooseBallPos(p: { x: number; y: number } | null) {
+  gooseBallPos = p;
+}
+export function getGooseBallPos() {
+  return gooseBallPos;
 }
 
 type Mood = "idle" | "playing" | "sleeping" | "away";
@@ -51,16 +60,23 @@ const DIALOGUES: string[][] = [
 
 const PLAY_LINES = [
   "Pass it!",
-  "Got it! :D",
-  "Wheee!",
   "Catch! :)",
   "Over here!",
-  "My turn!",
-  "Nice one!",
+  "Your turn!",
+  "Heads up!",
   "Boing! :D",
-  "Bounce!",
-  "Wooo!",
+  "Incoming!",
 ];
+const HOLD_LINES = ["My turn!", "Ready!", "Here we go!"];
+const RECEIVE_LINES = ["Got it! :D", "Nice one!", "Caught it!"];
+const BALL_PASS_MIN_ARC_HEIGHT = 28;
+// Arc height = horizontal distance * ARC_HEIGHT_MULTIPLIER, so longer throws
+// curve higher and feel more like a real lob.
+const ARC_HEIGHT_MULTIPLIER = 0.12;
+// A ball-play session lasts MIN_BALL_PASSES plus up to RANDOM_EXTRA_PASSES
+// additional turns so the length varies naturally each time.
+const MIN_BALL_PASSES = 6;
+const RANDOM_EXTRA_PASSES = 3;
 
 const LONELY_LINES = [
   "I'm so lonely... :(",
@@ -107,17 +123,60 @@ async function runBallPlay() {
   const pair = getPair();
   if (!pair) return;
   mood = "playing";
-  const turns = 8 + Math.floor(Math.random() * 4);
-  for (let i = 0; i < turns; i++) {
-    if (!getPair() || !ballPos) break;
-    pair[i % 2].say(pick(PLAY_LINES), 1700);
-    await wait(1600 + Math.random() * 700);
+  const animateBallPass = async (from: GooseAPI, to: GooseAPI, durationMs: number) => {
+    const start = from.getPosition();
+    const end = to.getPosition();
+    // Higher/lower arc based on horizontal throw distance.
+    const lift = Math.max(BALL_PASS_MIN_ARC_HEIGHT, Math.abs(end.x - start.x) * ARC_HEIGHT_MULTIPLIER);
+    const startAt = Date.now();
+    while (true) {
+      const t = Math.min(1, (Date.now() - startAt) / durationMs);
+      setGooseBallPos({
+        x: start.x + (end.x - start.x) * t,
+        y: start.y + (end.y - start.y) * t - Math.sin(Math.PI * t) * lift,
+      });
+      if (t >= 1) return true;
+      await wait(16);
+      if (!getPair()) return false;
+    }
+  };
+
+  const turns = MIN_BALL_PASSES + Math.floor(Math.random() * RANDOM_EXTRA_PASSES);
+  let holderIdx = Math.random() < 0.5 ? 0 : 1;
+  try {
+    setGooseBallPos(pair[holderIdx].getPosition());
+    for (let i = 0; i < turns; i++) {
+      const activePair = getPair();
+      if (!activePair) break;
+      const holder = activePair[holderIdx];
+      const receiver = activePair[1 - holderIdx];
+
+      setGooseBallPos(holder.getPosition());
+      holder.say(pick(HOLD_LINES), 900);
+      await wait(700);
+
+      holder.say(pick(PLAY_LINES), 900);
+      const moved = await animateBallPass(holder, receiver, 850 + Math.random() * 250);
+      if (!moved) break;
+
+      receiver.say(pick(RECEIVE_LINES), 900);
+      holderIdx = 1 - holderIdx;
+      await wait(550 + Math.random() * 220);
+    }
+  } finally {
+    setGooseBallPos(null);
+  }
+
+  const pairAfterPlay = getPair();
+  if (!pairAfterPlay) {
+    mood = "idle";
+    return;
   }
   // Wind down + sleep
   mood = "sleeping";
-  pair[0].say("Phew! :)", 1800);
+  pairAfterPlay[0].say("Phew! :)", 1800);
   await wait(1600);
-  if (getPair()) pair[1].say("Tired now... :sleepy:", 1800);
+  if (getPair()) pairAfterPlay[1].say("Tired now... :sleepy:", 1800);
   await wait(1800);
   // Sleep for a little while — alternating Zzz
   const zzzRounds = 5 + Math.floor(Math.random() * 4);
@@ -198,6 +257,7 @@ function stopSchedulerIfEmpty() {
       schedulerTimer = null;
     }
     mood = "idle";
+    setGooseBallPos(null);
   }
 }
 
