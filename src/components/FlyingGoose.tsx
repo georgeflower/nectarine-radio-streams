@@ -372,7 +372,9 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     bubble.style.opacity = "1";
     bubble.style.transform = "scale(1)";
     reactionUntilRef.current = performance.now() + 2600;
-  }, [oneliners]);
+    // Let the partner goose chime in with a cute response.
+    reactToOnelinerSmiley(variant);
+  }, [oneliners, variant]);
 
   useEffect(() => {
     const frames = buildFrameSvgs(variant).map(
