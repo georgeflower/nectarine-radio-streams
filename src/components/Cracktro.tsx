@@ -62,6 +62,11 @@ const STORAGE_INFOBAR = "cracktro-infobar-on";
 const STORAGE_FPS_COUNTER = "cracktro-fps-counter";
 const STORAGE_SCENE_ERAS = "cracktro-scene-eras";
 const STORAGE_SCENE_ERA_LISTEN_MS = "cracktro-scene-era-listen-ms";
+const MAX_FRAME_TIME_MS = 100;
+const FPS_EMA_ALPHA = 0.1;
+const LOW_FPS_THRESHOLD = 28;
+const LOW_FPS_SUSTAINED_MS = 12_000;
+const FPS_HUD_UPDATE_INTERVAL_MS = 250;
 
 type PanelId = "oneliner" | "online" | "queue" | "history";
 const PANELS: { id: PanelId; label: string }[] = [
@@ -510,15 +515,15 @@ const Cracktro = ({
     };
 
     const tick = (now: number) => {
-      const dtMs = Math.min(100, Math.max(1, now - lastFrameAt || 1000 / 60));
+      const dtMs = Math.min(MAX_FRAME_TIME_MS, Math.max(1, now - lastFrameAt));
       lastFrameAt = now;
       const frameScale = dtMs / (1000 / 60);
       const instFps = 1000 / dtMs;
-      fpsEma += (instFps - fpsEma) * 0.1;
-      if (fpsEma < 28) lowFpsMs += dtMs;
+      fpsEma += (instFps - fpsEma) * FPS_EMA_ALPHA;
+      if (fpsEma < LOW_FPS_THRESHOLD) lowFpsMs += dtMs;
       else lowFpsMs = Math.max(0, lowFpsMs - dtMs * 2);
-      const lowFps = lowFpsMs >= 12_000;
-      if (now - lastHudUpdateAt > 250) {
+      const lowFps = lowFpsMs >= LOW_FPS_SUSTAINED_MS;
+      if (now - lastHudUpdateAt > FPS_HUD_UPDATE_INTERVAL_MS) {
         setFps(Math.round(fpsEma));
         setLowFpsDetected((prev) => (prev === lowFps ? prev : lowFps));
         lastHudUpdateAt = now;
