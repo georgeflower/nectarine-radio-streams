@@ -292,7 +292,7 @@ function pickUsageTracked<T>(bucket: string, arr: readonly T[]): T {
   const weights = nextCounts.map((count) => maxCount + 1 - count);
   const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
   let threshold = Math.random() * totalWeight;
-  let selectedIndex = weights.length - 1;
+  let selectedIndex = 0;
   for (let i = 0; i < weights.length; i++) {
     threshold -= weights[i];
     if (threshold < 0) {
