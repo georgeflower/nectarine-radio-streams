@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { SMILEYS } from "@/lib/smileys";
 import { registerGoose, reactToOnelinerSmiley, type GooseAPI } from "@/lib/gooseSocial";
 import type { OnelinerEntry } from "@/lib/nectarine";
+import { detectOnelinerReaction } from "@/lib/onelinerReactions";
 
 /**
  * Pixel-art goose drawn entirely in code (no image asset). Wanders the viewport
@@ -247,6 +248,11 @@ const SMILEY_RE = new RegExp(SMILEY_KEYS.map(escapeRegex).join("|"), "i");
 const SMILEY_RE_G = new RegExp(SMILEY_KEYS.map(escapeRegex).join("|"), "gi");
 const SMILEY_LC: Record<string, string> = {};
 for (const k of SMILEY_KEYS) SMILEY_LC[k.toLowerCase()] = k;
+const REACTION_SMILEY: Record<"heart" | "laughter" | "wink", string> = {
+  heart: SMILEYS["<3"],
+  laughter: SMILEYS[":lol:"],
+  wink: SMILEYS[";)"],
+};
 
 function firstSmileyUrl(text: string): string | null {
   const m = SMILEY_RE.exec(text);
@@ -357,7 +363,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
     const text = top.text || "";
     const mentionsGoose = /\bgoose\b/i.test(text);
-    const smileyUrl = firstSmileyUrl(text);
+    const reaction = detectOnelinerReaction(text);
+    const smileyUrl = firstSmileyUrl(text) || (reaction ? REACTION_SMILEY[reaction] : null);
 
     let content = "";
     if (mentionsGoose) {
@@ -450,6 +457,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         bubble.style.transform = "scale(1)";
         reactionUntilRef.current = performance.now() + durationMs;
       },
+      getPosition: () => ({ x, y }),
       setAway: (a: boolean) => {
         away = a;
         if (a) {
