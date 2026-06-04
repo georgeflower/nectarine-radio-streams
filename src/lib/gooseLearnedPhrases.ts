@@ -1,4 +1,4 @@
-const STORAGE_KEY = "goose-learned-phrases.json";
+const STORAGE_KEY = "goose-learned-phrases";
 const MAX_PHRASES = 120;
 const MAX_TEXT_LEN = 90;
 const MIN_TEXT_LEN = 3;
