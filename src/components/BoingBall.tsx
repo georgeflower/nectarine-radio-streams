@@ -157,9 +157,16 @@ const BoingBall = () => {
 
       const r = R();
 
-      let squash = 0;
-      // Physics
-      vy += gravity * dt;
+      const directive = getBallPlayDirective();
+      // While the geese are playing, calm the ball down so it stays nearby
+      // and the geese can actually catch up to it: less gravity, no lively
+      // re-bounce boost, and a gentle horizontal friction.
+      const playing = !!directive;
+      const effectiveGravity = playing ? 380 : gravity;
+      vy += effectiveGravity * dt;
+      if (playing) {
+        vx *= Math.pow(0.55, dt); // ~friction toward 0
+      }
       x += vx * dt;
       y += vy * dt;
 
@@ -176,9 +183,10 @@ const BoingBall = () => {
       if (y + r > floor) {
         y = floor - r;
         vy = -Math.abs(vy) * bounce;
-        if (Math.abs(vy) < 120) vy = -900; // keep it lively, big bounces
+        if (!playing && Math.abs(vy) < 120) vy = -900; // keep it lively outside play
         squash = 0.6;
       }
+
       if (y - r < 0) {
         y = r;
         vy = Math.abs(vy);
