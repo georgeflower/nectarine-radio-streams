@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { SMILEYS } from "@/lib/smileys";
+import { registerGoose, reactToOnelinerSmiley, type GooseAPI } from "@/lib/gooseSocial";
 import type { OnelinerEntry } from "@/lib/nectarine";
 
 /**
@@ -243,6 +244,7 @@ function escapeRegex(s: string) {
 }
 const SMILEY_KEYS = Object.keys(SMILEYS).sort((a, b) => b.length - a.length);
 const SMILEY_RE = new RegExp(SMILEY_KEYS.map(escapeRegex).join("|"), "i");
+const SMILEY_RE_G = new RegExp(SMILEY_KEYS.map(escapeRegex).join("|"), "gi");
 const SMILEY_LC: Record<string, string> = {};
 for (const k of SMILEY_KEYS) SMILEY_LC[k.toLowerCase()] = k;
 
@@ -251,6 +253,37 @@ function firstSmileyUrl(text: string): string | null {
   if (!m) return null;
   const canonical = SMILEY_LC[m[0].toLowerCase()];
   return canonical ? SMILEYS[canonical] : null;
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c] as string));
+}
+
+// Render plain text with smiley codes converted to inline <img> tags so the
+// goose can "speak" using the same emoticon vocabulary as the oneliner.
+function renderGooseHTML(text: string): string {
+  if (!text) return "";
+  const pieces: string[] = [];
+  let last = 0;
+  SMILEY_RE_G.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = SMILEY_RE_G.exec(text)) !== null) {
+    if (m.index > last) pieces.push(escapeHtml(text.slice(last, m.index)));
+    const canonical = SMILEY_LC[m[0].toLowerCase()];
+    const url = canonical ? SMILEYS[canonical] : null;
+    if (url) {
+      pieces.push(
+        `<img src="${url}" alt="" style="display:inline-block;height:18px;width:auto;vertical-align:middle;margin:0 2px" />`,
+      );
+    } else {
+      pieces.push(escapeHtml(m[0]));
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) pieces.push(escapeHtml(text.slice(last)));
+  return pieces.join("");
 }
 
 // Pixel-art heart SVG (retro 11x10 grid).
@@ -339,7 +372,9 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     bubble.style.opacity = "1";
     bubble.style.transform = "scale(1)";
     reactionUntilRef.current = performance.now() + 2600;
-  }, [oneliners]);
+    // Let the partner goose chime in with a cute response.
+    reactToOnelinerSmiley(variant);
+  }, [oneliners, variant]);
 
   useEffect(() => {
     const frames = buildFrameSvgs(variant).map(
@@ -391,6 +426,10 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let lookScale = 1; // animated -1..1, smoothly tweens toward lookDir while standing
     let startleEnd = 0;
 
+    // Away-mode (fly off-screen) state, driven by the social coordinator.
+    let away = false;
+    let awayHeading = 0;
+
     const wrap = wrapRef.current;
     const img = imgRef.current;
     const imgBody = imgStandBodyRef.current;
@@ -400,6 +439,37 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     img.src = frames[0];
     imgBody.src = frames[STAND_BODY];
     imgHead.src = frames[STAND_HEAD];
+
+    // Imperative API exposed to the social coordinator so the partner goose
+    // (and the BoingBall) can trigger speech bubbles and fly-away behavior.
+    const api: GooseAPI = {
+      variant,
+      say: (text: string, durationMs = 2400) => {
+        bubble.innerHTML = renderGooseHTML(text);
+        bubble.style.opacity = "1";
+        bubble.style.transform = "scale(1)";
+        reactionUntilRef.current = performance.now() + durationMs;
+      },
+      setAway: (a: boolean) => {
+        away = a;
+        if (a) {
+          // Head toward the nearest horizontal edge.
+          awayHeading = x < w / 2 ? Math.PI : 0;
+          // Force takeoff if currently perched.
+          if (mode === "land") {
+            // Skip the startle; just leap off.
+            mode = "fly";
+            perchEl = null;
+            heading = awayHeading;
+            targetHeading = awayHeading;
+            img.style.opacity = "1";
+            imgBody.style.opacity = "0";
+            imgHead.style.opacity = "0";
+          }
+        }
+      },
+    };
+    const unregisterGoose = registerGoose(api);
 
 
 
@@ -566,7 +636,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
 
       // ===== FLY / APPROACH =====
-      if (mode === "fly" && elapsed >= nextPerchAt) {
+      if (mode === "fly" && !away && elapsed >= nextPerchAt) {
         const p = pickPerch();
         if (p) {
           perchEl = p.el;
@@ -581,7 +651,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       }
 
       if (mode === "approach") {
-        if (!perchAlive()) {
+        if (!perchAlive() || away) {
           mode = "fly";
           nextPerchAt = elapsed + nextPerchDelay();
         } else {
@@ -602,23 +672,31 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
       // === Normal flying (also used during approach) ===
       if (mode === "fly") {
-        if (elapsed >= nextDriftAt) {
-          targetHeading += (Math.random() - 0.5) * 0.6;
-          nextDriftAt = elapsed + 400 + Math.random() * 500;
-        }
-        if (elapsed >= nextBankAt) {
-          const turn = (Math.PI / 180) * (60 + Math.random() * 80);
-          targetHeading += (Math.random() < 0.5 ? -1 : 1) * turn;
-          targetSpeed = 80 + Math.random() * 90;
-          nextBankAt = elapsed + 3500 + Math.random() * 5000;
-        }
+        if (away) {
+          // Beeline off-screen and stay there until the coordinator brings
+          // us back. Suppress drift, banking and the inward boundary nudge.
+          targetHeading = awayHeading;
+          targetSpeed = 180;
+          nextPerchAt = elapsed + 1e9;
+        } else {
+          if (elapsed >= nextDriftAt) {
+            targetHeading += (Math.random() - 0.5) * 0.6;
+            nextDriftAt = elapsed + 400 + Math.random() * 500;
+          }
+          if (elapsed >= nextBankAt) {
+            const turn = (Math.PI / 180) * (60 + Math.random() * 80);
+            targetHeading += (Math.random() < 0.5 ? -1 : 1) * turn;
+            targetSpeed = 80 + Math.random() * 90;
+            nextBankAt = elapsed + 3500 + Math.random() * 5000;
+          }
 
-        const margin = 80;
-        if (x < margin || x > w - margin || y < margin || y > h - margin) {
-          const cx = w / 2;
-          const cy = h / 2;
-          const inward = Math.atan2(cy - y, cx - x);
-          targetHeading = inward + (Math.random() - 0.5) * 0.4;
+          const margin = 80;
+          if (x < margin || x > w - margin || y < margin || y > h - margin) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const inward = Math.atan2(cy - y, cx - x);
+            targetHeading = inward + (Math.random() - 0.5) * 0.4;
+          }
         }
       }
 
@@ -669,6 +747,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
+      unregisterGoose();
     };
   }, [variant]);
 

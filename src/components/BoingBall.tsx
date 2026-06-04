@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { setBallPos } from "@/lib/gooseSocial";
 
 /**
  * Classic Amiga "Boing" ball — checkered sphere bouncing across the screen.
@@ -181,6 +182,9 @@ const BoingBall = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBall(x, y, r, squash);
 
+      // Publish position so the geese can react to / play with the ball.
+      setBallPos({ x, y });
+
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -188,6 +192,7 @@ const BoingBall = () => {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
+      setBallPos(null);
     };
   }, []);
 
