@@ -26,6 +26,9 @@ export type GooseAPI = {
   setSitting: (sitting: boolean) => void;
   // Marks that this goose is in a food-fetch mission and should not re-perch.
   setFetchingFood: (fetching: boolean) => void;
+  // Toggle "ball-play is currently active" — while true, the goose must
+  // stay airborne and skip routine/tiredness perching.
+  setBallPlayActive: (active: boolean) => void;
 };
 
 const geese = new Map<number, GooseAPI>();
@@ -210,6 +213,8 @@ async function runBallPlay() {
   // Ensure neither goose is sitting when play begins.
   pair[0].setSitting(false);
   pair[1].setSitting(false);
+  pair[0].setBallPlayActive(true);
+  pair[1].setBallPlayActive(true);
   const bumpedSince = (expectedBumper: GooseRole, marker: number) =>
     !!lastBumpEvent && lastBumpEvent.by === expectedBumper && lastBumpEvent.at > marker;
 
@@ -252,6 +257,7 @@ async function runBallPlay() {
     }
   } finally {
     clearBallPlayState();
+    for (const g of geese.values()) g.setBallPlayActive(false);
   }
 
   const pairAfterPlay = getPair();

@@ -540,6 +540,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let sittingForMeal = false;
     let eatingMode = false; // when true, lands and pecks indefinitely
     let fetchingFood = false;
+    let ballPlayActive = false;
     let stamina = STAMINA_MAX;
     let restingFromTiredness = false;
     let panicFlightUntil = 0;
@@ -662,6 +663,16 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           imgHead.style.opacity = "0";
         }
         nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
+      },
+      setBallPlayActive: (active: boolean) => {
+        ballPlayActive = active;
+        if (active) {
+          sittingForMeal = false;
+          eatingGooseIds.delete(gooseId);
+          eatingMode = false;
+          restingFromTiredness = false;
+          if (mode === "ground" || mode === "land" || mode === "approach") takeoff();
+        }
       },
     };
     const unregisterGoose = registerGoose(api);
@@ -909,7 +920,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
 
       // ===== FLY / APPROACH =====
-      if (!fetchingFood && !eatingMode && (mode === "fly" || mode === "approach") && gooseIsTired(stamina)) {
+      if (!fetchingFood && !eatingMode && !ballPlayActive && (mode === "fly" || mode === "approach") && gooseIsTired(stamina)) {
         const nearestPerch = pickPerch({ x, y });
         if (nearestPerch) {
           perchEl = nearestPerch.el;
@@ -932,7 +943,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           targetSpeed = scale(115);
         }
       }
-      if (mode === "fly" && !away && !eatingMode && !fetchingFood && elapsed >= nextPerchAt) {
+      if (mode === "fly" && !away && !eatingMode && !fetchingFood && !ballPlayActive && elapsed >= nextPerchAt) {
         const p = pickPerch();
         if (p) {
           perchEl = p.el;
