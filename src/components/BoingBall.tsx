@@ -192,6 +192,7 @@ const BoingBall = () => {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
+      setBallPos(null);
     };
   }, []);
 
