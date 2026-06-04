@@ -9,6 +9,7 @@ const makeGoose = (variant: GooseRole): GooseAPI => ({
   setChaseTarget: vi.fn(),
   setFoodBag: vi.fn(),
   setSitting: vi.fn(),
+  setFetchingFood: vi.fn(),
 });
 
 describe("gooseSocial game flows", () => {
@@ -99,6 +100,8 @@ describe("gooseSocial game flows", () => {
     expect(white.setAway).toHaveBeenCalledWith(false);
     expect(white.setFoodBag).toHaveBeenCalledWith(true);
     expect(white.setFoodBag).toHaveBeenCalledWith(false);
+    expect(white.setFetchingFood).toHaveBeenCalledWith(true);
+    expect(white.setFetchingFood).toHaveBeenCalledWith(false);
     expect(white.setSitting).toHaveBeenCalledWith(true);
     expect(white.setSitting).toHaveBeenCalledWith(false);
     expect(brown.setSitting).toHaveBeenCalledWith(true);

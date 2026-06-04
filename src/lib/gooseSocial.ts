@@ -4,6 +4,8 @@
 // sequences. The BoingBall publishes its position so the geese can react
 // to it.
 
+import { pickLearnedPhrase } from "@/lib/gooseLearnedPhrases";
+
 export type GooseRole = "white" | "brown";
 
 export type GooseAPI = {
@@ -22,6 +24,8 @@ export type GooseAPI = {
   setFoodBag: (carrying: boolean) => void;
   // Keep the goose seated on the ground for snack breaks.
   setSitting: (sitting: boolean) => void;
+  // Marks that this goose is in a food-fetch mission and should not re-perch.
+  setFetchingFood: (fetching: boolean) => void;
 };
 
 const geese = new Map<number, GooseAPI>();
@@ -31,8 +35,32 @@ let ballPos: { x: number; y: number } | null = null;
 export function setBallPos(p: { x: number; y: number } | null) {
   ballPos = p;
 }
+
+function buildContextualDialogue(now: number): string[] {
+  const learned = pickLearnedPhrase();
+  if (learned && Math.random() < 0.3) {
+    return [`Heard this in chat: "${learned}"`, "That line honks. Keep it!"];
+  }
+  if (recentOneliner && now - recentOneliner.at < 45_000 && Math.random() < 0.6) {
+    const user = recentOneliner.username || "someone";
+    return [`${user} just dropped a line`, "Chat is popping off! :D"];
+  }
+  const hour = new Date(now).getHours();
+  if ((hour >= 22 || hour <= 5) && Math.random() < 0.5) {
+    return ["Moonlight patrol engaged", "Night honks only 🌙"];
+  }
+  if (ballPos && Math.random() < 0.4) {
+    return ["Keep an eye on the boing ball", "It's plotting a ricochet!"];
+  }
+  return pick(DIALOGUES);
+}
 export function getBallPos() {
   return ballPos;
+}
+
+export function noteRecentOneliner(username: string, text: string) {
+  if (!text.trim()) return;
+  recentOneliner = { username, text: text.trim(), at: Date.now() };
 }
 
 type BallPlayDirective = {
@@ -67,6 +95,7 @@ let lastBallPlayAt = 0;
 let lastFlyAwayAt = 0;
 let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
+let recentOneliner: { username: string; text: string; at: number } | null = null;
 
 const DIALOGUES: string[][] = [
   ["Hi! :)", "Hi friend! :D"],
@@ -79,6 +108,11 @@ const DIALOGUES: string[][] = [
   ["Look at the stars :O", "So pretty <3"],
   ["I love this song :D", "Me too! :dance:"],
   ["Got any snacks?", "Just grass :P", "Yum! :)"],
+  ["Clouds are doing loops today", "Perfect weather for chaos flying!"],
+  ["Keyboard clacks detected...", "The humans are typing spells again!"],
+  ["Did you see that bounce?", "10/10 boing form!"],
+  ["Radio vibes are immaculate", "Certified honk classic."],
+  ["Tailwind from the left!", "Bank right and send it!"],
 ];
 
 const PLAY_LINES = [
@@ -107,6 +141,8 @@ const LONELY_LINES = [
   "Come back :(",
   "Hellooo? :|",
   "It's quiet without you...",
+  "I miss the snack scout already",
+  "Come back with croissants! :(",
 ];
 
 const SLEEPY_LINES = ["Zzz..", "Zzz...", "..Zzz", "Zzzz~"];
@@ -118,6 +154,8 @@ const FOOD_EAT_LINES = [
   "Carb-loading for round two",
   "Munch munch",
   "Refueling the engines",
+  "This baguette has boss music",
+  "Crunch level: MAXIMUM",
 ];
 const FOOD_RESUME_LINES = ["Alright, back to the ball!", "Round two, let's bump!"];
 
@@ -149,6 +187,7 @@ function clearFlyAwayState() {
     g.setAway(false);
     g.setFoodBag(false);
     g.setSitting(false);
+    g.setFetchingFood(false);
   }
 }
 
@@ -240,6 +279,7 @@ async function runFlyAway() {
   const leaving = pair[whichIdx];
   const staying = pair[1 - whichIdx];
   try {
+    leaving.setFetchingFood(true);
     leaving.say(pick(FOOD_FETCH_LINES), 2400);
     await wait(1400);
     if (!getPair()) return;
@@ -255,6 +295,7 @@ async function runFlyAway() {
     leaving.setAway(false);
     await wait(320);
     leaving.setFoodBag(true);
+    leaving.setFetchingFood(false);
     await wait(2200);
     if (getPair()) {
       leaving.say(pick(FOOD_RETURN_LINES), 2200);
@@ -302,7 +343,7 @@ async function step() {
       await runBallPlay();
     } else if (now - lastDialogueAt > 22_000) {
       lastDialogueAt = now;
-      await runDialogue(pick(DIALOGUES));
+      await runDialogue(buildContextualDialogue(now));
     }
   }
   if (running) {
@@ -368,6 +409,7 @@ export const __testing = {
     lastBallPlayAt = 0;
     lastFlyAwayAt = 0;
     lastBumpEvent = null;
+    recentOneliner = null;
     running = false;
     if (schedulerTimer) {
       clearTimeout(schedulerTimer);
