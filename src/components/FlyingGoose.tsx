@@ -747,6 +747,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
+      unregisterGoose();
     };
   }, [variant]);
 
