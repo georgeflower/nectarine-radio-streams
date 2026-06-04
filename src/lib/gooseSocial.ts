@@ -45,8 +45,15 @@ let ballPos: { x: number; y: number } | null = null;
 export function setBallPos(p: { x: number; y: number } | null) {
   ballPos = p;
 }
+let lowFpsPerformance = false;
+export function setGoosePerformanceState(next: { lowFps: boolean }) {
+  lowFpsPerformance = next.lowFps;
+}
 
 function buildContextualDialogue(now: number): string[] {
+  if (lowFpsPerformance) {
+    return pick(LOW_FPS_DIALOGUES);
+  }
   if (!recentOneliner || now - recentOneliner.at > RECENT_ONELINER_WINDOW_MS) {
     return pick(IDLE_DIALOGUE_FALLBACKS);
   }
@@ -163,6 +170,11 @@ const IDLE_DIALOGUE_FALLBACKS: string[][] = [
   ["Still flying?", "Always. Confirmasse!"],
   ["Sync pulse stable?", "Stable and shiny."],
   ["Boing break soon?", "After one more lap!"],
+];
+const LOW_FPS_DIALOGUES: string[][] = [
+  ["Yo... this is a SLOW PC with a bad GPU :( :(", "We can hear every dropped frame."],
+  ["Scroller lag detected — bad GPU vibes today. :(", "We'll keep honking through the stutter!"],
+  ["SLOW PC alert! bad GPU mood activated. :( :(", "Still scene forever, even at low FPS."],
 ];
 
 const ONELINER_REACTION_RESPONSES = [
@@ -535,6 +547,7 @@ export const __testing = {
     recentOneliner = null;
     recentOnelinerTrail = [];
     sceneEra = "intro";
+    lowFpsPerformance = false;
     running = false;
     if (schedulerTimer) {
       clearTimeout(schedulerTimer);

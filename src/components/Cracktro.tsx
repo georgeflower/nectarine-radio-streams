@@ -9,7 +9,7 @@ import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl } from "@/l
 import { StageProvider } from "@/lib/stage";
 import { renderBBCode } from "@/lib/bbcode";
 import { getSceneEraConfig, getSceneEraFromListeningMs } from "@/lib/gooseSceneEra";
-import { setGooseSceneEra } from "@/lib/gooseSocial";
+import { setGoosePerformanceState, setGooseSceneEra } from "@/lib/gooseSocial";
 import Flag from "./Flag";
 
 type OnlineUser = { name: string; flag: string };
@@ -53,8 +53,14 @@ const MODES: { id: ScrollMode; label: string }[] = [
 const STORAGE_MODE = "cracktro-scroll-mode";
 const STORAGE_ON = "cracktro-scroll-on";
 const STORAGE_INFOBAR = "cracktro-infobar-on";
+const STORAGE_FPS_COUNTER = "cracktro-fps-counter";
 const STORAGE_SCENE_ERAS = "cracktro-scene-eras";
 const STORAGE_SCENE_ERA_LISTEN_MS = "cracktro-scene-era-listen-ms";
+const MAX_FRAME_TIME_MS = 100;
+const FPS_EMA_ALPHA = 0.1;
+const LOW_FPS_THRESHOLD = 28;
+const LOW_FPS_SUSTAINED_MS = 12_000;
+const FPS_HUD_UPDATE_INTERVAL_MS = 250;
 
 type PanelId = "oneliner" | "online" | "queue" | "history";
 const PANELS: { id: PanelId; label: string }[] = [
@@ -136,6 +142,18 @@ const Cracktro = ({
       /* ignore */
     }
   }, [infobarOn]);
+  const [fpsCounterOn, setFpsCounterOn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(STORAGE_FPS_COUNTER) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_FPS_COUNTER, fpsCounterOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [fpsCounterOn]);
+  const [fps, setFps] = useState<number | null>(null);
+  const [lowFpsDetected, setLowFpsDetected] = useState(false);
   const [panelsOn, setPanelsOn] = useState<Record<PanelId, boolean>>(() => {
     const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: true, history: false };
     try {
@@ -272,14 +290,13 @@ const Cracktro = ({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const text = useMemo(
-    () =>
-      `   NOW SPINNING:  ${(artist || "UNKNOWN ARTIST").toUpperCase()}  ---  ${(title || "UNKNOWN TUNE").toUpperCase()}` +
-      `${platform ? `   ON  ${platform.toUpperCase()}` : ""}` +
-      `${rating !== undefined ? `   ★ ${rating.toFixed(2)}` : ""}` +
-      `   ***   STAY TUNED TO NECTARINE DEMOSCENE RADIO   ***   GREETZ TO ALL THE SCENERS OUT THERE   ***   `,
-    [artist, title, platform, rating],
-  );
+  const text = useMemo(() => (
+    `   NOW SPINNING:  ${(artist || "UNKNOWN ARTIST").toUpperCase()}  ---  ${(title || "UNKNOWN TUNE").toUpperCase()}` +
+    `${platform ? `   ON  ${platform.toUpperCase()}` : ""}` +
+    `${rating !== undefined ? `   ★ ${rating.toFixed(2)}` : ""}` +
+    `${lowFpsDetected ? "   ***   BIRDS SAY: SLOW PC + BAD GPU :( :(   ***" : ""}` +
+    `   ***   STAY TUNED TO NECTARINE DEMOSCENE RADIO   ***   GREETZ TO ALL THE SCENERS OUT THERE   ***   `
+  ), [artist, title, platform, rating, lowFpsDetected]);
 
   type Skin = "default" | "amiga" | "atari" | "c64" | "xm";
   const autoSkin = useMemo<Skin>(() => {
@@ -424,6 +441,15 @@ const Cracktro = ({
     setGooseSceneEra(sceneEra);
     return () => setGooseSceneEra("intro");
   }, [sceneEra]);
+  useEffect(() => {
+    setGoosePerformanceState({ lowFps: lowFpsDetected });
+    return () => setGoosePerformanceState({ lowFps: false });
+  }, [lowFpsDetected]);
+  useEffect(() => {
+    if (scrollOn) return;
+    setFps(null);
+    setLowFpsDetected(false);
+  }, [scrollOn]);
   const effectiveStyle = useMemo<VisualizerStyle>(() => {
     if (style !== "off") return style;
     if (sceneEra === "warmed") return "starfield";
@@ -480,6 +506,10 @@ const Cracktro = ({
 
     let offset = 0;
     let t = 0;
+    let lastFrameAt = performance.now();
+    let fpsEma = 60;
+    let lowFpsMs = 0;
+    let lastHudUpdateAt = 0;
     let raf = 0;
 
     const drawBackdrop = (w: number, h: number) => {
@@ -562,7 +592,21 @@ const Cracktro = ({
       octx.globalCompositeOperation = "source-over";
     };
 
-    const tick = () => {
+    const tick = (now: number) => {
+      const dtMs = Math.min(MAX_FRAME_TIME_MS, Math.max(1, now - lastFrameAt));
+      lastFrameAt = now;
+      const frameScale = dtMs / (1000 / 60);
+      const instFps = 1000 / dtMs;
+      fpsEma += (instFps - fpsEma) * FPS_EMA_ALPHA;
+      if (fpsEma < LOW_FPS_THRESHOLD) lowFpsMs += dtMs;
+      else lowFpsMs = Math.max(0, lowFpsMs - dtMs * 2);
+      const lowFps = lowFpsMs >= LOW_FPS_SUSTAINED_MS;
+      if (now - lastHudUpdateAt > FPS_HUD_UPDATE_INTERVAL_MS) {
+        setFps(Math.round(fpsEma));
+        setLowFpsDetected((prev) => (prev === lowFps ? prev : lowFps));
+        lastHudUpdateAt = now;
+      }
+
       ctx.font = fontStr;
       ctx.textBaseline = "middle";
       const w = canvas.width;
@@ -671,8 +715,8 @@ const Cracktro = ({
         x += cw;
       }
 
-      offset += 3 * dpr * sceneEraConfig.scrollerSpeed;
-      t += 0.05;
+      offset += 3 * dpr * sceneEraConfig.scrollerSpeed * frameScale;
+      t += 0.05 * frameScale;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -702,16 +746,17 @@ const Cracktro = ({
           aria-label="Exit Cracktro"
           title="Exit Cracktro"
         >
-          ✕ EXIT
-        </button>
-        {sceneErasOn && (
-          <div
-            className="absolute top-2 left-24 z-10 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground"
-            aria-label={`Scene Era: ${sceneEraConfig.label}`}
-          >
-            Era: {sceneEraConfig.label}
-          </div>
-        )}
+          Era: {sceneEraConfig.label}
+        </div>
+      )}
+      {fpsCounterOn && (
+        <div
+          className="absolute top-2 right-24 z-10 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground"
+          aria-live="polite"
+        >
+          FPS: {fps ?? "--"}{lowFpsDetected ? " · SLOW GPU" : ""}
+        </div>
+      )}
 
         {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
         {scrollOn && (
@@ -924,7 +969,20 @@ const Cracktro = ({
           >
             ▲
           </button>
-        )}
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">FPS</span>
+          <button
+            type="button"
+            onClick={() => setFpsCounterOn((v) => !v)}
+            className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              fpsCounterOn
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-pressed={fpsCounterOn}
+            aria-label="Toggle FPS counter"
+          >
+            {fpsCounterOn ? "ON" : "OFF"}
+          </button>
 
         {/* Bottom controls bar — opened only by explicit click. */}
         <div
