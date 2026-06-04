@@ -132,8 +132,10 @@ const Cracktro = ({
   }, [panelsOn]);
   const togglePanel = (id: PanelId) => setPanelsOn((p) => ({ ...p, [id]: !p[id] }));
 
-  // Auto-hide UI (exit + controls) after 5s of no pointer activity.
-  const [showControls, setShowControls] = useState(true);
+  // Auto-hide hint chrome after inactivity. Settings stay collapsed until
+  // explicitly expanded.
+  const [showControls, setShowControls] = useState(false);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const hideTimerRef = useRef<number | null>(null);
   useEffect(() => {
     const reveal = () => {
@@ -141,7 +143,6 @@ const Cracktro = ({
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
       hideTimerRef.current = window.setTimeout(() => setShowControls(false), 5000);
     };
-    reveal();
     window.addEventListener("mousemove", reveal);
     window.addEventListener("touchstart", reveal, { passive: true });
     window.addEventListener("keydown", reveal);
@@ -819,14 +820,39 @@ const Cracktro = ({
         </button>
       )}
 
-      {/* Bottom controls bar — scroller toggle + scroller mode + visualizer effect.
-          Hides after 5s of inactivity; reappears on mousemove/touch/keypress. */}
+      {!settingsExpanded && (
+        <button
+          type="button"
+          onClick={() => setSettingsExpanded(true)}
+          className={`absolute right-3 bottom-3 h-10 w-10 rounded-sm border border-border bg-card/80 backdrop-blur-sm text-foreground text-lg leading-none transition-opacity duration-500 ${
+            showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+          style={{ zIndex: 12 }}
+          aria-label="Expand settings"
+          title="Expand settings"
+        >
+          ▲
+        </button>
+      )}
+
+      {/* Bottom controls bar — opened only by explicit click. */}
       <div
-        className={`absolute left-0 right-0 bottom-0 flex flex-col gap-1.5 px-3 py-2 bg-card/70 border-t border-border backdrop-blur-sm transition-opacity duration-500 ${
-          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+        className={`absolute left-0 right-0 bottom-0 flex flex-col gap-1.5 px-3 py-2 bg-card/70 border-t border-border backdrop-blur-sm transition-opacity duration-300 ${
+          settingsExpanded ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         style={{ zIndex: 11 }}
       >
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={() => setSettingsExpanded(false)}
+            className="min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
+            aria-label="Collapse settings"
+            title="Collapse settings"
+          >
+            ▼
+          </button>
+        </div>
         {/* Row 1: scroller controls */}
         <div className="flex flex-wrap items-center justify-center gap-2">
           <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mr-1">Scroller</span>

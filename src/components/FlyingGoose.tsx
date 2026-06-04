@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { SMILEYS } from "@/lib/smileys";
 import { registerGoose, reactToOnelinerSmiley, type GooseAPI } from "@/lib/gooseSocial";
+import { getEatingLayoutForGoose, getSceneScale } from "@/lib/gooseScene";
 import type { OnelinerEntry } from "@/lib/nectarine";
 import { detectOnelinerReaction } from "@/lib/onelinerReactions";
 
@@ -213,11 +214,14 @@ const PALETTES: Record<GooseVariant, Record<string, string>> = {
 const PIXEL = 3;
 const FRAME_W = 24;
 const FRAME_H = 18;
-const SPRITE_W = FRAME_W * PIXEL;
-const SPRITE_H = FRAME_H * PIXEL;
+const BASE_SPRITE_W = FRAME_W * PIXEL;
+const BASE_SPRITE_H = FRAME_H * PIXEL;
 const STAND_FRAME = 4;
 const STAND_BODY = 5;
 const STAND_HEAD = 6;
+
+const eatingGooseIds = new Set<number>();
+let nextGooseInstanceId = 1;
 
 
 function buildFrameSvgs(variant: GooseVariant = "white"): string[] {
@@ -234,7 +238,7 @@ function buildFrameSvgs(variant: GooseVariant = "white"): string[] {
         );
       }
     });
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${SPRITE_W}" height="${SPRITE_H}" viewBox="0 0 ${SPRITE_W} ${SPRITE_H}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${BASE_SPRITE_W}" height="${BASE_SPRITE_H}" viewBox="0 0 ${BASE_SPRITE_W} ${BASE_SPRITE_H}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
   });
 }
 
@@ -348,6 +352,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
   // Imperative reaction state shared between effects.
   const reactionUntilRef = useRef<number>(0);
   const lastOnelinerKeyRef = useRef<string | null>(null);
+  const gooseInstanceIdRef = useRef<number>(0);
+  if (!gooseInstanceIdRef.current) gooseInstanceIdRef.current = nextGooseInstanceId++;
 
   // React to new oneliner entries.
   useEffect(() => {
@@ -401,24 +407,40 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     const stageH = () => (rootEl ? rootEl.clientHeight : window.innerHeight);
     let w = stageW();
     let h = stageH();
+    let sceneScale = getSceneScale(w, h);
+    const spriteW = () => BASE_SPRITE_W * sceneScale;
+    const spriteH = () => BASE_SPRITE_H * sceneScale;
+    const scale = (value: number) => value * sceneScale;
+    const gooseId = gooseInstanceIdRef.current;
+    const peckPhase = Math.random() * Math.PI * 2;
+    const peckTempo = 0.85 + Math.random() * 0.3;
+    const peckStrength = 0.85 + Math.random() * 0.35;
+
+    const getEatingLayout = () =>
+      getEatingLayoutForGoose(gooseId, [...eatingGooseIds], w, h, sceneScale);
+
+    let carryingFoodBag = false;
     const onResize = () => {
+      const prevW = Math.max(1, w);
+      const prevH = Math.max(1, h);
+      const prevScale = sceneScale;
       w = stageW();
       h = stageH();
+      sceneScale = getSceneScale(w, h);
+      const sx = w / prevW;
+      const sy = h / prevH;
+      const sv = sceneScale / Math.max(prevScale, 0.0001);
+      x *= sx;
+      y *= sy;
+      speed *= sv;
+      targetSpeed *= sv;
     };
-    let ro: ResizeObserver | null = null;
-    if (rootEl) {
-      ro = new ResizeObserver(onResize);
-      ro.observe(rootEl);
-    } else {
-      window.addEventListener("resize", onResize);
-    }
-
     // Flight state
     let x = Math.random() * w;
     let y = h * (0.2 + Math.random() * 0.4);
     let heading = Math.random() * Math.PI * 2;
     let targetHeading = heading;
-    let speed = 110;
+    let speed = scale(110);
     let targetSpeed = speed;
     let frameIdx = 0;
     let frameAccum = 0;
@@ -427,6 +449,14 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let elapsed = 0;
     let last = performance.now();
     let raf = 0;
+
+    let ro: ResizeObserver | null = null;
+    if (rootEl) {
+      ro = new ResizeObserver(onResize);
+      ro.observe(rootEl);
+    } else {
+      window.addEventListener("resize", onResize);
+    }
 
     // Random helpers for landing/perch cadence.
     const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -461,6 +491,15 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     const foodBag = foodBagRef.current;
     const bubble = bubbleRef.current;
     if (!wrap || !img || !imgBody || !imgHead || !foodBag || !bubble) return;
+    const applyScaledStyles = () => {
+      wrap.style.width = `${spriteW()}px`;
+      wrap.style.height = `${spriteH()}px`;
+      imgHead.style.transformOrigin = `${11.5 * PIXEL * sceneScale}px ${10 * PIXEL * sceneScale}px`;
+      foodBag.style.fontSize = `${22 * sceneScale}px`;
+    };
+    applyScaledStyles();
+    onResize();
+    applyScaledStyles();
     img.src = frames[0];
     imgBody.src = frames[STAND_BODY];
     imgHead.src = frames[STAND_HEAD];
@@ -505,39 +544,28 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         }
       },
       setFoodBag: (carrying: boolean) => {
-        foodBag.style.opacity = carrying ? "1" : "0";
+        carryingFoodBag = carrying;
       },
       setSitting: (sitting: boolean) => {
         sittingForMeal = sitting;
         if (sitting) {
-          // Prefer a real perch (window title bar or letter); fall back to a
-          // ground picnic at the screen center if nothing is available.
-          const p = pickPerch();
-          if (p) {
-            perchEl = p.el;
-            perchChar = p.char;
-            perchKind = p.kind;
-            perchOffset = p.offset;
-            mode = "approach";
-            eatingMode = true;
-            chaseTarget = null;
-            img.style.opacity = "1";
-            imgBody.style.opacity = "0";
-            imgHead.style.opacity = "0";
-          } else {
-            eatingMode = true;
-            mode = "ground";
-            perchEl = null;
-            const dir = variant === "white" ? -1 : 1;
-            x = w * 0.5 + dir * 60;
-            y = h - SPRITE_H / 2 - 16;
-            heading = variant === "white" ? 0 : Math.PI;
-            targetHeading = heading;
-            img.style.opacity = "0";
-            imgBody.style.opacity = "1";
-            imgHead.style.opacity = "1";
-          }
+          eatingGooseIds.add(gooseId);
+          eatingMode = true;
+          mode = "ground";
+          perchEl = null;
+          chaseTarget = null;
+          const layout = getEatingLayout();
+          x = layout.x;
+          y = layout.y;
+          heading = layout.heading;
+          targetHeading = heading;
+          speed = 0;
+          targetSpeed = 0;
+          img.style.opacity = "0";
+          imgBody.style.opacity = "1";
+          imgHead.style.opacity = "1";
         } else {
+          eatingGooseIds.delete(gooseId);
           eatingMode = false;
           if (mode === "ground" || mode === "land") takeoff();
         }
@@ -557,7 +585,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         ),
       ).filter((el) => {
         const r = el.getBoundingClientRect();
-        return r.width > 6 && r.height > 6 && r.top > 40 && r.bottom < h - 20;
+        return r.width > scale(6) && r.height > scale(6) && r.top > scale(40) && r.bottom < h - scale(20);
       });
       if (candidates.length === 0) return null;
       const el = candidates[Math.floor(Math.random() * candidates.length)];
@@ -610,7 +638,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       takeoffAt = eatingMode ? Number.POSITIVE_INFINITY : elapsed + sitDuration();
       nextLookAt = elapsed + rand(700, 1600);
       x = cx;
-      y = topY - SPRITE_H + sink + SPRITE_H / 2;
+      y = topY - spriteH() + sink + spriteH() / 2;
     };
 
 
@@ -628,8 +656,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       perchEl = null;
       heading = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
       targetHeading = heading;
-      speed = 180;
-      targetSpeed = 130;
+      speed = scale(180);
+      targetSpeed = scale(130);
       nextPerchAt = elapsed + nextPerchDelay();
       frameIdx = 2;
       img.src = frames[frameIdx];
@@ -646,6 +674,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       last = now;
       const dt = dtMs / 1000;
       elapsed += dtMs;
+      applyScaledStyles();
 
       hideBubbleIfExpired(now);
 
@@ -664,7 +693,29 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       const positionBubble = (cx: number, cy: number) => {
         if (!reactionUntilRef.current) return;
         bubble.style.left = `${cx}px`;
-        bubble.style.top = `${cy - SPRITE_H / 2 - 6}px`;
+        bubble.style.top = `${cy - spriteH() / 2 - scale(6)}px`;
+      };
+
+      const positionFoodBag = () => {
+        if (eatingMode) {
+          const layout = getEatingLayout();
+          foodBag.style.opacity = "1";
+          foodBag.style.left = `${layout.foodX}px`;
+          foodBag.style.top = `${layout.foodY}px`;
+          foodBag.style.transform = "translate(-50%, -50%) rotate(0deg)";
+          return;
+        }
+        if (carryingFoodBag) {
+          const beakOffsetX = spriteW() * 0.34;
+          const beakOffsetY = -spriteH() * 0.12;
+          const facingLeft = Math.cos(heading) < 0;
+          foodBag.style.opacity = "1";
+          foodBag.style.left = `${x + (facingLeft ? -beakOffsetX : beakOffsetX)}px`;
+          foodBag.style.top = `${y + beakOffsetY}px`;
+          foodBag.style.transform = `translate(-50%, -50%) rotate(${facingLeft ? -8 : 8}deg)`;
+          return;
+        }
+        foodBag.style.opacity = "0";
       };
 
       if (mode === "land") {
@@ -685,13 +736,17 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           const neckBob = Math.sin(elapsed / 520) * 0.5;
           const yaw = lookScale * 22; // degrees of head turn
           const lateral = lookScale * 2.5; // px of head sway
-          const tx = cx - SPRITE_W / 2;
-          const ty = topY - SPRITE_H + sink;
+          const tx = cx - spriteW() / 2;
+          const ty = topY - spriteH() + sink;
           // Wrap: position only — no flipping, no rotation. Body stays put.
           wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
           if (eatingMode) {
             // Pecking at the food: rhythmic chew/peck instead of idle look.
-            const chew = Math.sin(elapsed / CHEW_CYCLE_MS) * CHEW_AMPLITUDE;
+            const chew =
+              Math.sin(elapsed / (CHEW_CYCLE_MS * peckTempo) + peckPhase) *
+              CHEW_AMPLITUDE *
+              peckStrength *
+              sceneScale;
             imgHead.style.transform = `translate(0px, ${chew}px) rotate(${chew * CHEW_ROTATION_FACTOR}deg)`;
           } else {
             // Head: rotate + slight translate, pivoting at the neck base.
@@ -699,6 +754,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           }
 
           positionBubble(cx, topY);
+          positionFoodBag();
           if (elapsed >= takeoffAt) takeoff();
           raf = requestAnimationFrame(tick);
           return;
@@ -707,23 +763,36 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
       if (mode === "startle") {
         const shake = Math.sin(elapsed / 35) * 2;
-        const baseX = x - SPRITE_W / 2 + shake;
-        const baseY = y - SPRITE_H / 2;
+        const baseX = x - spriteW() / 2 + shake;
+        const baseY = y - spriteH() / 2;
         wrap.style.transform = `translate3d(${baseX}px, ${baseY}px, 0)`;
         imgHead.style.transform = `scaleX(${lookScale})`;
         positionBubble(x, y);
+        positionFoodBag();
         if (elapsed >= startleEnd) takeoff();
         raf = requestAnimationFrame(tick);
         return;
       }
 
       if (mode === "ground") {
-        const tx = x - SPRITE_W / 2;
-        const ty = h - SPRITE_H - 10;
-        const chew = Math.sin(elapsed / CHEW_CYCLE_MS) * CHEW_AMPLITUDE;
+        if (eatingMode) {
+          const layout = getEatingLayout();
+          x += (layout.x - x) * Math.min(1, dt * 6);
+          y += (layout.y - y) * Math.min(1, dt * 6);
+          heading = layout.heading;
+          targetHeading = heading;
+        }
+        const tx = x - spriteW() / 2;
+        const ty = y - spriteH() / 2;
+        const chew =
+          Math.sin(elapsed / (CHEW_CYCLE_MS * peckTempo) + peckPhase) *
+          CHEW_AMPLITUDE *
+          peckStrength *
+          sceneScale;
         wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
         imgHead.style.transform = `translate(0px, ${chew}px) rotate(${chew * CHEW_ROTATION_FACTOR}deg)`;
         positionBubble(x, y);
+        positionFoodBag();
         raf = requestAnimationFrame(tick);
         return;
       }
@@ -738,7 +807,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           perchKind = p.kind;
           perchOffset = p.offset;
           mode = "approach";
-          targetSpeed = 110; // normal cruise — do NOT sprint to the perch
+          targetSpeed = scale(110); // normal cruise — do NOT sprint to the perch
         } else {
           nextPerchAt = elapsed + rand(4000, 9000);
         }
@@ -751,9 +820,9 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         } else {
           const { cx, topY, sink } = perchTarget();
           const tx = cx;
-          const ty = topY - SPRITE_H + sink + SPRITE_H / 2;
+          const ty = topY - spriteH() + sink + spriteH() / 2;
           targetHeading = Math.atan2(ty - y, tx - x);
-          if (Math.hypot(tx - x, ty - y) < 8) {
+          if (Math.hypot(tx - x, ty - y) < scale(8)) {
             x = tx;
             y = ty;
             mode = "land";
@@ -770,11 +839,11 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           // Beeline off-screen and stay there until the coordinator brings
           // us back. Suppress drift, banking and the inward boundary nudge.
           targetHeading = awayHeading;
-          targetSpeed = 180;
+          targetSpeed = scale(180);
           nextPerchAt = elapsed + 1e9;
         } else if (chaseTarget) {
           targetHeading = Math.atan2(chaseTarget.y - y, chaseTarget.x - x);
-          targetSpeed = 290;
+          targetSpeed = scale(290);
           nextPerchAt = elapsed + 1e9;
 
         } else {
@@ -785,11 +854,11 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           if (elapsed >= nextBankAt) {
             const turn = (Math.PI / 180) * (60 + Math.random() * 80);
             targetHeading += (Math.random() < 0.5 ? -1 : 1) * turn;
-            targetSpeed = 80 + Math.random() * 90;
+            targetSpeed = scale(80 + Math.random() * 90);
             nextBankAt = elapsed + 3500 + Math.random() * 5000;
           }
 
-          const margin = 80;
+          const margin = scale(80);
           if (x < margin || x > w - margin || y < margin || y > h - margin) {
             const cx = w / 2;
             const cy = h / 2;
@@ -806,13 +875,13 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
       speed += (targetSpeed - speed) * Math.min(1, dt * 1.2);
 
-      const bob = Math.sin(elapsed / 380) * 14 * dt;
+      const bob = Math.sin(elapsed / 380) * scale(14) * dt;
       const vx = Math.cos(heading) * speed;
       const vy = Math.sin(heading) * speed + bob * 4;
       x += vx * dt;
       y += vy * dt;
-      x = Math.max(-SPRITE_W, Math.min(w + SPRITE_W, x));
-      y = Math.max(-SPRITE_H, Math.min(h + SPRITE_H, y));
+      x = Math.max(-spriteW(), Math.min(w + spriteW(), x));
+      y = Math.max(-spriteH(), Math.min(h + spriteH(), y));
 
       // Smoother, more even flap cycle. Slight speed influence kept tiny so
       // the loop reads as a steady, natural wingbeat rather than a jitter.
@@ -835,8 +904,9 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       const visualRot = (facingLeft ? -pitch : pitch) + beakTilt;
       const scaleX = facingLeft ? -1 : 1;
 
-      wrap.style.transform = `translate3d(${x - SPRITE_W / 2}px, ${y - SPRITE_H / 2 + headBob}px, 0) rotate(${visualRot}deg) scaleX(${scaleX})`;
+      wrap.style.transform = `translate3d(${x - spriteW() / 2}px, ${y - spriteH() / 2 + headBob}px, 0) rotate(${visualRot}deg) scaleX(${scaleX})`;
       positionBubble(x, y);
+      positionFoodBag();
 
       raf = requestAnimationFrame(tick);
     };
@@ -847,6 +917,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       cancelAnimationFrame(raf);
       if (ro) ro.disconnect();
       else window.removeEventListener("resize", onResize);
+      eatingGooseIds.delete(gooseId);
       unregisterGoose();
     };
   }, [variant]);
@@ -863,8 +934,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           position: "absolute",
           left: 0,
           top: 0,
-          width: SPRITE_W,
-          height: SPRITE_H,
+          width: BASE_SPRITE_W,
+          height: BASE_SPRITE_H,
           willChange: "transform",
           transformOrigin: "center center",
           filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.25))",
@@ -873,8 +944,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         <img
           ref={imgRef}
           alt=""
-          width={SPRITE_W}
-          height={SPRITE_H}
+          width={BASE_SPRITE_W}
+          height={BASE_SPRITE_H}
           style={{
             imageRendering: "pixelated",
             display: "block",
@@ -886,8 +957,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         <img
           ref={imgStandBodyRef}
           alt=""
-          width={SPRITE_W}
-          height={SPRITE_H}
+          width={BASE_SPRITE_W}
+          height={BASE_SPRITE_H}
           style={{
             imageRendering: "pixelated",
             display: "block",
@@ -900,8 +971,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         <img
           ref={imgStandHeadRef}
           alt=""
-          width={SPRITE_W}
-          height={SPRITE_H}
+          width={BASE_SPRITE_W}
+          height={BASE_SPRITE_H}
           style={{
             imageRendering: "pixelated",
             display: "block",
@@ -917,29 +988,24 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
             transition: "opacity 260ms ease-out",
           }}
         />
-        <div
-          ref={foodBagRef}
-          aria-hidden
-          style={{
-            position: "absolute",
-            // Anchor at the beak tip (col 22, row 8) so the goose carries
-            // the sack like a stork delivering a baby.
-            left: `${22 * PIXEL}px`,
-            top: `${10 * PIXEL}px`,
-            fontSize: 22,
-            lineHeight: 1,
-            opacity: 0,
-            transform: "translate(-10%, -10%) rotate(8deg)",
-            transition: "opacity 180ms ease-out",
-            filter: "drop-shadow(1px 1px 0 rgba(0,0,0,0.55))",
-            pointerEvents: "none",
-          }}
-        >
-          🛍️
-        </div>
-
-
-
+      </div>
+      <div
+        ref={foodBagRef}
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          fontSize: 22,
+          lineHeight: 1,
+          opacity: 0,
+          transform: "translate(-50%, -50%) rotate(8deg)",
+          transition: "opacity 180ms ease-out",
+          filter: "drop-shadow(1px 1px 0 rgba(0,0,0,0.55))",
+          pointerEvents: "none",
+        }}
+      >
+        🛍️
       </div>
       {/* Reaction bubble: WHATTA!! / smileys / pixel heart */}
       <div

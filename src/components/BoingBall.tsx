@@ -24,15 +24,60 @@ const BoingBall = () => {
     const stageW = () => (stageEl ? stageEl.clientWidth : window.innerWidth);
     const stageH = () => (stageEl ? stageEl.clientHeight : window.innerHeight);
 
+    const REF_MIN_DIM = 900;
+    const MIN_SCENE_SCALE = 0.55;
+    const MAX_SCENE_SCALE = 1.8;
+    const sceneScaleFor = (width: number, height: number) =>
+      Math.max(MIN_SCENE_SCALE, Math.min(MAX_SCENE_SCALE, Math.min(width, height) / REF_MIN_DIM));
+
+    let stageWidth = stageW();
+    let stageHeight = stageH();
+    let sceneScale = sceneScaleFor(stageWidth, stageHeight);
+
+    // Ball state (in CSS px)
+    const BASE_RADIUS = 63;
+    const BASE_VX = 320;
+    const BASE_GRAVITY = 650;
+    const BASE_GOOSE_COLLISION_PADDING = 30;
+    const BASE_BUMP_VELOCITY_X = 260;
+    const BASE_BUMP_VELOCITY_Y_SCALE = 180;
+    const BASE_BUMP_UPWARD_LIFT = 140;
+    const BASE_FLOOR_PADDING = 8;
+    const BASE_LIVELY_BOUNCE_THRESHOLD = 120;
+    const BASE_LIVELY_BOUNCE_IMPULSE = 900;
+
+    const radius = () => BASE_RADIUS * sceneScale;
+    const gooseCollisionPadding = () => BASE_GOOSE_COLLISION_PADDING * sceneScale;
+    const bumpVelocityX = () => BASE_BUMP_VELOCITY_X * sceneScale;
+    const bumpVelocityYScale = () => BASE_BUMP_VELOCITY_Y_SCALE * sceneScale;
+    const bumpUpwardLift = () => BASE_BUMP_UPWARD_LIFT * sceneScale;
+    const floorY = () => stageHeight - BASE_FLOOR_PADDING * sceneScale;
+
+    let x = stageWidth * 0.3;
+    let y = stageHeight * 0.3;
+    let vx = BASE_VX * sceneScale;
+    let vy = 0;
+
     let dpr = Math.min(window.devicePixelRatio || 1, 2);
     const resize = () => {
+      const prevW = Math.max(1, stageWidth);
+      const prevH = Math.max(1, stageHeight);
+      const prevScale = sceneScale;
       dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = stageW();
-      const h = stageH();
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
+      stageWidth = stageW();
+      stageHeight = stageH();
+      sceneScale = sceneScaleFor(stageWidth, stageHeight);
+      canvas.width = Math.floor(stageWidth * dpr);
+      canvas.height = Math.floor(stageHeight * dpr);
+      canvas.style.width = `${stageWidth}px`;
+      canvas.style.height = `${stageHeight}px`;
+      const sx = stageWidth / prevW;
+      const sy = stageHeight / prevH;
+      const s = sceneScale / Math.max(prevScale, 0.0001);
+      x *= sx;
+      y *= sy;
+      vx *= s;
+      vy *= s;
     };
     resize();
     let ro: ResizeObserver | null = null;
@@ -43,21 +88,11 @@ const BoingBall = () => {
       window.addEventListener("resize", resize);
     }
 
-    // Ball state (in CSS px)
-    const R = () => Math.min(stageW(), stageH()) * 0.07;
-    let x = stageW() * 0.3;
-    let y = stageH() * 0.3;
-    let vx = 320; // px/s
-    let vy = 0;
-    const gravity = 650; // px/s^2 — gentler so it bounces higher
+    const gravity = () => BASE_GRAVITY * sceneScale;
     const bounce = 0.94;
     // Goose sprites are visibly wider than the ball radius, so extend contact
     // distance to keep bumps feeling sprite-to-ball instead of pixel-perfect.
-    const GOOSE_COLLISION_PADDING = 30;
     const BUMP_COOLDOWN_MS = 260;
-    const BUMP_VELOCITY_X = 260;
-    const BUMP_VELOCITY_Y_SCALE = 180;
-    const BUMP_UPWARD_LIFT = 140;
 
     let spin = 0; // rotation around tilted axis (radians)
     let spinDir = 1;
@@ -83,9 +118,9 @@ const BoingBall = () => {
       const ry = r * (1 - squash * 0.28);
 
       // Shadow ellipse on floor
-      const floor = stageH() - 8;
+      const floor = floorY();
       const shadowY = floor;
-      const shadowScale = Math.max(0.35, 1 - (floor - cy) / (stageH() * 0.9));
+      const shadowScale = Math.max(0.35, 1 - (floor - cy) / (stageHeight * 0.9));
       ctx.save();
       ctx.scale(dpr, dpr);
       ctx.fillStyle = "rgba(0,0,0,0.35)";
@@ -168,7 +203,7 @@ const BoingBall = () => {
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
 
-      const r = R();
+      const r = radius();
 
       let squash = 0;
       const directive = getBallPlayDirective();
@@ -176,7 +211,7 @@ const BoingBall = () => {
       // and the geese can actually catch up to it: less gravity, no lively
       // re-bounce boost, and a gentle horizontal friction.
       const playing = !!directive;
-      const effectiveGravity = playing ? 380 : gravity;
+      const effectiveGravity = playing ? gravity() * (380 / BASE_GRAVITY) : gravity();
       vy += effectiveGravity * dt;
       if (playing) {
         vx *= Math.pow(0.55, dt); // ~friction toward 0
@@ -184,20 +219,22 @@ const BoingBall = () => {
       x += vx * dt;
       y += vy * dt;
 
-      const floor = stageH() - 8;
+      const floor = floorY();
       if (x - r < 0) {
         x = r;
         vx = Math.abs(vx);
         spinDir = -1;
-      } else if (x + r > stageW()) {
-        x = stageW() - r;
+      } else if (x + r > stageWidth) {
+        x = stageWidth - r;
         vx = -Math.abs(vx);
         spinDir = 1;
       }
       if (y + r > floor) {
         y = floor - r;
         vy = -Math.abs(vy) * bounce;
-        if (!playing && Math.abs(vy) < 120) vy = -900; // keep it lively outside play
+        if (!playing && Math.abs(vy) < BASE_LIVELY_BOUNCE_THRESHOLD * sceneScale) {
+          vy = -BASE_LIVELY_BOUNCE_IMPULSE * sceneScale; // keep it lively outside play
+        }
         squash = 0.6;
       }
 
@@ -220,17 +257,17 @@ const BoingBall = () => {
           const dx = x - chaserPos.x;
           const dy = y - chaserPos.y;
           const dist = Math.hypot(dx, dy);
-          const collisionRadius = r + GOOSE_COLLISION_PADDING;
+          const collisionRadius = r + gooseCollisionPadding();
           if (dist <= collisionRadius && now - lastGooseBumpAt > BUMP_COOLDOWN_MS) {
             const tx = directive.bumpToward.x - chaserPos.x;
             const ty = directive.bumpToward.y - chaserPos.y;
             const mag = Math.hypot(tx, ty) || 1;
             const ux = tx / mag;
             const uy = ty / mag;
-            vx = ux * BUMP_VELOCITY_X;
-            vy = uy * BUMP_VELOCITY_Y_SCALE - BUMP_UPWARD_LIFT;
-            x += ux * 5;
-            y += uy * 5;
+            vx = ux * bumpVelocityX();
+            vy = uy * bumpVelocityYScale() - bumpUpwardLift();
+            x += ux * (5 * sceneScale);
+            y += uy * (5 * sceneScale);
             spinDir = ux < 0 ? 1 : -1;
             lastGooseBumpAt = now;
             reportBallBump(directive.chaser);
