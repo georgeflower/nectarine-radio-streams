@@ -43,9 +43,10 @@ const BoingBall = () => {
     // distance to keep bumps feeling sprite-to-ball instead of pixel-perfect.
     const GOOSE_COLLISION_PADDING = 30;
     const BUMP_COOLDOWN_MS = 260;
-    const BUMP_VELOCITY_X = 420;
-    const BUMP_VELOCITY_Y_SCALE = 300;
-    const BUMP_UPWARD_LIFT = 220;
+    const BUMP_VELOCITY_X = 260;
+    const BUMP_VELOCITY_Y_SCALE = 180;
+    const BUMP_UPWARD_LIFT = 140;
+
     let spin = 0; // rotation around tilted axis (radians)
     let spinDir = 1;
     let lastGooseBumpAt = 0;
@@ -158,8 +159,16 @@ const BoingBall = () => {
       const r = R();
 
       let squash = 0;
-      // Physics
-      vy += gravity * dt;
+      const directive = getBallPlayDirective();
+      // While the geese are playing, calm the ball down so it stays nearby
+      // and the geese can actually catch up to it: less gravity, no lively
+      // re-bounce boost, and a gentle horizontal friction.
+      const playing = !!directive;
+      const effectiveGravity = playing ? 380 : gravity;
+      vy += effectiveGravity * dt;
+      if (playing) {
+        vx *= Math.pow(0.55, dt); // ~friction toward 0
+      }
       x += vx * dt;
       y += vy * dt;
 
@@ -176,9 +185,10 @@ const BoingBall = () => {
       if (y + r > floor) {
         y = floor - r;
         vy = -Math.abs(vy) * bounce;
-        if (Math.abs(vy) < 120) vy = -900; // keep it lively, big bounces
+        if (!playing && Math.abs(vy) < 120) vy = -900; // keep it lively outside play
         squash = 0.6;
       }
+
       if (y - r < 0) {
         y = r;
         vy = Math.abs(vy);
@@ -190,8 +200,8 @@ const BoingBall = () => {
       const nearFloor = Math.max(0, 1 - distToFloor / (r * 0.6));
       squash = Math.max(squash, nearFloor * 0.35);
 
-      const directive = getBallPlayDirective();
       if (directive) {
+
         const positions = getGoosePositions();
         const chaserPos = positions?.[directive.chaser];
         if (chaserPos) {

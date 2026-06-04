@@ -442,6 +442,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let awayHeading = 0;
     let chaseTarget: { x: number; y: number } | null = null;
     let sittingForMeal = false;
+    let eatingMode = false; // when true, lands and pecks indefinitely
+
 
     const wrap = wrapRef.current;
     const img = imgRef.current;
@@ -499,19 +501,38 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       setSitting: (sitting: boolean) => {
         sittingForMeal = sitting;
         if (sitting) {
-          mode = "ground";
-          perchEl = null;
-          const dir = variant === "white" ? -1 : 1;
-          x = w * 0.5 + dir * 60;
-          y = h - SPRITE_H / 2 - 16;
-          heading = variant === "white" ? 0 : Math.PI;
-          targetHeading = heading;
-          img.style.opacity = "0";
-          imgBody.style.opacity = "1";
-          imgHead.style.opacity = "1";
-        } else if (mode === "ground") {
-          takeoff();
+          // Prefer a real perch (window title bar or letter); fall back to a
+          // ground picnic at the screen center if nothing is available.
+          const p = pickPerch();
+          if (p) {
+            perchEl = p.el;
+            perchChar = p.char;
+            perchKind = p.kind;
+            perchOffset = p.offset;
+            mode = "approach";
+            eatingMode = true;
+            chaseTarget = null;
+            img.style.opacity = "1";
+            imgBody.style.opacity = "0";
+            imgHead.style.opacity = "0";
+          } else {
+            eatingMode = true;
+            mode = "ground";
+            perchEl = null;
+            const dir = variant === "white" ? -1 : 1;
+            x = w * 0.5 + dir * 60;
+            y = h - SPRITE_H / 2 - 16;
+            heading = variant === "white" ? 0 : Math.PI;
+            targetHeading = heading;
+            img.style.opacity = "0";
+            imgBody.style.opacity = "1";
+            imgHead.style.opacity = "1";
+          }
+        } else {
+          eatingMode = false;
+          if (mode === "ground" || mode === "land") takeoff();
         }
+
       },
     };
     const unregisterGoose = registerGoose(api);
@@ -577,11 +598,12 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       imgBody.style.opacity = "1";
       imgHead.style.opacity = "1";
       img.style.opacity = "0";
-      takeoffAt = elapsed + sitDuration();
+      takeoffAt = eatingMode ? Number.POSITIVE_INFINITY : elapsed + sitDuration();
       nextLookAt = elapsed + rand(700, 1600);
       x = cx;
       y = topY - SPRITE_H + sink + SPRITE_H / 2;
     };
+
 
     const startle = () => {
       mode = "startle";
@@ -658,8 +680,15 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           const ty = topY - SPRITE_H + sink;
           // Wrap: position only — no flipping, no rotation. Body stays put.
           wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
-          // Head: rotate + slight translate, pivoting at the neck base.
-          imgHead.style.transform = `translate(${lateral}px, ${neckBob}px) rotate(${yaw + wiggle}deg)`;
+          if (eatingMode) {
+            // Pecking at the food: rhythmic chew/peck instead of idle look.
+            const chew = Math.sin(elapsed / CHEW_CYCLE_MS) * CHEW_AMPLITUDE;
+            imgHead.style.transform = `translate(0px, ${chew}px) rotate(${chew * CHEW_ROTATION_FACTOR}deg)`;
+          } else {
+            // Head: rotate + slight translate, pivoting at the neck base.
+            imgHead.style.transform = `translate(${lateral}px, ${neckBob}px) rotate(${yaw + wiggle}deg)`;
+          }
+
           positionBubble(cx, topY);
           if (elapsed >= takeoffAt) takeoff();
           raf = requestAnimationFrame(tick);
@@ -736,8 +765,9 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           nextPerchAt = elapsed + 1e9;
         } else if (chaseTarget) {
           targetHeading = Math.atan2(chaseTarget.y - y, chaseTarget.x - x);
-          targetSpeed = 190;
+          targetSpeed = 290;
           nextPerchAt = elapsed + 1e9;
+
         } else {
           if (elapsed >= nextDriftAt) {
             targetHeading += (Math.random() - 0.5) * 0.6;
@@ -762,7 +792,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
       let dh = ((targetHeading - heading + Math.PI) % (Math.PI * 2)) - Math.PI;
       if (dh < -Math.PI) dh += Math.PI * 2;
-      const turnRate = (reducedMotion ? 0.6 : mode === "approach" ? 2.2 : 1.4) * dt;
+      const turnRate = (reducedMotion ? 0.6 : chaseTarget ? 3.2 : mode === "approach" ? 2.2 : 1.4) * dt;
       heading += Math.max(-turnRate, Math.min(turnRate, dh));
 
       speed += (targetSpeed - speed) * Math.min(1, dt * 1.2);
@@ -882,18 +912,22 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           aria-hidden
           style={{
             position: "absolute",
-            left: `${18 * PIXEL}px`,
-            top: `${9 * PIXEL}px`,
-            fontSize: 10,
+            // Anchor at the beak tip (col 22, row 8) so the goose carries
+            // the sack like a stork delivering a baby.
+            left: `${22 * PIXEL}px`,
+            top: `${10 * PIXEL}px`,
+            fontSize: 22,
             lineHeight: 1,
             opacity: 0,
-            transform: "translate(-50%, -50%)",
+            transform: "translate(-10%, -10%) rotate(8deg)",
             transition: "opacity 180ms ease-out",
-            filter: "drop-shadow(1px 1px 0 rgba(0,0,0,0.45))",
+            filter: "drop-shadow(1px 1px 0 rgba(0,0,0,0.55))",
+            pointerEvents: "none",
           }}
         >
-          👜
+          🛍️
         </div>
+
 
 
       </div>

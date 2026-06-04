@@ -264,13 +264,16 @@ async function runFlyAway() {
 
     if (getPair()) {
       for (const g of geese.values()) g.setSitting(true);
-      await wait(700);
-      const rounds = 3 + Math.floor(Math.random() * 2);
-      for (let i = 0; i < rounds; i++) {
+      await wait(1200); // let them fly to a perch and settle
+      const eatStart = Date.now();
+      const MIN_EAT_MS = 20_000;
+      let i = 0;
+      while (Date.now() - eatStart < MIN_EAT_MS) {
         const activePair = getPair();
         if (!activePair) break;
         activePair[i % 2].say(pick(FOOD_EAT_LINES), 2200);
-        await wait(2200);
+        i++;
+        await wait(2400);
       }
       if (getPair()) {
         await wait(700);
@@ -278,6 +281,7 @@ async function runFlyAway() {
         if (pairAfterSnack) pairAfterSnack[0].say(pick(FOOD_RESUME_LINES), 2200);
       }
     }
+
   } finally {
     clearFlyAwayState();
     mood = "idle";
