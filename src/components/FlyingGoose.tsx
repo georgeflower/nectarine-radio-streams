@@ -519,7 +519,8 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     const rand = (a: number, b: number) => a + Math.random() * (b - a);
     const nextPerchDelay = () => rand(8000, 28000); // ms between landings
     const sitDuration = () => rand(5000, 22000); // ms sat on a letter
-    const tiredRestDuration = () => rand(6500, 12000); // ms minimum still rest when exhausted
+    const tiredRestDuration = () => rand(6500, 12000); // ms of still rest when exhausted (randomized)
+    const tiredRecoveryTakeoffDelay = () => rand(2200, 4600); // ms after recovery before taking off
 
     // Perch state
     let mode: Mode = "fly";
@@ -879,7 +880,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           if (restingFromTiredness && gooseIsRecovered(stamina) && elapsed >= tiredRestReleaseAt) {
             restingFromTiredness = false;
             tiredRestReleaseAt = 0;
-            takeoffAt = Math.min(takeoffAt, elapsed + rand(2200, 4600));
+            takeoffAt = Math.min(takeoffAt, elapsed + tiredRecoveryTakeoffDelay());
           }
           if (elapsed >= takeoffAt) takeoff();
           raf = requestAnimationFrame(tick);

@@ -47,6 +47,8 @@ const BoingBall = () => {
     const BASE_FLOOR_PADDING = 8;
     const BASE_LIVELY_BOUNCE_THRESHOLD = 120;
     const BASE_LIVELY_BOUNCE_IMPULSE = 900;
+    const BASE_MIN_APPROACH_PADDING = 6;
+    const APPROACH_PADDING_VELOCITY_FACTOR = 0.14;
 
     const radius = () => BASE_RADIUS * sceneScale;
     const gooseCollisionPadding = () => BASE_GOOSE_COLLISION_PADDING * sceneScale;
@@ -54,6 +56,7 @@ const BoingBall = () => {
     const bumpVelocityYScale = () => BASE_BUMP_VELOCITY_Y_SCALE * sceneScale;
     const bumpUpwardLift = () => BASE_BUMP_UPWARD_LIFT * sceneScale;
     const floorY = () => stageHeight - BASE_FLOOR_PADDING * sceneScale;
+    const minApproachPadding = () => BASE_MIN_APPROACH_PADDING * sceneScale;
 
     let x = stageWidth * 0.3;
     let y = stageHeight * 0.3;
@@ -260,7 +263,13 @@ const BoingBall = () => {
           const dy = y - chaserPos.y;
           const dist = Math.hypot(dx, dy);
           const collisionRadius = r + gooseCollisionPadding();
-          const approachPadding = Math.max(6 * sceneScale, Math.hypot(vx, vy) * dt * 0.14);
+          // Add a small velocity-based cushion so high-speed visual touches
+          // still register as bumps instead of tunneling (skipping overlap
+          // between frames due to fast movement) through the radius.
+          const approachPadding = Math.max(
+            minApproachPadding(),
+            Math.hypot(vx, vy) * dt * APPROACH_PADDING_VELOCITY_FACTOR,
+          );
           const effectiveCollisionRadius = collisionRadius + approachPadding;
           if (dist <= effectiveCollisionRadius && now - lastGooseBumpAt > BUMP_COOLDOWN_MS) {
             const tx = directive.bumpToward.x - chaserPos.x;
