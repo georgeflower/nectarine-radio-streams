@@ -153,7 +153,13 @@ const Visualizer = ({ analyser, style }: Props) => {
     };
 
     resize();
-    window.addEventListener("resize", resize);
+    let ro: ResizeObserver | null = null;
+    if (stageEl) {
+      ro = new ResizeObserver(resize);
+      ro.observe(stageEl);
+    } else {
+      window.addEventListener("resize", resize);
+    }
 
     starsRef.current = Array.from({ length: STAR_COUNT }, () => ({
       x: (Math.random() - 0.5) * 2000,
