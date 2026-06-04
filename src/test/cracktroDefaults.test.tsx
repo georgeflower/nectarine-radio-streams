@@ -127,4 +127,13 @@ describe("Cracktro defaults and fullscreen behavior", () => {
     expect(screen.getByAltText("FI")).toBeInTheDocument();
     expect(screen.getByAltText("SE")).toBeInTheDocument();
   });
+
+  it("shows persisted scene era badge when scene eras are enabled", async () => {
+    localStorage.setItem("cracktro-scene-eras", "1");
+    localStorage.setItem("cracktro-scene-era-listen-ms", String(200 * 60_000));
+
+    render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
+
+    expect(await screen.findByLabelText("Scene Era: Veteran")).toBeInTheDocument();
+  });
 });
