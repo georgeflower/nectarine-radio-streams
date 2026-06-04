@@ -46,8 +46,10 @@ export function setBallPos(p: { x: number; y: number } | null) {
   ballPos = p;
 }
 
-function buildContextualDialogue(now: number): string[] | null {
-  if (!recentOneliner || now - recentOneliner.at > RECENT_ONELINER_WINDOW_MS) return null;
+function buildContextualDialogue(now: number): string[] {
+  if (!recentOneliner || now - recentOneliner.at > RECENT_ONELINER_WINDOW_MS) {
+    return pick(IDLE_DIALOGUE_FALLBACKS);
+  }
   const user = recentOneliner.username || "someone";
   const triggered = findLearnedTrigger(recentOneliner.text);
   if (triggered) {
@@ -121,7 +123,7 @@ let recentOneliner: { username: string; text: string; at: number } | null = null
 let recentOnelinerTrail: Array<{ username?: string; text: string }> = [];
 const MAX_ONELINER_TRAIL = 14;
 
-// Keep idle chatter tied to very recent chat activity (85s).
+// Prefer chat tied to recent oneliners (85s), then fall back to ambient banter.
 const RECENT_ONELINER_WINDOW_MS = 85_000;
 // Minimum gap between contextual goose dialogues (70s).
 const DIALOGUE_COOLDOWN_MS = 70_000;
@@ -154,6 +156,13 @@ const ONELINER_DIALOGUES: string[][] = [
   ['"{line}"', "That's a keeper, no doubt."],
   ["Scene meter after {user}: 100%", "No notes. Just honks."],
   ["{user} just made the demo gods smile", "Respect and raster love."],
+];
+const IDLE_DIALOGUE_FALLBACKS: string[][] = [
+  ["Signal check?", "Loud and clear. :D"],
+  ["Any fresh modules in the queue?", "Always buffering scene magic."],
+  ["Still flying?", "Always. Confirmasse!"],
+  ["Sync pulse stable?", "Stable and shiny."],
+  ["Boing break soon?", "After one more lap!"],
 ];
 
 const ONELINER_REACTION_RESPONSES = [
@@ -454,7 +463,7 @@ async function step() {
       await runBallPlay();
     } else if (now - lastDialogueAt > getDialogueCooldownMs()) {
       const dialogue = buildContextualDialogue(now);
-      if (dialogue) {
+      if (dialogue.length) {
         lastDialogueAt = now;
         await runDialogue(dialogue);
       }

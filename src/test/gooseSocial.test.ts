@@ -168,12 +168,15 @@ describe("gooseSocial game flows", () => {
     randomSpy.mockRestore();
   });
 
-  it("only builds idle dialogue when a recent oneliner exists", async () => {
+  it("falls back to ambient idle dialogue when no recent oneliner exists", async () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
     const social = await import("@/lib/gooseSocial");
     social.__testing.resetStateForTests();
 
-    expect(social.__testing.buildContextualDialogueForTests(Date.now())).toBeNull();
+    expect(social.__testing.buildContextualDialogueForTests(Date.now())).toEqual([
+      "Signal check?",
+      "Loud and clear. :D",
+    ]);
 
     social.noteRecentOneliner("SceneUser", "Confirmasse forever");
     const dialogue = social.__testing.buildContextualDialogueForTests(Date.now());
