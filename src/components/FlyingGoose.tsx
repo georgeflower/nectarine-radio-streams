@@ -912,18 +912,22 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           aria-hidden
           style={{
             position: "absolute",
-            left: `${18 * PIXEL}px`,
-            top: `${9 * PIXEL}px`,
-            fontSize: 10,
+            // Anchor at the beak tip (col 22, row 8) so the goose carries
+            // the sack like a stork delivering a baby.
+            left: `${22 * PIXEL}px`,
+            top: `${10 * PIXEL}px`,
+            fontSize: 22,
             lineHeight: 1,
             opacity: 0,
-            transform: "translate(-50%, -50%)",
+            transform: "translate(-10%, -10%) rotate(8deg)",
             transition: "opacity 180ms ease-out",
-            filter: "drop-shadow(1px 1px 0 rgba(0,0,0,0.45))",
+            filter: "drop-shadow(1px 1px 0 rgba(0,0,0,0.55))",
+            pointerEvents: "none",
           }}
         >
-          👜
+          🛍️
         </div>
+
 
 
       </div>
