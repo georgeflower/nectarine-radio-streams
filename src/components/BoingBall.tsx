@@ -43,9 +43,10 @@ const BoingBall = () => {
     // distance to keep bumps feeling sprite-to-ball instead of pixel-perfect.
     const GOOSE_COLLISION_PADDING = 30;
     const BUMP_COOLDOWN_MS = 260;
-    const BUMP_VELOCITY_X = 420;
-    const BUMP_VELOCITY_Y_SCALE = 300;
-    const BUMP_UPWARD_LIFT = 220;
+    const BUMP_VELOCITY_X = 260;
+    const BUMP_VELOCITY_Y_SCALE = 180;
+    const BUMP_UPWARD_LIFT = 140;
+
     let spin = 0; // rotation around tilted axis (radians)
     let spinDir = 1;
     let lastGooseBumpAt = 0;
