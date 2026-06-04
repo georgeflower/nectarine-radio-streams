@@ -219,7 +219,7 @@ const Index = () => {
     } catch {
       // ignore
     }
-    return "nostalgia";
+    return "legacy";
   });
 
   const [scanlines, setScanlines] = usePersistedBool(SCANLINES_STORAGE_KEY, false);

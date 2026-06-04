@@ -342,9 +342,10 @@ const Cracktro = ({
 
   const [brownGooseOn, setBrownGooseOn] = useState<boolean>(() => {
     try {
-      return localStorage.getItem("cracktro-goose-brown") === "1";
+      const v = localStorage.getItem("cracktro-goose-brown");
+      return v === null ? true : v === "1";
     } catch {
-      return false;
+      return true;
     }
   });
   useEffect(() => {
