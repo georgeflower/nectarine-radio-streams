@@ -191,9 +191,9 @@ const BoingBall = () => {
         const distToFloor = floor - (y + r);
         const nearFloor = Math.max(0, 1 - distToFloor / (r * 0.6));
         squash = Math.max(squash, nearFloor * 0.35);
-      }
 
-      spin += spinDir * 1.8 * dt;
+        spin += spinDir * 1.8 * dt;
+      }
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBall(x, y, r, squash);
