@@ -489,7 +489,8 @@ const Cracktro = ({
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize);
+      if (ro) ro.disconnect();
+      else window.removeEventListener("resize", resize);
     };
   }, [text, mode, scrollOn, skin]);
 
