@@ -167,4 +167,31 @@ describe("gooseSocial game flows", () => {
     unregBrown();
     randomSpy.mockRestore();
   });
+
+  it("only builds idle dialogue when a recent oneliner exists", async () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+    const social = await import("@/lib/gooseSocial");
+    social.__testing.resetStateForTests();
+
+    expect(social.__testing.buildContextualDialogueForTests(Date.now())).toBeNull();
+
+    social.noteRecentOneliner("SceneUser", "Confirmasse forever");
+    const dialogue = social.__testing.buildContextualDialogueForTests(Date.now());
+    expect(dialogue).not.toBeNull();
+    expect(dialogue?.join(" ")).toContain("SceneUser");
+
+    randomSpy.mockRestore();
+  });
+
+  it("has a large set of oneliner reaction responses", async () => {
+    const social = await import("@/lib/gooseSocial");
+    social.__testing.resetStateForTests();
+
+    const responses = social.__testing.getOnelinerReactionResponsesForTests();
+    expect(responses.length).toBeGreaterThanOrEqual(50);
+    expect(responses).toContain("Confirmasse!");
+    expect(responses).toContain("He-Man!");
+    expect(responses).toContain("glob glob!");
+    expect(responses).toContain("Jogeir is GOD!");
+  });
 });
