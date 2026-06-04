@@ -91,7 +91,7 @@ const Cracktro = ({
     } catch {
       // ignore
     }
-    return "sinus";
+    return "copper";
   });
   const [infobarOn, setInfobarOn] = useState<boolean>(() => {
     try {
