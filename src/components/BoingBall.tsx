@@ -184,13 +184,13 @@ const BoingBall = () => {
       x += vx * dt;
       y += vy * dt;
 
-      const floor = window.innerHeight - 8;
+      const floor = stageH() - 8;
       if (x - r < 0) {
         x = r;
         vx = Math.abs(vx);
         spinDir = -1;
-      } else if (x + r > window.innerWidth) {
-        x = window.innerWidth - r;
+      } else if (x + r > stageW()) {
+        x = stageW() - r;
         vx = -Math.abs(vx);
         spinDir = 1;
       }
