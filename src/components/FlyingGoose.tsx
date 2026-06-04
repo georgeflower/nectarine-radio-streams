@@ -519,6 +519,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     const rand = (a: number, b: number) => a + Math.random() * (b - a);
     const nextPerchDelay = () => rand(8000, 28000); // ms between landings
     const sitDuration = () => rand(5000, 22000); // ms sat on a letter
+    const tiredRestDuration = () => rand(6500, 12000); // ms minimum still rest when exhausted
 
     // Perch state
     let mode: Mode = "fly";
@@ -543,6 +544,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let ballPlayActive = false;
     let stamina = STAMINA_MAX;
     let restingFromTiredness = false;
+    let tiredRestReleaseAt = 0;
     let panicFlightUntil = 0;
     let lastAppliedPanicUntil = 0;
 
@@ -749,6 +751,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       imgHead.style.opacity = "1";
       img.style.opacity = "0";
       takeoffAt = eatingMode || restingFromTiredness ? Number.POSITIVE_INFINITY : elapsed + sitDuration();
+      tiredRestReleaseAt = restingFromTiredness ? elapsed + tiredRestDuration() : 0;
       nextLookAt = elapsed + rand(700, 1600);
       x = cx;
       y = topY + sink - spriteH() / 2;
@@ -767,6 +770,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     const takeoff = () => {
       mode = "fly";
       restingFromTiredness = false;
+      tiredRestReleaseAt = 0;
       perchEl = null;
       heading = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
       targetHeading = heading;
@@ -872,9 +876,10 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
           positionBubble(cx, topY);
           positionFoodBag();
-          if (restingFromTiredness && gooseIsRecovered(stamina)) {
+          if (restingFromTiredness && gooseIsRecovered(stamina) && elapsed >= tiredRestReleaseAt) {
             restingFromTiredness = false;
-            takeoffAt = Math.min(takeoffAt, elapsed + rand(400, 1200));
+            tiredRestReleaseAt = 0;
+            takeoffAt = Math.min(takeoffAt, elapsed + rand(2200, 4600));
           }
           if (elapsed >= takeoffAt) takeoff();
           raf = requestAnimationFrame(tick);
