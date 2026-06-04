@@ -750,6 +750,21 @@ const Cracktro = ({
             {gooseOn ? "ON" : "OFF"}
           </button>
 
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Brown Goose</span>
+          <button
+            type="button"
+            onClick={() => setBrownGooseOn((v) => !v)}
+            className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              brownGooseOn
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-pressed={brownGooseOn}
+            title="Toggle brown flying goose"
+          >
+            {brownGooseOn ? "ON" : "OFF"}
+          </button>
+
           <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Boing</span>
           <button
             type="button"
