@@ -62,11 +62,11 @@ describe("gooseSocial game flows", () => {
     const white = makeGoose("white");
     const brown = makeGoose("brown");
     const unregWhite = social.__testing.registerGooseForTests(white);
-    const unregister = { brown: () => {} };
+    let unregBrown: (() => void) | null = null;
     brown.setSitting = vi.fn((sitting: boolean) => {
-      if (sitting) unregister.brown();
+      if (sitting) unregBrown?.();
     });
-    unregister.brown = social.__testing.registerGooseForTests(brown);
+    unregBrown = social.__testing.registerGooseForTests(brown);
 
     const breakRun = social.__testing.runFlyAway();
     await vi.runAllTimersAsync();
