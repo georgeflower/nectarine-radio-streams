@@ -86,4 +86,45 @@ describe("Cracktro defaults and fullscreen behavior", () => {
 
     await waitFor(() => expect(onExit).toHaveBeenCalledTimes(1));
   });
+
+  it("reveals and hides exit chrome with mouse movement", async () => {
+    render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
+
+    const exitButton = await screen.findByRole("button", { name: "Exit Cracktro" });
+    expect(exitButton.className).toContain("opacity-0");
+
+    fireEvent.mouseMove(window);
+    await waitFor(() => expect(exitButton.className).toContain("opacity-100"));
+  });
+
+  it("renders oneliner BBCode song/artist links and flags", async () => {
+    localStorage.setItem(
+      "cracktro-panels-on",
+      JSON.stringify({ oneliner: true, online: false, queue: false, history: false }),
+    );
+    render(
+      <Cracktro
+        analyser={null}
+        style="off"
+        artist="Skaven"
+        title="Lizardking"
+        onExit={() => undefined}
+        oneliners={[
+          {
+            username: "axis",
+            time: "12:34:56",
+            flag: "fi",
+            text: "[song]123[/song] by [artist]55[/artist] [flag]se[/flag]",
+          },
+        ]}
+      />,
+    );
+
+    const songLink = await screen.findByRole("link", { name: "song #123" });
+    expect(songLink).toHaveAttribute("href", "https://scenestream.net/demovibes/song/123/");
+    const artistLink = screen.getByRole("link", { name: "artist #55" });
+    expect(artistLink).toHaveAttribute("href", "https://scenestream.net/demovibes/artist/55/");
+    expect(screen.getByAltText("FI")).toBeInTheDocument();
+    expect(screen.getByAltText("SE")).toBeInTheDocument();
+  });
 });

@@ -5,9 +5,10 @@ import FloatingWindow from "./FloatingWindow";
 import FlyingGoose from "./FlyingGoose";
 import BoingBall from "./BoingBall";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
-import type { OnelinerEntry, QueueEntry } from "@/lib/nectarine";
-import { renderWithSmileys } from "@/lib/smileys";
+import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl } from "@/lib/nectarine";
 import { StageProvider } from "@/lib/stage";
+import { renderBBCode } from "@/lib/bbcode";
+import Flag from "./Flag";
 
 type OnlineUser = { name: string; flag: string };
 
@@ -549,7 +550,9 @@ const Cracktro = ({
       <button
         type="button"
         onClick={() => onExitRef.current?.()}
-        className="absolute top-2 left-2 z-10 min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className={`absolute top-2 left-2 z-10 min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-opacity duration-500 ${
+          showHintChrome ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
         aria-label="Exit Cracktro"
         title="Exit Cracktro"
       >
@@ -630,10 +633,28 @@ const Cracktro = ({
             <ul className="flex flex-col gap-1.5">
               {oneliners.slice(0, 30).map((o, i) => (
                 <li key={i} className="leading-snug break-words">
-                  <span className="text-muted-foreground text-[10px] mr-1">{o.time}</span>
-                  <span className="font-semibold text-primary">{o.username}</span>
+                  <span className="text-muted-foreground text-[10px] mr-1">
+                    {formatOnelinerTime(o.time)}
+                  </span>
+                  <span className="font-semibold text-primary">
+                    <Flag code={o.flag} />
+                    {(() => {
+                      const href = userUrl(o.username);
+                      if (!href) return o.username;
+                      return (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {o.username}
+                        </a>
+                      );
+                    })()}
+                  </span>
                   <span className="text-muted-foreground">: </span>
-                  <span>{renderWithSmileys(o.text)}</span>
+                  <span>{renderBBCode(o.text)}</span>
                 </li>
               ))}
             </ul>
