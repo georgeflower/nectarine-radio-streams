@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Visualizer, { type VisualizerStyle } from "./Visualizer";
 import BeatOverlay from "./BeatOverlay";
 import FloatingWindow from "./FloatingWindow";
@@ -7,6 +7,7 @@ import BoingBall from "./BoingBall";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 import type { OnelinerEntry, QueueEntry } from "@/lib/nectarine";
 import { renderWithSmileys } from "@/lib/smileys";
+import { StageProvider } from "@/lib/stage";
 
 type OnlineUser = { name: string; flag: string };
 
