@@ -146,7 +146,7 @@ describe("Cracktro defaults and fullscreen behavior", () => {
     expect(fpsToggle).toHaveAttribute("aria-pressed", "false");
 
     fireEvent.click(fpsToggle);
-    expect(fpsToggle).toHaveAttribute("aria-pressed", "true");
-    expect(localStorage.getItem("cracktro-fps-counter")).toBe("1");
+    await waitFor(() => expect(fpsToggle).toHaveAttribute("aria-pressed", "true"));
+    await waitFor(() => expect(localStorage.getItem("cracktro-fps-counter")).toBe("1"));
   });
 });

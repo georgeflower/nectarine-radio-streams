@@ -187,6 +187,7 @@ describe("gooseSocial game flows", () => {
   });
 
   it("switches to low-FPS dialogue when performance is bad", async () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
     const social = await import("@/lib/gooseSocial");
     social.__testing.resetStateForTests();
 
@@ -195,6 +196,7 @@ describe("gooseSocial game flows", () => {
     expect(dialogue[0]).toContain("SLOW PC");
     expect(dialogue[0].toLowerCase()).toContain("bad gpu");
     social.setGoosePerformanceState({ lowFps: false });
+    randomSpy.mockRestore();
   });
 
   it("prioritizes emphatic learned triggers for dialogue", async () => {
