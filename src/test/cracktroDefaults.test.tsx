@@ -136,4 +136,17 @@ describe("Cracktro defaults and fullscreen behavior", () => {
 
     expect(await screen.findByLabelText("Scene Era: Veteran")).toBeInTheDocument();
   });
+
+  it("allows toggling FPS counter from settings and persists it", async () => {
+    render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
+
+    fireEvent.mouseMove(window);
+    fireEvent.click(await screen.findByRole("button", { name: "Expand settings" }));
+    const fpsToggle = await screen.findByRole("button", { name: "Toggle FPS counter" });
+    expect(fpsToggle).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(fpsToggle);
+    expect(fpsToggle).toHaveAttribute("aria-pressed", "true");
+    expect(localStorage.getItem("cracktro-fps-counter")).toBe("1");
+  });
 });
