@@ -93,11 +93,16 @@ const Visualizer = ({ analyser, style }: Props) => {
       ? (new Uint8Array(new ArrayBuffer(analyser.fftSize)) as Uint8Array<ArrayBuffer>)
       : null;
 
+    const stageEl = canvas.parentElement;
+    const stageW = () => (stageEl ? stageEl.clientWidth : window.innerWidth);
+    const stageH = () => (stageEl ? stageEl.clientHeight : window.innerHeight);
     const resize = () => {
-      canvas.width = Math.floor(window.innerWidth * dpr);
-      canvas.height = Math.floor(window.innerHeight * dpr);
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
+      const w = stageW();
+      const h = stageH();
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
     };
 
     const sampleAudio = (): AudioSnapshot => {
@@ -148,7 +153,13 @@ const Visualizer = ({ analyser, style }: Props) => {
     };
 
     resize();
-    window.addEventListener("resize", resize);
+    let ro: ResizeObserver | null = null;
+    if (stageEl) {
+      ro = new ResizeObserver(resize);
+      ro.observe(stageEl);
+    } else {
+      window.addEventListener("resize", resize);
+    }
 
     starsRef.current = Array.from({ length: STAR_COUNT }, () => ({
       x: (Math.random() - 0.5) * 2000,
@@ -529,7 +540,8 @@ const Visualizer = ({ analyser, style }: Props) => {
     }
 
     return () => {
-      window.removeEventListener("resize", resize);
+      if (ro) ro.disconnect();
+      else window.removeEventListener("resize", resize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [analyser, style]);
@@ -538,7 +550,7 @@ const Visualizer = ({ analyser, style }: Props) => {
     <canvas
       ref={canvasRef}
       aria-hidden="true"
-      className="fixed inset-0 pointer-events-none"
+      className="absolute inset-0 pointer-events-none"
       style={{ zIndex: 0 }}
     />
   );

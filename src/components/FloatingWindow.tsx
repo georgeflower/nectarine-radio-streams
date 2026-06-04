@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useStageSize } from "@/lib/stage";
 
 type Props = {
   id: string;
@@ -36,19 +37,16 @@ const FloatingWindow = ({ id, title, defaultX, defaultY, defaultW = 280, default
     return { x: defaultX, y: defaultY, w: defaultW, h: defaultH };
   });
 
-  // Clamp on mount + window resize so panels never sit off-screen.
+  const stage = useStageSize();
+
+  // Clamp on mount + stage resize so panels never sit off-screen.
   useEffect(() => {
-    const clampToViewport = () => {
-      setPos((p) => ({
-        ...p,
-        x: clamp(p.x, 0, Math.max(0, window.innerWidth - p.w)),
-        y: clamp(p.y, 0, Math.max(0, window.innerHeight - 40)),
-      }));
-    };
-    clampToViewport();
-    window.addEventListener("resize", clampToViewport);
-    return () => window.removeEventListener("resize", clampToViewport);
-  }, []);
+    setPos((p) => ({
+      ...p,
+      x: clamp(p.x, 0, Math.max(0, stage.width - p.w)),
+      y: clamp(p.y, 0, Math.max(0, stage.height - 40)),
+    }));
+  }, [stage.width, stage.height]);
 
   useEffect(() => {
     try {
@@ -68,10 +66,10 @@ const FloatingWindow = ({ id, title, defaultX, defaultY, defaultW = 280, default
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragRef.current) return;
     const { ox, oy, px, py } = dragRef.current;
-    const nx = clamp(px + (e.clientX - ox), 0, Math.max(0, window.innerWidth - pos.w));
-    const ny = clamp(py + (e.clientY - oy), 0, Math.max(0, window.innerHeight - 40));
+    const nx = clamp(px + (e.clientX - ox), 0, Math.max(0, stage.width - pos.w));
+    const ny = clamp(py + (e.clientY - oy), 0, Math.max(0, stage.height - 40));
     setPos((p) => ({ ...p, x: nx, y: ny }));
-  }, [pos.w]);
+  }, [pos.w, stage.width, stage.height]);
 
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }

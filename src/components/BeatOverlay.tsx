@@ -21,7 +21,7 @@ const BeatOverlay = ({ analyser, enabled = true }: Props) => {
   return (
     <div
       aria-hidden="true"
-      className="fixed inset-0 pointer-events-none"
+      className="absolute inset-0 pointer-events-none"
       style={{ zIndex: 2 }}
     >
       {/* edge flash vignette */}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Visualizer, { type VisualizerStyle } from "./Visualizer";
 import BeatOverlay from "./BeatOverlay";
 import FloatingWindow from "./FloatingWindow";
@@ -7,6 +7,7 @@ import BoingBall from "./BoingBall";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 import type { OnelinerEntry, QueueEntry } from "@/lib/nectarine";
 import { renderWithSmileys } from "@/lib/smileys";
+import { StageProvider } from "@/lib/stage";
 
 type OnlineUser = { name: string; flag: string };
 
@@ -71,6 +72,11 @@ const Cracktro = ({
 }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
+  const setWrap = useCallback((el: HTMLDivElement | null) => {
+    wrapRef.current = el;
+    setStageEl(el);
+  }, []);
   const onExitRef = useRef(onExit);
   useEffect(() => {
     onExitRef.current = onExit;
@@ -90,7 +96,7 @@ const Cracktro = ({
     } catch {
       // ignore
     }
-    return "sinus";
+    return "copper";
   });
   const [infobarOn, setInfobarOn] = useState<boolean>(() => {
     try {
@@ -160,7 +166,33 @@ const Cracktro = ({
   const rating = typeof info?.rating === "number" ? info.rating : undefined;
   const votes = info?.votes;
 
-  // Request browser fullscreen.
+  // Windowed-mode state. When true, cracktro lives inside a draggable +
+  // resizable window instead of taking over the viewport. Exiting browser
+  // fullscreen drops us here instead of closing the cracktro entirely.
+  const [windowed, setWindowed] = useState(false);
+  const [winRect, setWinRect] = useState<{ x: number; y: number; w: number; h: number }>(() => {
+    const W = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const H = typeof window !== "undefined" ? window.innerHeight : 720;
+    const w = Math.min(900, Math.max(480, Math.floor(W * 0.7)));
+    const h = Math.min(600, Math.max(360, Math.floor(H * 0.7)));
+    return { x: Math.floor((W - w) / 2), y: Math.floor((H - h) / 2), w, h };
+  });
+
+  const enterFullscreen = useCallback(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const req = (el as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+    }).requestFullscreen ?? (el as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+    }).webkitRequestFullscreen;
+    Promise.resolve(req?.call(el))
+      .then(() => { setWindowed(false); })
+      .catch(() => { /* ignore */ });
+  }, []);
+
+  // Auto-request fullscreen on mount; if it fails or the user exits, we drop
+  // into windowed mode rather than closing.
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -169,13 +201,16 @@ const Cracktro = ({
     }).requestFullscreen ?? (el as HTMLElement & {
       webkitRequestFullscreen?: () => Promise<void>;
     }).webkitRequestFullscreen;
-    let entered = false;
     Promise.resolve(req?.call(el))
-      .then(() => { entered = !!document.fullscreenElement; })
-      .catch(() => { /* ignore */ });
+      .then(() => { /* entered */ })
+      .catch(() => { setWindowed(true); });
 
     const onFsChange = () => {
-      if (entered && !document.fullscreenElement) onExitRef.current();
+      if (!document.fullscreenElement) {
+        setWindowed(true);
+      } else {
+        setWindowed(false);
+      }
     };
     document.addEventListener("fullscreenchange", onFsChange);
     return () => {
@@ -186,13 +221,52 @@ const Cracktro = ({
     };
   }, []);
 
-  // Esc handler.
+  // Esc only acts when not in browser fullscreen (the browser handles that
+  // case itself). In windowed mode we keep the cracktro alive — closing
+  // requires the explicit Close button.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onExitRef.current();
+      if (e.key !== "Escape") return;
+      if (document.fullscreenElement) return; // browser will exit; onFsChange handles it
+      // In windowed mode, do nothing — Close button is the explicit exit.
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Track live window size from CSS resize handle into state so children reflow.
+  useEffect(() => {
+    if (!windowed) return;
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setWinRect((r) => {
+        const w = el.offsetWidth;
+        const h = el.offsetHeight;
+        if (w === r.w && h === r.h) return r;
+        return { ...r, w, h };
+      });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [windowed]);
+
+  // Drag the window by its title bar.
+  const dragRef = useRef<{ ox: number; oy: number; px: number; py: number } | null>(null);
+  const onTitleDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { ox: e.clientX, oy: e.clientY, px: winRect.x, py: winRect.y };
+  }, [winRect.x, winRect.y]);
+  const onTitleMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    const { ox, oy, px, py } = dragRef.current;
+    const nx = Math.max(0, Math.min(window.innerWidth - 80, px + (e.clientX - ox)));
+    const ny = Math.max(0, Math.min(window.innerHeight - 24, py + (e.clientY - oy)));
+    setWinRect((r) => ({ ...r, x: nx, y: ny }));
+  }, []);
+  const onTitleUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    dragRef.current = null;
   }, []);
 
   const text = useMemo(() => (
@@ -215,7 +289,7 @@ const Cracktro = ({
       const v = localStorage.getItem("cracktro-skin-override") as Skin | "auto" | null;
       if (v && ["auto", "default", "amiga", "atari", "c64", "xm"].includes(v)) return v;
     } catch { /* ignore */ }
-    return "auto";
+    return "xm";
   });
   useEffect(() => {
     try { localStorage.setItem("cracktro-skin-override", skinOverride); } catch { /* ignore */ }
@@ -257,14 +331,23 @@ const Cracktro = ({
     // Tall enough that wave displacement + glyph + shadow blur never clips.
     const CSS_H = 360;
 
+    const stageEl = canvas.parentElement;
+    const stageW = () => (stageEl ? stageEl.clientWidth : window.innerWidth);
     const resize = () => {
-      canvas.width = Math.floor(window.innerWidth * dpr);
+      const w = stageW();
+      canvas.width = Math.floor(w * dpr);
       canvas.height = Math.floor(CSS_H * dpr);
-      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.width = `${w}px`;
       canvas.style.height = `${CSS_H}px`;
     };
     resize();
-    window.addEventListener("resize", resize);
+    let ro: ResizeObserver | null = null;
+    if (stageEl) {
+      ro = new ResizeObserver(resize);
+      ro.observe(stageEl);
+    } else {
+      window.addEventListener("resize", resize);
+    }
 
     const fontSize = 64 * dpr;
     const fontStr = skin === "xm"
@@ -479,18 +562,73 @@ const Cracktro = ({
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize);
+      if (ro) ro.disconnect();
+      else window.removeEventListener("resize", resize);
     };
   }, [text, mode, scrollOn, skin]);
 
 
   const scrollerBottomOffset = 40; // px, leaves room for the controls bar
 
+  const wrapStyle: React.CSSProperties = windowed
+    ? {
+        position: "fixed",
+        left: winRect.x,
+        top: winRect.y,
+        width: winRect.w,
+        height: winRect.h,
+        resize: "both",
+        overflow: "hidden",
+        border: "1px solid hsl(var(--border))",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+        minWidth: 360,
+        minHeight: 240,
+      }
+    : {};
+
   return (
     <div
-      ref={wrapRef}
-      className="fixed inset-0 z-[9999] bg-background overflow-hidden"
+      ref={setWrap}
+      className={
+        windowed
+          ? "z-[9999] bg-background"
+          : "fixed inset-0 z-[9999] bg-background overflow-hidden"
+      }
+      style={wrapStyle}
     >
+      {windowed && (
+        <div
+          className="absolute top-0 left-0 right-0 h-6 bg-card/90 border-b border-border flex items-center justify-between px-2 cursor-move select-none touch-none"
+          style={{ zIndex: 20 }}
+          onPointerDown={onTitleDown}
+          onPointerMove={onTitleMove}
+          onPointerUp={onTitleUp}
+          onPointerCancel={onTitleUp}
+        >
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground truncate">
+            Cracktro — Windowed
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={enterFullscreen}
+              className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-sm border border-border bg-background/60 hover:bg-background"
+              aria-label="Enter fullscreen"
+            >
+              ⤢
+            </button>
+            <button
+              type="button"
+              onClick={onExit}
+              className="text-[10px] px-2 py-0.5 rounded-sm border border-border bg-background/60 hover:bg-background"
+              aria-label="Close cracktro"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+      <StageProvider element={stageEl}>
       <Visualizer analyser={analyser} style={style === "off" ? "tunnel" : style} />
       <BeatOverlay analyser={analyser} enabled />
       {gooseOn && <FlyingGoose oneliners={oneliners} />}
@@ -658,18 +796,28 @@ const Cracktro = ({
       )}
 
 
-      {/* Top-right exit — auto-hides with the controls. */}
-      <button
-        type="button"
-        onClick={onExit}
-        className={`absolute top-4 right-4 min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/80 text-foreground hover:bg-card hover:opacity-90 touch-manipulation transition-opacity duration-500 ${
-          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-        style={{ zIndex: 10 }}
-        aria-label="Exit fullscreen cracktro"
-      >
-        Exit ✕
-      </button>
+      {/* Top-right exit — only shown in fullscreen; sends us to windowed mode.
+          In windowed mode the title bar provides the close + fullscreen buttons. */}
+      {!windowed && (
+        <button
+          type="button"
+          onClick={() => {
+            if (document.fullscreenElement) {
+              document.exitFullscreen?.().catch(() => undefined);
+            } else {
+              setWindowed(true);
+            }
+          }}
+          className={`absolute top-4 right-4 min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/80 text-foreground hover:bg-card hover:opacity-90 touch-manipulation transition-opacity duration-500 ${
+            showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+          style={{ zIndex: 10 }}
+          aria-label="Exit fullscreen to window"
+          title="Exit fullscreen (continues in a window)"
+        >
+          Window ⤓
+        </button>
+      )}
 
       {/* Bottom controls bar — scroller toggle + scroller mode + visualizer effect.
           Hides after 5s of inactivity; reappears on mousemove/touch/keypress. */}
@@ -823,12 +971,10 @@ const Cracktro = ({
                 </button>
               ))}
             </div>
-            <span className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground ml-2">
-              ESC to exit
-            </span>
           </div>
         )}
       </div>
+      </StageProvider>
     </div>
   );
 };
