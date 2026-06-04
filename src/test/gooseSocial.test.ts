@@ -252,7 +252,9 @@ describe("gooseSocial game flows", () => {
 
     expect(dialogues.length).toBeGreaterThanOrEqual(100);
     expect(new Set(normalizedPrompts).size).toBe(dialogues.length);
-    expect(dialogues.filter(([prompt]) => prompt.toLowerCase().includes("scrolltext"))).toHaveLength(1);
+    expect(dialogues.filter(([prompt]) => prompt === "Got scrolltext?")).toHaveLength(1);
+    expect(dialogues).toContainEqual(["Got scrolltext?", "Got infinite scrolltext."]);
     expect(dialogues.filter(([prompt]) => prompt === "Compo goose?")).toHaveLength(1);
+    expect(dialogues).toContainEqual(["Compo goose?", "Honks in victory."]);
   });
 });
