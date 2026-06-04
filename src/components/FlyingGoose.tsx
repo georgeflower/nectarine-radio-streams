@@ -396,13 +396,22 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-    let w = window.innerWidth;
-    let h = window.innerHeight;
+    const rootEl = wrapRef.current?.parentElement ?? null;
+    const stageW = () => (rootEl ? rootEl.clientWidth : window.innerWidth);
+    const stageH = () => (rootEl ? rootEl.clientHeight : window.innerHeight);
+    let w = stageW();
+    let h = stageH();
     const onResize = () => {
-      w = window.innerWidth;
-      h = window.innerHeight;
+      w = stageW();
+      h = stageH();
     };
-    window.addEventListener("resize", onResize);
+    let ro: ResizeObserver | null = null;
+    if (rootEl) {
+      ro = new ResizeObserver(onResize);
+      ro.observe(rootEl);
+    } else {
+      window.addEventListener("resize", onResize);
+    }
 
     // Flight state
     let x = Math.random() * w;
