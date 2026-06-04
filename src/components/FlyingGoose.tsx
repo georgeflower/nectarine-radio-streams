@@ -326,7 +326,7 @@ const HEART_SVG = (() => {
   return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
 })();
 
-type Mode = "fly" | "approach" | "land" | "startle";
+type Mode = "fly" | "approach" | "land" | "startle" | "ground";
 
 type Props = {
   oneliners?: OnelinerEntry[];
@@ -338,6 +338,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
   const imgRef = useRef<HTMLImageElement | null>(null);
   const imgStandBodyRef = useRef<HTMLImageElement | null>(null);
   const imgStandHeadRef = useRef<HTMLImageElement | null>(null);
+  const foodBagRef = useRef<HTMLDivElement | null>(null);
 
   const bubbleRef = useRef<HTMLDivElement | null>(null);
 
@@ -436,13 +437,16 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     // Away-mode (fly off-screen) state, driven by the social coordinator.
     let away = false;
     let awayHeading = 0;
+    let chaseTarget: { x: number; y: number } | null = null;
+    let sittingForMeal = false;
 
     const wrap = wrapRef.current;
     const img = imgRef.current;
     const imgBody = imgStandBodyRef.current;
     const imgHead = imgStandHeadRef.current;
+    const foodBag = foodBagRef.current;
     const bubble = bubbleRef.current;
-    if (!wrap || !img || !imgBody || !imgHead || !bubble) return;
+    if (!wrap || !img || !imgBody || !imgHead || !foodBag || !bubble) return;
     img.src = frames[0];
     imgBody.src = frames[STAND_BODY];
     imgHead.src = frames[STAND_HEAD];
@@ -474,6 +478,36 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
             imgBody.style.opacity = "0";
             imgHead.style.opacity = "0";
           }
+        }
+      },
+      setChaseTarget: (target: { x: number; y: number } | null) => {
+        chaseTarget = target;
+        if (target && !away && !sittingForMeal) {
+          mode = "fly";
+          perchEl = null;
+          img.style.opacity = "1";
+          imgBody.style.opacity = "0";
+          imgHead.style.opacity = "0";
+        }
+      },
+      setFoodBag: (carrying: boolean) => {
+        foodBag.style.opacity = carrying ? "1" : "0";
+      },
+      setSitting: (sitting: boolean) => {
+        sittingForMeal = sitting;
+        if (sitting) {
+          mode = "ground";
+          perchEl = null;
+          const dir = variant === "white" ? -1 : 1;
+          x = w * 0.5 + dir * 60;
+          y = h - SPRITE_H / 2 - 16;
+          heading = variant === "white" ? 0 : Math.PI;
+          targetHeading = heading;
+          img.style.opacity = "0";
+          imgBody.style.opacity = "1";
+          imgHead.style.opacity = "1";
+        } else if (mode === "ground") {
+          takeoff();
         }
       },
     };
@@ -642,6 +676,17 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         return;
       }
 
+      if (mode === "ground") {
+        const tx = x - SPRITE_W / 2;
+        const ty = h - SPRITE_H - 10;
+        const chew = Math.sin(elapsed / 180) * 1.2;
+        wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
+        imgHead.style.transform = `translate(0px, ${chew}px) rotate(${chew * 2.4}deg)`;
+        positionBubble(x, y);
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+
 
       // ===== FLY / APPROACH =====
       if (mode === "fly" && !away && elapsed >= nextPerchAt) {
@@ -685,6 +730,10 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           // us back. Suppress drift, banking and the inward boundary nudge.
           targetHeading = awayHeading;
           targetSpeed = 180;
+          nextPerchAt = elapsed + 1e9;
+        } else if (chaseTarget) {
+          targetHeading = Math.atan2(chaseTarget.y - y, chaseTarget.x - x);
+          targetSpeed = 190;
           nextPerchAt = elapsed + 1e9;
         } else {
           if (elapsed >= nextDriftAt) {
@@ -825,6 +874,23 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
             transition: "opacity 260ms ease-out",
           }}
         />
+        <div
+          ref={foodBagRef}
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: `${18 * PIXEL}px`,
+            top: `${9 * PIXEL}px`,
+            fontSize: 10,
+            lineHeight: 1,
+            opacity: 0,
+            transform: "translate(-50%, -50%)",
+            transition: "opacity 180ms ease-out",
+            filter: "drop-shadow(1px 1px 0 rgba(0,0,0,0.45))",
+          }}
+        >
+          👜
+        </div>
 
 
       </div>
