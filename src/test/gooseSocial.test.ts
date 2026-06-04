@@ -186,6 +186,46 @@ describe("gooseSocial game flows", () => {
     randomSpy.mockRestore();
   });
 
+  it("weights less-used dialogue entries higher", async () => {
+    const randomSpy = vi.spyOn(Math, "random")
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.5);
+    const social = await import("@/lib/gooseSocial");
+    social.__testing.resetStateForTests();
+
+    expect(social.__testing.pickUsageTrackedForTests("weighted-dialogue", ["first", "second"])).toBe("first");
+    expect(social.__testing.pickUsageTrackedForTests("weighted-dialogue", ["first", "second"])).toBe("second");
+
+    randomSpy.mockRestore();
+  });
+
+  it("resets ball-play cooldown from the end of a play session", async () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.9);
+    const social = await import("@/lib/gooseSocial");
+    social.__testing.resetStateForTests();
+
+    const white = makeGoose("white");
+    const brown = makeGoose("brown");
+    const unregWhite = social.__testing.registerGooseForTests(white);
+    const unregBrown = social.__testing.registerGooseForTests(brown);
+    social.setBallPos({ x: 300, y: 220 });
+
+    const startedAt = Date.now();
+    const stepping = social.__testing.stepForTests();
+    await vi.runAllTimersAsync();
+    await stepping;
+
+    const cooledAt = social.__testing.getLastBallPlayAtForTests();
+    const cooldownMs = social.__testing.getBallPlayCooldownMsForTests();
+    expect(cooledAt).toBeGreaterThan(startedAt);
+    expect(social.__testing.canStartBallPlayForTests(cooledAt + cooldownMs - 1)).toBe(false);
+    expect(social.__testing.canStartBallPlayForTests(cooledAt + cooldownMs)).toBe(true);
+
+    unregWhite();
+    unregBrown();
+    randomSpy.mockRestore();
+  });
+
   it("switches to low-FPS dialogue when performance is bad", async () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
     const social = await import("@/lib/gooseSocial");

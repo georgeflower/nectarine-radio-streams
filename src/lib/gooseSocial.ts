@@ -53,10 +53,10 @@ export function setGoosePerformanceState(next: { lowFps: boolean }) {
 
 function buildContextualDialogue(now: number): string[] {
   if (lowFpsPerformance) {
-    return pick(LOW_FPS_DIALOGUES);
+    return pickUsageTracked("low-fps-dialogues", LOW_FPS_DIALOGUES);
   }
   if (!recentOneliner || now - recentOneliner.at > RECENT_ONELINER_WINDOW_MS) {
-    return pick(IDLE_DIALOGUE_FALLBACKS);
+    return pickUsageTracked("idle-dialogues", IDLE_DIALOGUE_FALLBACKS);
   }
   const user = recentOneliner.username || "someone";
   const triggered = findLearnedTrigger(recentOneliner.text);
@@ -66,13 +66,13 @@ function buildContextualDialogue(now: number): string[] {
   const mood = applyEraMood(deriveOnelinerMood(recentOnelinerTrail), sceneEra);
   const lexiconLine = buildBirdUtterance({ mood, maxLen: 34 });
   if (lexiconLine) {
-    return [`${user} vibe: ${lexiconLine}`, pick(LEXICON_DIALOGUE_LINES)];
+    return [`${user} vibe: ${lexiconLine}`, pickUsageTracked("lexicon-dialogue-lines", LEXICON_DIALOGUE_LINES)];
   }
   // Keep learned whole-phrase replay as a fallback after lexicon synthesis.
   const learned = pickLearnedPhrase();
   if (learned) return [`${user} just unlocked: "${learned}"`, "Chatline certified. Confirmasse!"];
   const line = recentOneliner.text.length > 56 ? `${recentOneliner.text.slice(0, 53)}...` : recentOneliner.text;
-  return pick(ONELINER_DIALOGUES).map((entry) =>
+  return pickUsageTracked("oneliner-dialogues", ONELINER_DIALOGUES).map((entry) =>
     entry.replaceAll("{user}", user).replaceAll("{line}", line),
   );
 }
@@ -129,12 +129,14 @@ let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
 let recentOneliner: { username: string; text: string; at: number } | null = null;
 let recentOnelinerTrail: Array<{ username?: string; text: string }> = [];
+const dialogueUsage = new Map<string, number[]>();
 const MAX_ONELINER_TRAIL = 14;
 
 // Prefer chat tied to recent oneliners (85s), then fall back to ambient banter.
 const RECENT_ONELINER_WINDOW_MS = 85_000;
 // Minimum gap between contextual goose dialogues (70s).
 const DIALOGUE_COOLDOWN_MS = 70_000;
+const BALL_PLAY_COOLDOWN_MS = 180_000;
 const DIALOGUE_COOLDOWN_BY_ERA: Record<GooseSceneEra, number> = {
   intro: DIALOGUE_COOLDOWN_MS,
   // Gradual cooldown reduction (~11-34%) so later eras feel livelier without spam.
@@ -279,11 +281,36 @@ const FOOD_RESUME_LINES = ["Alright, back to the ball!", "Round two, let's bump!
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
+function pickUsageTracked<T>(bucket: string, arr: readonly T[]): T {
+  const counts = dialogueUsage.get(bucket);
+  const nextCounts = counts && counts.length === arr.length
+    ? counts
+    : Array.from({ length: arr.length }, () => 0);
+  dialogueUsage.set(bucket, nextCounts);
+
+  const maxCount = nextCounts.reduce((highest, count) => Math.max(highest, count), 0);
+  const weights = nextCounts.map((count) => maxCount + 1 - count);
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  let threshold = Math.random() * totalWeight;
+  let selectedIndex = weights.length - 1;
+  for (let i = 0; i < weights.length; i++) {
+    threshold -= weights[i];
+    if (threshold <= 0) {
+      selectedIndex = i;
+      break;
+    }
+  }
+  nextCounts[selectedIndex] += 1;
+  return arr[selectedIndex];
+}
 function applyEraMood(mood: LexiconMood, era: GooseSceneEra): LexiconMood {
   return ERA_MOOD_OVERRIDES[era]?.[mood] ?? mood;
 }
 function getDialogueCooldownMs() {
   return DIALOGUE_COOLDOWN_BY_ERA[sceneEra] ?? DIALOGUE_COOLDOWN_MS;
+}
+function canStartBallPlay(now: number) {
+  return ballPos !== null && now - lastBallPlayAt >= BALL_PLAY_COOLDOWN_MS;
 }
 function wait(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
@@ -465,9 +492,12 @@ async function step() {
     if (now - lastFlyAwayAt > 240_000 && Math.random() < 0.25) {
       lastFlyAwayAt = now;
       await runFlyAway();
-    } else if (ballPos && now - lastBallPlayAt > 180_000) {
-      lastBallPlayAt = now;
-      await runBallPlay();
+    } else if (canStartBallPlay(now)) {
+      try {
+        await runBallPlay();
+      } finally {
+        lastBallPlayAt = Date.now();
+      }
     } else if (now - lastDialogueAt > getDialogueCooldownMs()) {
       const dialogue = buildContextualDialogue(now);
       if (dialogue.length) {
@@ -541,6 +571,7 @@ export const __testing = {
     lastBumpEvent = null;
     recentOneliner = null;
     recentOnelinerTrail = [];
+    dialogueUsage.clear();
     sceneEra = "intro";
     lowFpsPerformance = false;
     running = false;
@@ -550,5 +581,13 @@ export const __testing = {
     }
   },
   buildContextualDialogueForTests: buildContextualDialogue,
+  canStartBallPlayForTests: canStartBallPlay,
+  getBallPlayCooldownMsForTests: () => BALL_PLAY_COOLDOWN_MS,
+  getLastBallPlayAtForTests: () => lastBallPlayAt,
   getOnelinerReactionResponsesForTests: () => [...ONELINER_REACTION_RESPONSES],
+  pickUsageTrackedForTests: <T,>(bucket: string, options: readonly T[]) => pickUsageTracked(bucket, options),
+  setLastBallPlayAtForTests: (at: number) => {
+    lastBallPlayAt = at;
+  },
+  stepForTests: step,
 };
