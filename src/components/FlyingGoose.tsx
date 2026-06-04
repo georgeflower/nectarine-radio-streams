@@ -233,6 +233,8 @@ const NECK_PIVOT_X_PX = 11.5 * PIXEL;
 const NECK_PIVOT_Y_PX = 10 * PIXEL;
 const BEAK_OFFSET_X_RATIO = 0.34;
 const BEAK_OFFSET_Y_RATIO = -0.12;
+const LETTER_PERCH_SINK = 10;
+const WINDOW_PERCH_SINK = 2;
 
 const eatingGooseIds = new Set<number>();
 let nextGooseInstanceId = 1;
@@ -444,8 +446,24 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       const sx = w / prevW;
       const sy = h / prevH;
       const sv = sceneScale / Math.max(prevScale, 0.0001);
-      x *= sx;
-      y *= sy;
+      const perched = mode === "land" || mode === "startle";
+      const perchAlive =
+        perchEl &&
+        perchEl.isConnected &&
+        (perchKind === "letter"
+          ? (perchEl.getAttribute("data-goose-letter") || "") === perchChar &&
+            perchEl.textContent === perchChar
+          : perchEl.hasAttribute("data-goose-perch"));
+      if (perched && perchAlive) {
+        const r = perchEl.getBoundingClientRect();
+        const cx = r.left + r.width * perchOffset;
+        const sink = perchKind === "letter" ? LETTER_PERCH_SINK : WINDOW_PERCH_SINK;
+        x = cx;
+        y = r.top + sink - spriteH() / 2;
+      } else {
+        x *= sx;
+        y *= sy;
+      }
       speed *= sv;
       targetSpeed *= sv;
     };
@@ -636,10 +654,10 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       const cx = r.left + r.width * perchOffset;
       if (perchKind === "letter") {
         // Letter rect top sits above the visible cap because of line-height.
-        return { cx, topY: r.top, sink: 10 };
+        return { cx, topY: r.top, sink: LETTER_PERCH_SINK };
       }
       // Window title bar — feet rest right on the top edge.
-      return { cx, topY: r.top, sink: 2 };
+      return { cx, topY: r.top, sink: WINDOW_PERCH_SINK };
     };
 
     const showStartleBubble = () => {
@@ -668,7 +686,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       takeoffAt = eatingMode || restingFromTiredness ? Number.POSITIVE_INFINITY : elapsed + sitDuration();
       nextLookAt = elapsed + rand(700, 1600);
       x = cx;
-      y = topY - spriteH() + sink + spriteH() / 2;
+      y = topY + sink - spriteH() / 2;
     };
 
 
