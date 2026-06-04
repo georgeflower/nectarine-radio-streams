@@ -540,7 +540,8 @@ const Visualizer = ({ analyser, style }: Props) => {
     }
 
     return () => {
-      window.removeEventListener("resize", resize);
+      if (ro) ro.disconnect();
+      else window.removeEventListener("resize", resize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [analyser, style]);
@@ -549,7 +550,7 @@ const Visualizer = ({ analyser, style }: Props) => {
     <canvas
       ref={canvasRef}
       aria-hidden="true"
-      className="fixed inset-0 pointer-events-none"
+      className="absolute inset-0 pointer-events-none"
       style={{ zIndex: 0 }}
     />
   );
