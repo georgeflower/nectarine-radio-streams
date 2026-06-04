@@ -285,14 +285,14 @@ function pickUsageTracked<T>(bucket: string, arr: readonly T[]): T {
   const counts = dialogueUsage.get(bucket);
   const nextCounts = counts && counts.length === arr.length
     ? counts
-    : Array.from({ length: arr.length }, (_, index) => counts?.[index] ?? 0);
+    : Array.from({ length: arr.length }, () => 0);
   dialogueUsage.set(bucket, nextCounts);
 
   const maxCount = nextCounts.reduce((highest, count) => Math.max(highest, count), 0);
   const weights = nextCounts.map((count) => maxCount + 1 - count);
   const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
   let threshold = Math.random() * totalWeight;
-  let selectedIndex = 0;
+  let selectedIndex = weights.length - 1;
   for (let i = 0; i < weights.length; i++) {
     threshold -= weights[i];
     if (threshold < 0) {
@@ -310,7 +310,7 @@ function getDialogueCooldownMs() {
   return DIALOGUE_COOLDOWN_BY_ERA[sceneEra] ?? DIALOGUE_COOLDOWN_MS;
 }
 function canStartBallPlay(now: number) {
-  return !!ballPos && now - lastBallPlayAt >= BALL_PLAY_COOLDOWN_MS;
+  return ballPos !== null && now - lastBallPlayAt >= BALL_PLAY_COOLDOWN_MS;
 }
 function wait(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
