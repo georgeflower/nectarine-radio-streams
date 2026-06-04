@@ -570,11 +570,65 @@ const Cracktro = ({
 
   const scrollerBottomOffset = 40; // px, leaves room for the controls bar
 
+  const wrapStyle: React.CSSProperties = windowed
+    ? {
+        position: "fixed",
+        left: winRect.x,
+        top: winRect.y,
+        width: winRect.w,
+        height: winRect.h,
+        resize: "both",
+        overflow: "hidden",
+        border: "1px solid hsl(var(--border))",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+        minWidth: 360,
+        minHeight: 240,
+      }
+    : {};
+
   return (
     <div
-      ref={wrapRef}
-      className="fixed inset-0 z-[9999] bg-background overflow-hidden"
+      ref={setWrap}
+      className={
+        windowed
+          ? "z-[9999] bg-background"
+          : "fixed inset-0 z-[9999] bg-background overflow-hidden"
+      }
+      style={wrapStyle}
     >
+      {windowed && (
+        <div
+          className="absolute top-0 left-0 right-0 h-6 bg-card/90 border-b border-border flex items-center justify-between px-2 cursor-move select-none touch-none"
+          style={{ zIndex: 20 }}
+          onPointerDown={onTitleDown}
+          onPointerMove={onTitleMove}
+          onPointerUp={onTitleUp}
+          onPointerCancel={onTitleUp}
+        >
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground truncate">
+            Cracktro — Windowed
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={enterFullscreen}
+              className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-sm border border-border bg-background/60 hover:bg-background"
+              aria-label="Enter fullscreen"
+            >
+              ⤢
+            </button>
+            <button
+              type="button"
+              onClick={onExit}
+              className="text-[10px] px-2 py-0.5 rounded-sm border border-border bg-background/60 hover:bg-background"
+              aria-label="Close cracktro"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+      <StageProvider element={stageEl}>
       <Visualizer analyser={analyser} style={style === "off" ? "tunnel" : style} />
       <BeatOverlay analyser={analyser} enabled />
       {gooseOn && <FlyingGoose oneliners={oneliners} />}
