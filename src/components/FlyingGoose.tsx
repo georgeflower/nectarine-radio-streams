@@ -219,6 +219,10 @@ const BASE_SPRITE_H = FRAME_H * PIXEL;
 const STAND_FRAME = 4;
 const STAND_BODY = 5;
 const STAND_HEAD = 6;
+const NECK_PIVOT_X_PX = 11.5 * PIXEL;
+const NECK_PIVOT_Y_PX = 10 * PIXEL;
+const BEAK_OFFSET_X_RATIO = 0.34;
+const BEAK_OFFSET_Y_RATIO = -0.12;
 
 const eatingGooseIds = new Set<number>();
 let nextGooseInstanceId = 1;
@@ -353,7 +357,6 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
   const reactionUntilRef = useRef<number>(0);
   const lastOnelinerKeyRef = useRef<string | null>(null);
   const gooseInstanceIdRef = useRef<number>(0);
-  if (!gooseInstanceIdRef.current) gooseInstanceIdRef.current = nextGooseInstanceId++;
 
   // React to new oneliner entries.
   useEffect(() => {
@@ -401,6 +404,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     const reducedMotion =
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!gooseInstanceIdRef.current) gooseInstanceIdRef.current = nextGooseInstanceId++;
 
     const rootEl = wrapRef.current?.parentElement ?? null;
     const stageW = () => (rootEl ? rootEl.clientWidth : window.innerWidth);
@@ -494,10 +498,9 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     const applyScaledStyles = () => {
       wrap.style.width = `${spriteW()}px`;
       wrap.style.height = `${spriteH()}px`;
-      imgHead.style.transformOrigin = `${11.5 * PIXEL * sceneScale}px ${10 * PIXEL * sceneScale}px`;
+      imgHead.style.transformOrigin = `${NECK_PIVOT_X_PX * sceneScale}px ${NECK_PIVOT_Y_PX * sceneScale}px`;
       foodBag.style.fontSize = `${22 * sceneScale}px`;
     };
-    applyScaledStyles();
     onResize();
     applyScaledStyles();
     img.src = frames[0];
@@ -585,7 +588,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         ),
       ).filter((el) => {
         const r = el.getBoundingClientRect();
-        return r.width > scale(6) && r.height > scale(6) && r.top > scale(40) && r.bottom < h - scale(20);
+        return r.width > 6 && r.height > 6 && r.top > 40 && r.bottom < h - 20;
       });
       if (candidates.length === 0) return null;
       const el = candidates[Math.floor(Math.random() * candidates.length)];
@@ -697,25 +700,22 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       };
 
       const positionFoodBag = () => {
+        foodBag.style.opacity = eatingMode || carryingFoodBag ? "1" : "0";
         if (eatingMode) {
           const layout = getEatingLayout();
-          foodBag.style.opacity = "1";
           foodBag.style.left = `${layout.foodX}px`;
           foodBag.style.top = `${layout.foodY}px`;
           foodBag.style.transform = "translate(-50%, -50%) rotate(0deg)";
           return;
         }
         if (carryingFoodBag) {
-          const beakOffsetX = spriteW() * 0.34;
-          const beakOffsetY = -spriteH() * 0.12;
+          const beakOffsetX = spriteW() * BEAK_OFFSET_X_RATIO;
+          const beakOffsetY = spriteH() * BEAK_OFFSET_Y_RATIO;
           const facingLeft = Math.cos(heading) < 0;
-          foodBag.style.opacity = "1";
           foodBag.style.left = `${x + (facingLeft ? -beakOffsetX : beakOffsetX)}px`;
           foodBag.style.top = `${y + beakOffsetY}px`;
           foodBag.style.transform = `translate(-50%, -50%) rotate(${facingLeft ? -8 : 8}deg)`;
-          return;
         }
-        foodBag.style.opacity = "0";
       };
 
       if (mode === "land") {

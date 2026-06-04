@@ -13,7 +13,7 @@ export const getEatingLayoutForGoose = (
   sceneScale: number,
 ) => {
   const sortedIds = [...allEatingGooseIds].sort((a, b) => a - b);
-  const count = Math.max(1, sortedIds.length || 1);
+  const count = Math.max(1, sortedIds.length);
   const index = Math.max(0, sortedIds.indexOf(gooseId));
   const foodX = stageWidth * 0.5;
   const foodY = stageHeight - 28 * sceneScale;

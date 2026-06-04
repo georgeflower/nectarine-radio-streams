@@ -38,6 +38,8 @@ const BoingBall = () => {
     const BASE_RADIUS = 63;
     const BASE_VX = 320;
     const BASE_GRAVITY = 650;
+    const BASE_PLAY_GRAVITY = 380;
+    const PLAY_GRAVITY_RATIO = BASE_PLAY_GRAVITY / BASE_GRAVITY;
     const BASE_GOOSE_COLLISION_PADDING = 30;
     const BASE_BUMP_VELOCITY_X = 260;
     const BASE_BUMP_VELOCITY_Y_SCALE = 180;
@@ -211,7 +213,7 @@ const BoingBall = () => {
       // and the geese can actually catch up to it: less gravity, no lively
       // re-bounce boost, and a gentle horizontal friction.
       const playing = !!directive;
-      const effectiveGravity = playing ? gravity() * (380 / BASE_GRAVITY) : gravity();
+      const effectiveGravity = playing ? gravity() * PLAY_GRAVITY_RATIO : gravity();
       vy += effectiveGravity * dt;
       if (playing) {
         vx *= Math.pow(0.55, dt); // ~friction toward 0

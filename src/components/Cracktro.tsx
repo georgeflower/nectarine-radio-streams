@@ -134,14 +134,18 @@ const Cracktro = ({
 
   // Auto-hide hint chrome after inactivity. Settings stay collapsed until
   // explicitly expanded.
-  const [showControls, setShowControls] = useState(false);
+  const [showHintChrome, setShowHintChrome] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
   const hideTimerRef = useRef<number | null>(null);
+  const lastRevealAtRef = useRef(0);
   useEffect(() => {
     const reveal = () => {
-      setShowControls(true);
+      const now = performance.now();
+      if (now - lastRevealAtRef.current < 120) return;
+      lastRevealAtRef.current = now;
+      setShowHintChrome(true);
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = window.setTimeout(() => setShowControls(false), 5000);
+      hideTimerRef.current = window.setTimeout(() => setShowHintChrome(false), 5000);
     };
     window.addEventListener("mousemove", reveal);
     window.addEventListener("touchstart", reveal, { passive: true });
@@ -810,7 +814,7 @@ const Cracktro = ({
             }
           }}
           className={`absolute top-4 right-4 min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/80 text-foreground hover:bg-card hover:opacity-90 touch-manipulation transition-opacity duration-500 ${
-            showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+            showHintChrome ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
           style={{ zIndex: 10 }}
           aria-label="Exit fullscreen to window"
@@ -825,7 +829,7 @@ const Cracktro = ({
           type="button"
           onClick={() => setSettingsExpanded(true)}
           className={`absolute right-3 bottom-3 h-10 w-10 rounded-sm border border-border bg-card/80 backdrop-blur-sm text-foreground text-lg leading-none transition-opacity duration-500 ${
-            showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+            showHintChrome ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
           style={{ zIndex: 12 }}
           aria-label="Expand settings"
