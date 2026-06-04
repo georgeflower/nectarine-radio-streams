@@ -736,8 +736,9 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           nextPerchAt = elapsed + 1e9;
         } else if (chaseTarget) {
           targetHeading = Math.atan2(chaseTarget.y - y, chaseTarget.x - x);
-          targetSpeed = 190;
+          targetSpeed = 290;
           nextPerchAt = elapsed + 1e9;
+
         } else {
           if (elapsed >= nextDriftAt) {
             targetHeading += (Math.random() - 0.5) * 0.6;
