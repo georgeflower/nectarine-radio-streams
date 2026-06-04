@@ -184,14 +184,28 @@ const FRAMES: string[][] = [
 
 
 
-const COLORS: Record<string, string> = {
-  K: "#1a1a1a",
-  W: "#ffffff",
-  L: "#e8eaee",
-  G: "#b8bcc2",
-  O: "#ff8a1f",
-  D: "#c95a00",
-  E: "#1a1a1a",
+type GooseVariant = "white" | "brown";
+
+const PALETTES: Record<GooseVariant, Record<string, string>> = {
+  white: {
+    K: "#1a1a1a",
+    W: "#ffffff",
+    L: "#e8eaee",
+    G: "#b8bcc2",
+    O: "#ff8a1f",
+    D: "#c95a00",
+    E: "#1a1a1a",
+  },
+  // Warm brown goose: chocolate outline, tan body, cream belly, yellow beak.
+  brown: {
+    K: "#2a1a0d",
+    W: "#8a5a32",
+    L: "#e6cfa8",
+    G: "#5a3a1f",
+    O: "#f2c542",
+    D: "#a07020",
+    E: "#0d0703",
+  },
 };
 
 const PIXEL = 3;
@@ -204,13 +218,14 @@ const STAND_BODY = 5;
 const STAND_HEAD = 6;
 
 
-function buildFrameSvgs(): string[] {
+function buildFrameSvgs(variant: GooseVariant = "white"): string[] {
+  const colors = PALETTES[variant];
   return FRAMES.map((rows) => {
     const rects: string[] = [];
     rows.forEach((row, y) => {
       for (let x = 0; x < row.length; x++) {
         const c = row[x];
-        const color = COLORS[c];
+        const color = colors[c];
         if (!color) continue;
         rects.push(
           `<rect x="${x * PIXEL}" y="${y * PIXEL}" width="${PIXEL}" height="${PIXEL}" fill="${color}"/>`,
@@ -276,9 +291,10 @@ type Mode = "fly" | "approach" | "land" | "startle";
 
 type Props = {
   oneliners?: OnelinerEntry[];
+  variant?: GooseVariant;
 };
 
-const FlyingGoose = ({ oneliners = [] }: Props) => {
+const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const imgStandBodyRef = useRef<HTMLImageElement | null>(null);
@@ -326,7 +342,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
   }, [oneliners]);
 
   useEffect(() => {
-    const frames = buildFrameSvgs().map(
+    const frames = buildFrameSvgs(variant).map(
       (svg) => "data:image/svg+xml;utf8," + encodeURIComponent(svg),
     );
 
@@ -654,7 +670,7 @@ const FlyingGoose = ({ oneliners = [] }: Props) => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
     };
-  }, []);
+  }, [variant]);
 
   return (
     <div

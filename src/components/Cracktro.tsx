@@ -229,6 +229,13 @@ const Cracktro = ({
     try { localStorage.setItem("cracktro-goose", gooseOn ? "1" : "0"); } catch { /* ignore */ }
   }, [gooseOn]);
 
+  const [brownGooseOn, setBrownGooseOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("cracktro-goose-brown") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("cracktro-goose-brown", brownGooseOn ? "1" : "0"); } catch { /* ignore */ }
+  }, [brownGooseOn]);
+
   const [boingOn, setBoingOn] = useState<boolean>(() => {
     try { return localStorage.getItem("cracktro-boing") === "1"; } catch { return false; }
   });
@@ -487,6 +494,7 @@ const Cracktro = ({
       <Visualizer analyser={analyser} style={style === "off" ? "tunnel" : style} />
       <BeatOverlay analyser={analyser} enabled />
       {gooseOn && <FlyingGoose oneliners={oneliners} />}
+      {brownGooseOn && <FlyingGoose oneliners={oneliners} variant="brown" />}
       {boingOn && <BoingBall />}
 
       {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
@@ -740,6 +748,21 @@ const Cracktro = ({
             title="Toggle flying goose"
           >
             {gooseOn ? "ON" : "OFF"}
+          </button>
+
+          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Brown Goose</span>
+          <button
+            type="button"
+            onClick={() => setBrownGooseOn((v) => !v)}
+            className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              brownGooseOn
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-pressed={brownGooseOn}
+            title="Toggle brown flying goose"
+          >
+            {brownGooseOn ? "ON" : "OFF"}
           </button>
 
           <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Boing</span>
