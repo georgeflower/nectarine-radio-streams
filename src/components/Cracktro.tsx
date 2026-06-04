@@ -166,7 +166,33 @@ const Cracktro = ({
   const rating = typeof info?.rating === "number" ? info.rating : undefined;
   const votes = info?.votes;
 
-  // Request browser fullscreen.
+  // Windowed-mode state. When true, cracktro lives inside a draggable +
+  // resizable window instead of taking over the viewport. Exiting browser
+  // fullscreen drops us here instead of closing the cracktro entirely.
+  const [windowed, setWindowed] = useState(false);
+  const [winRect, setWinRect] = useState<{ x: number; y: number; w: number; h: number }>(() => {
+    const W = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const H = typeof window !== "undefined" ? window.innerHeight : 720;
+    const w = Math.min(900, Math.max(480, Math.floor(W * 0.7)));
+    const h = Math.min(600, Math.max(360, Math.floor(H * 0.7)));
+    return { x: Math.floor((W - w) / 2), y: Math.floor((H - h) / 2), w, h };
+  });
+
+  const enterFullscreen = useCallback(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const req = (el as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+    }).requestFullscreen ?? (el as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+    }).webkitRequestFullscreen;
+    Promise.resolve(req?.call(el))
+      .then(() => { setWindowed(false); })
+      .catch(() => { /* ignore */ });
+  }, []);
+
+  // Auto-request fullscreen on mount; if it fails or the user exits, we drop
+  // into windowed mode rather than closing.
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -175,13 +201,16 @@ const Cracktro = ({
     }).requestFullscreen ?? (el as HTMLElement & {
       webkitRequestFullscreen?: () => Promise<void>;
     }).webkitRequestFullscreen;
-    let entered = false;
     Promise.resolve(req?.call(el))
-      .then(() => { entered = !!document.fullscreenElement; })
-      .catch(() => { /* ignore */ });
+      .then(() => { /* entered */ })
+      .catch(() => { setWindowed(true); });
 
     const onFsChange = () => {
-      if (entered && !document.fullscreenElement) onExitRef.current();
+      if (!document.fullscreenElement) {
+        setWindowed(true);
+      } else {
+        setWindowed(false);
+      }
     };
     document.addEventListener("fullscreenchange", onFsChange);
     return () => {
@@ -192,13 +221,52 @@ const Cracktro = ({
     };
   }, []);
 
-  // Esc handler.
+  // Esc only acts when not in browser fullscreen (the browser handles that
+  // case itself). In windowed mode we keep the cracktro alive — closing
+  // requires the explicit Close button.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onExitRef.current();
+      if (e.key !== "Escape") return;
+      if (document.fullscreenElement) return; // browser will exit; onFsChange handles it
+      // In windowed mode, do nothing — Close button is the explicit exit.
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Track live window size from CSS resize handle into state so children reflow.
+  useEffect(() => {
+    if (!windowed) return;
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setWinRect((r) => {
+        const w = el.offsetWidth;
+        const h = el.offsetHeight;
+        if (w === r.w && h === r.h) return r;
+        return { ...r, w, h };
+      });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [windowed]);
+
+  // Drag the window by its title bar.
+  const dragRef = useRef<{ ox: number; oy: number; px: number; py: number } | null>(null);
+  const onTitleDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { ox: e.clientX, oy: e.clientY, px: winRect.x, py: winRect.y };
+  }, [winRect.x, winRect.y]);
+  const onTitleMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    const { ox, oy, px, py } = dragRef.current;
+    const nx = Math.max(0, Math.min(window.innerWidth - 80, px + (e.clientX - ox)));
+    const ny = Math.max(0, Math.min(window.innerHeight - 24, py + (e.clientY - oy)));
+    setWinRect((r) => ({ ...r, x: nx, y: ny }));
+  }, []);
+  const onTitleUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    dragRef.current = null;
   }, []);
 
   const text = useMemo(() => (
