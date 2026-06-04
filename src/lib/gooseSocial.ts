@@ -67,6 +67,9 @@ const PLAY_LINES = [
   "Boing! :D",
   "Incoming!",
 ];
+const HOLD_LINES = ["My turn!", "Ready!", "Here we go!"];
+const RECEIVE_LINES = ["Got it! :D", "Nice one!", "Caught it!"];
+const BALL_PASS_MIN_ARC_HEIGHT = 28;
 
 const LONELY_LINES = [
   "I'm so lonely... :(",
@@ -113,10 +116,11 @@ async function runBallPlay() {
   const pair = getPair();
   if (!pair) return;
   mood = "playing";
-  const animatePass = async (from: GooseAPI, to: GooseAPI, durationMs: number) => {
+  const animateBallPass = async (from: GooseAPI, to: GooseAPI, durationMs: number) => {
     const start = from.getPosition();
     const end = to.getPosition();
-    const lift = Math.max(28, Math.abs(end.x - start.x) * 0.12);
+    // Higher/lower arc based on horizontal throw distance.
+    const lift = Math.max(BALL_PASS_MIN_ARC_HEIGHT, Math.abs(end.x - start.x) * 0.12);
     const startAt = Date.now();
     while (true) {
       const t = Math.min(1, (Date.now() - startAt) / durationMs);
@@ -141,14 +145,14 @@ async function runBallPlay() {
       const receiver = activePair[1 - holderIdx];
 
       setGooseBallPos(holder.getPosition());
-      holder.say(i === 0 ? "My turn!" : pick(["Got it! :D", "My turn!", "Nice one!"]), 900);
+      holder.say(pick(HOLD_LINES), 900);
       await wait(700);
 
       holder.say(pick(PLAY_LINES), 900);
-      const moved = await animatePass(holder, receiver, 850 + Math.random() * 250);
+      const moved = await animateBallPass(holder, receiver, 850 + Math.random() * 250);
       if (!moved) break;
 
-      receiver.say(pick(["Got it! :D", "Nice catch!", "My turn!"]), 900);
+      receiver.say(pick(RECEIVE_LINES), 900);
       holderIdx = 1 - holderIdx;
       await wait(550 + Math.random() * 220);
     }

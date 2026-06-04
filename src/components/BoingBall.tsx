@@ -34,6 +34,10 @@ const BoingBall = () => {
     let vy = 0;
     const gravity = 650; // px/s^2 — gentler so it bounces higher
     const bounce = 0.94;
+    // During goose-controlled passes, rapidly damp idle momentum so physics
+    // resumes smoothly once scripted control ends.
+    const SCRIPTED_VELOCITY_DAMPING = 0.86;
+    const SCRIPTED_SPIN_FACTOR = 0.35;
     let spin = 0; // rotation around tilted axis (radians)
     let spinDir = 1;
 
@@ -150,9 +154,9 @@ const BoingBall = () => {
         const dx = scriptedPos.x - x;
         x = scriptedPos.x;
         y = scriptedPos.y;
-        vx *= 0.86;
-        vy *= 0.86;
-        spin += (dx / Math.max(1, r)) * 0.35;
+        vx *= SCRIPTED_VELOCITY_DAMPING;
+        vy *= SCRIPTED_VELOCITY_DAMPING;
+        spin += (dx / Math.max(1, r)) * SCRIPTED_SPIN_FACTOR;
       } else {
         // Physics
         vy += gravity * dt;
