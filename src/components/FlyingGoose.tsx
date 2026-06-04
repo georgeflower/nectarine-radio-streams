@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { SMILEYS } from "@/lib/smileys";
+import { registerGoose, reactToOnelinerSmiley, type GooseAPI } from "@/lib/gooseSocial";
 import type { OnelinerEntry } from "@/lib/nectarine";
 
 /**
