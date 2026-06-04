@@ -139,6 +139,19 @@ function getPair(): [GooseAPI, GooseAPI] | null {
   return a && b ? [a, b] : null;
 }
 
+function clearBallPlayState() {
+  ballPlayDirective = null;
+  for (const g of geese.values()) g.setChaseTarget(null);
+}
+
+function clearFlyAwayState() {
+  for (const g of geese.values()) {
+    g.setAway(false);
+    g.setFoodBag(false);
+    g.setSitting(false);
+  }
+}
+
 async function runDialogue(lines: string[]) {
   const pair = getPair();
   if (!pair) return;
@@ -191,11 +204,11 @@ async function runBallPlay() {
         }
         await wait(BUMP_CHECK_INTERVAL_MS);
       }
+      clearBallPlayState();
       await wait(550 + Math.random() * 220);
     }
   } finally {
-    ballPlayDirective = null;
-    for (const g of geese.values()) g.setChaseTarget(null);
+    clearBallPlayState();
   }
 
   const pairAfterPlay = getPair();
@@ -226,50 +239,49 @@ async function runFlyAway() {
   const whichIdx = Math.random() < 0.5 ? 0 : 1;
   const leaving = pair[whichIdx];
   const staying = pair[1 - whichIdx];
-  leaving.say(pick(FOOD_FETCH_LINES), 2400);
-  await wait(1400);
-  if (!getPair()) {
-    mood = "idle";
-    return;
-  }
-  leaving.setAway(true);
-  // Lonely partner chatters while the other goose fetches snacks.
-  const lonelyRounds = 4 + Math.floor(Math.random() * 3);
-  for (let i = 0; i < lonelyRounds; i++) {
-    await wait(3500 + Math.random() * 2500);
-    if (!getPair()) break;
-    staying.say(pick(LONELY_LINES), 2400);
-  }
-  await wait(1200);
-  leaving.setAway(false);
-  await wait(320);
-  leaving.setFoodBag(true);
-  await wait(2200);
-  if (getPair()) {
-    leaving.say(pick(FOOD_RETURN_LINES), 2200);
-    await wait(2000);
-    if (getPair()) staying.say("Yum, perfect timing! :D", 2200);
-  }
-
-  if (getPair()) {
-    for (const g of geese.values()) g.setSitting(true);
-    await wait(700);
-    const rounds = 3 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < rounds; i++) {
-      const activePair = getPair();
-      if (!activePair) break;
-      activePair[i % 2].say(pick(FOOD_EAT_LINES), 2200);
-      await wait(2200);
+  try {
+    leaving.say(pick(FOOD_FETCH_LINES), 2400);
+    await wait(1400);
+    if (!getPair()) return;
+    leaving.setAway(true);
+    // Lonely partner chatters while the other goose fetches snacks.
+    const lonelyRounds = 4 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < lonelyRounds; i++) {
+      await wait(3500 + Math.random() * 2500);
+      if (!getPair()) break;
+      staying.say(pick(LONELY_LINES), 2400);
     }
+    await wait(1200);
+    leaving.setAway(false);
+    await wait(320);
+    leaving.setFoodBag(true);
+    await wait(2200);
     if (getPair()) {
-      for (const g of geese.values()) g.setSitting(false);
-      leaving.setFoodBag(false);
-      await wait(700);
-      const pairAfterSnack = getPair();
-      if (pairAfterSnack) pairAfterSnack[0].say(pick(FOOD_RESUME_LINES), 2200);
+      leaving.say(pick(FOOD_RETURN_LINES), 2200);
+      await wait(2000);
+      if (getPair()) staying.say("Yum, perfect timing! :D", 2200);
     }
+
+    if (getPair()) {
+      for (const g of geese.values()) g.setSitting(true);
+      await wait(700);
+      const rounds = 3 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < rounds; i++) {
+        const activePair = getPair();
+        if (!activePair) break;
+        activePair[i % 2].say(pick(FOOD_EAT_LINES), 2200);
+        await wait(2200);
+      }
+      if (getPair()) {
+        await wait(700);
+        const pairAfterSnack = getPair();
+        if (pairAfterSnack) pairAfterSnack[0].say(pick(FOOD_RESUME_LINES), 2200);
+      }
+    }
+  } finally {
+    clearFlyAwayState();
+    mood = "idle";
   }
-  mood = "idle";
 }
 
 async function step() {

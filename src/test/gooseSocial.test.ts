@@ -38,6 +38,9 @@ describe("gooseSocial game flows", () => {
     const directive = social.getBallPlayDirective();
     expect(directive).not.toBeNull();
     if (directive) social.reportBallBump(directive.chaser);
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(social.getBallPlayDirective()).toBeNull();
 
     await vi.runAllTimersAsync();
     await playing;
@@ -48,6 +51,33 @@ describe("gooseSocial game flows", () => {
 
     unregWhite();
     unregBrown();
+    randomSpy.mockRestore();
+  });
+
+  it("clears snack state if one goose unregisters mid-break", async () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+    const social = await import("@/lib/gooseSocial");
+    social.__testing.resetStateForTests();
+
+    const white = makeGoose("white");
+    const brown = makeGoose("brown");
+    const unregWhite = social.__testing.registerGooseForTests(white);
+    const unregister = { brown: () => {} };
+    brown.setSitting = vi.fn((sitting: boolean) => {
+      if (sitting) unregister.brown();
+    });
+    unregister.brown = social.__testing.registerGooseForTests(brown);
+
+    const breakRun = social.__testing.runFlyAway();
+    await vi.runAllTimersAsync();
+    await breakRun;
+
+    expect(white.setFoodBag).toHaveBeenCalledWith(true);
+    expect(white.setFoodBag).toHaveBeenCalledWith(false);
+    expect(white.setSitting).toHaveBeenCalledWith(true);
+    expect(white.setSitting).toHaveBeenCalledWith(false);
+
+    unregWhite();
     randomSpy.mockRestore();
   });
 
