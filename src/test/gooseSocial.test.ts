@@ -55,6 +55,32 @@ describe("gooseSocial game flows", () => {
     randomSpy.mockRestore();
   });
 
+  it("calls setSitting(false) on both geese when runBallPlay starts", async () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+    const social = await import("@/lib/gooseSocial");
+    social.__testing.resetStateForTests();
+
+    const white = makeGoose("white");
+    const brown = makeGoose("brown");
+    const unregWhite = social.__testing.registerGooseForTests(white);
+    const unregBrown = social.__testing.registerGooseForTests(brown);
+    social.setBallPos({ x: 300, y: 220 });
+
+    const playing = social.__testing.runBallPlay();
+    // Advance just enough for the pre-play sitting clear to have been called.
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(white.setSitting).toHaveBeenCalledWith(false);
+    expect(brown.setSitting).toHaveBeenCalledWith(false);
+
+    await vi.runAllTimersAsync();
+    await playing;
+
+    unregWhite();
+    unregBrown();
+    randomSpy.mockRestore();
+  });
+
   it("clears snack state if one goose unregisters mid-break", async () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
     const social = await import("@/lib/gooseSocial");

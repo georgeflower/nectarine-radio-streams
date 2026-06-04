@@ -596,12 +596,20 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       },
       setChaseTarget: (target: { x: number; y: number } | null) => {
         chaseTarget = target;
-        if (target && !away && !sittingForMeal && !fetchingFood) {
-          mode = "fly";
-          perchEl = null;
-          img.style.opacity = "1";
-          imgBody.style.opacity = "0";
-          imgHead.style.opacity = "0";
+        if (target) {
+          // Ball-play overrides sitting: clear any lingering meal/sitting state.
+          if (sittingForMeal) {
+            sittingForMeal = false;
+            eatingGooseIds.delete(gooseId);
+            eatingMode = false;
+          }
+          if (!away && !fetchingFood) {
+            mode = "fly";
+            perchEl = null;
+            img.style.opacity = "1";
+            imgBody.style.opacity = "0";
+            imgHead.style.opacity = "0";
+          }
         }
       },
       setFoodBag: (carrying: boolean) => {
