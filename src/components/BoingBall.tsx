@@ -40,13 +40,15 @@ const BoingBall = () => {
     const BASE_GRAVITY = 650;
     const BASE_PLAY_GRAVITY = 380;
     const PLAY_GRAVITY_RATIO = BASE_PLAY_GRAVITY / BASE_GRAVITY;
-    const BASE_GOOSE_COLLISION_PADDING = 30;
+    const BASE_GOOSE_COLLISION_PADDING = 42;
     const BASE_BUMP_VELOCITY_X = 260;
     const BASE_BUMP_VELOCITY_Y_SCALE = 180;
     const BASE_BUMP_UPWARD_LIFT = 140;
     const BASE_FLOOR_PADDING = 8;
     const BASE_LIVELY_BOUNCE_THRESHOLD = 120;
     const BASE_LIVELY_BOUNCE_IMPULSE = 900;
+    const BASE_MIN_APPROACH_PADDING = 6;
+    const APPROACH_PADDING_VELOCITY_FACTOR = 0.14;
 
     const radius = () => BASE_RADIUS * sceneScale;
     const gooseCollisionPadding = () => BASE_GOOSE_COLLISION_PADDING * sceneScale;
@@ -54,6 +56,7 @@ const BoingBall = () => {
     const bumpVelocityYScale = () => BASE_BUMP_VELOCITY_Y_SCALE * sceneScale;
     const bumpUpwardLift = () => BASE_BUMP_UPWARD_LIFT * sceneScale;
     const floorY = () => stageHeight - BASE_FLOOR_PADDING * sceneScale;
+    const minApproachPadding = () => BASE_MIN_APPROACH_PADDING * sceneScale;
 
     let x = stageWidth * 0.3;
     let y = stageHeight * 0.3;
@@ -94,7 +97,7 @@ const BoingBall = () => {
     const bounce = 0.94;
     // Goose sprites are visibly wider than the ball radius, so extend contact
     // distance to keep bumps feeling sprite-to-ball instead of pixel-perfect.
-    const BUMP_COOLDOWN_MS = 260;
+    const BUMP_COOLDOWN_MS = 140;
 
     let spin = 0; // rotation around tilted axis (radians)
     let spinDir = 1;
@@ -260,7 +263,15 @@ const BoingBall = () => {
           const dy = y - chaserPos.y;
           const dist = Math.hypot(dx, dy);
           const collisionRadius = r + gooseCollisionPadding();
-          if (dist <= collisionRadius && now - lastGooseBumpAt > BUMP_COOLDOWN_MS) {
+          // Add a small velocity-based cushion so high-speed visual touches
+          // still register as bumps instead of tunneling (skipping overlap
+          // between frames due to fast movement) through the radius.
+          const approachPadding = Math.max(
+            minApproachPadding(),
+            Math.hypot(vx, vy) * dt * APPROACH_PADDING_VELOCITY_FACTOR,
+          );
+          const effectiveCollisionRadius = collisionRadius + approachPadding;
+          if (dist <= effectiveCollisionRadius && now - lastGooseBumpAt > BUMP_COOLDOWN_MS) {
             const tx = directive.bumpToward.x - chaserPos.x;
             const ty = directive.bumpToward.y - chaserPos.y;
             const mag = Math.hypot(tx, ty) || 1;
