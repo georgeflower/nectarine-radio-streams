@@ -244,6 +244,7 @@ function escapeRegex(s: string) {
 }
 const SMILEY_KEYS = Object.keys(SMILEYS).sort((a, b) => b.length - a.length);
 const SMILEY_RE = new RegExp(SMILEY_KEYS.map(escapeRegex).join("|"), "i");
+const SMILEY_RE_G = new RegExp(SMILEY_KEYS.map(escapeRegex).join("|"), "gi");
 const SMILEY_LC: Record<string, string> = {};
 for (const k of SMILEY_KEYS) SMILEY_LC[k.toLowerCase()] = k;
 
@@ -252,6 +253,37 @@ function firstSmileyUrl(text: string): string | null {
   if (!m) return null;
   const canonical = SMILEY_LC[m[0].toLowerCase()];
   return canonical ? SMILEYS[canonical] : null;
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c] as string));
+}
+
+// Render plain text with smiley codes converted to inline <img> tags so the
+// goose can "speak" using the same emoticon vocabulary as the oneliner.
+function renderGooseHTML(text: string): string {
+  if (!text) return "";
+  const pieces: string[] = [];
+  let last = 0;
+  SMILEY_RE_G.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = SMILEY_RE_G.exec(text)) !== null) {
+    if (m.index > last) pieces.push(escapeHtml(text.slice(last, m.index)));
+    const canonical = SMILEY_LC[m[0].toLowerCase()];
+    const url = canonical ? SMILEYS[canonical] : null;
+    if (url) {
+      pieces.push(
+        `<img src="${url}" alt="" style="display:inline-block;height:18px;width:auto;vertical-align:middle;margin:0 2px" />`,
+      );
+    } else {
+      pieces.push(escapeHtml(m[0]));
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) pieces.push(escapeHtml(text.slice(last)));
+  return pieces.join("");
 }
 
 // Pixel-art heart SVG (retro 11x10 grid).
