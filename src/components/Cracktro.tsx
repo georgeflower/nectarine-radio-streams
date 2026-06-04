@@ -796,18 +796,28 @@ const Cracktro = ({
       )}
 
 
-      {/* Top-right exit — auto-hides with the controls. */}
-      <button
-        type="button"
-        onClick={onExit}
-        className={`absolute top-4 right-4 min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/80 text-foreground hover:bg-card hover:opacity-90 touch-manipulation transition-opacity duration-500 ${
-          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-        style={{ zIndex: 10 }}
-        aria-label="Exit fullscreen cracktro"
-      >
-        Exit ✕
-      </button>
+      {/* Top-right exit — only shown in fullscreen; sends us to windowed mode.
+          In windowed mode the title bar provides the close + fullscreen buttons. */}
+      {!windowed && (
+        <button
+          type="button"
+          onClick={() => {
+            if (document.fullscreenElement) {
+              document.exitFullscreen?.().catch(() => undefined);
+            } else {
+              setWindowed(true);
+            }
+          }}
+          className={`absolute top-4 right-4 min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/80 text-foreground hover:bg-card hover:opacity-90 touch-manipulation transition-opacity duration-500 ${
+            showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+          style={{ zIndex: 10 }}
+          aria-label="Exit fullscreen to window"
+          title="Exit fullscreen (continues in a window)"
+        >
+          Window ⤓
+        </button>
+      )}
 
       {/* Bottom controls bar — scroller toggle + scroller mode + visualizer effect.
           Hides after 5s of inactivity; reappears on mousemove/touch/keypress. */}
