@@ -72,6 +72,11 @@ const Cracktro = ({
 }: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
+  const setWrap = useCallback((el: HTMLDivElement | null) => {
+    wrapRef.current = el;
+    setStageEl(el);
+  }, []);
   const onExitRef = useRef(onExit);
   useEffect(() => {
     onExitRef.current = onExit;
