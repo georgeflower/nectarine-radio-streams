@@ -46,7 +46,7 @@ export function setBallPos(p: { x: number; y: number } | null) {
   ballPos = p;
 }
 
-function buildContextualDialogue(now: number): string[] | null {
+function buildContextualDialogue(now: number): string[] {
   if (!recentOneliner || now - recentOneliner.at > RECENT_ONELINER_WINDOW_MS) {
     return pick(IDLE_DIALOGUE_FALLBACKS);
   }
@@ -463,7 +463,7 @@ async function step() {
       await runBallPlay();
     } else if (now - lastDialogueAt > getDialogueCooldownMs()) {
       const dialogue = buildContextualDialogue(now);
-      if (dialogue) {
+      if (dialogue.length) {
         lastDialogueAt = now;
         await runDialogue(dialogue);
       }
