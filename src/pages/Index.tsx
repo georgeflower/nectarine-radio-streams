@@ -101,7 +101,16 @@ const ExtLink = ({ href, children, className }: ExtLinkProps) => {
   );
 };
 
-const VIZ_STYLES: VisualizerStyle[] = ["off", "starfield", "bars", "plasma", "oscilloscope", "tunnel", "rings", "particles"];
+const VIZ_STYLES: VisualizerStyle[] = [
+  "off",
+  "starfield",
+  "bars",
+  "plasma",
+  "oscilloscope",
+  "tunnel",
+  "rings",
+  "particles",
+];
 const VIZ_STORAGE_KEY = "nectarine-viz";
 
 type ThemeId = "legacy" | "nectalift" | "nostalgia";
@@ -166,7 +175,6 @@ const Index = () => {
   const [bpmDebugOpen, setBpmDebugOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
   const [seekCount, setSeekCount] = useState(0);
-
 
   useEffect(() => {
     try {
@@ -285,8 +293,22 @@ const Index = () => {
 
   const now = playlist.now;
   const timeLeft = now ? computeTimeLeft(now.playstart, now.lengthSec) : "-";
-  const trackKey = now ? `${now.artist ?? ""}||${now.song ?? ""}||${now.playstart ?? ""}||${seekCount}` : `seek-${seekCount}`;
-  const { bpm, beatIndex, beatCount, status: bpmStatus, beatTimes, windowMs, lastComputeAt, lastBass, period, phaseErrorMs, confidence } = useBpm(analyser, true, trackKey);
+  const trackKey = now
+    ? `${now.artist ?? ""}||${now.song ?? ""}||${now.playstart ?? ""}||${seekCount}`
+    : `seek-${seekCount}`;
+  const {
+    bpm,
+    beatIndex,
+    beatCount,
+    status: bpmStatus,
+    beatTimes,
+    windowMs,
+    lastComputeAt,
+    lastBass,
+    period,
+    phaseErrorMs,
+    confidence,
+  } = useBpm(analyser, true, trackKey);
   void tick;
 
   return (
@@ -308,7 +330,6 @@ const Index = () => {
           queue={playlist.queue}
           history={playlist.history}
         />
-
       )}
       <main
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"
@@ -322,9 +343,7 @@ const Index = () => {
       >
         <header className="flex flex-col gap-3 mb-5 border-b border-border pb-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold neon tracking-widest uppercase">
-              ▌Necta Compact View
-            </h1>
+            <h1 className="text-2xl md:text-3xl font-bold neon tracking-widest uppercase">▌Necta Compact View</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2 md:justify-end w-full md:w-auto">
             <select
@@ -360,7 +379,11 @@ const Index = () => {
                 </option>
               ))}
             </select>
-            <div className="flex items-center rounded-sm border border-border bg-card/60 shrink-0" role="group" aria-label="Text size">
+            <div
+              className="flex items-center rounded-sm border border-border bg-card/60 shrink-0"
+              role="group"
+              aria-label="Text size"
+            >
               <button
                 type="button"
                 onClick={() => adjustFont(-0.1)}
@@ -402,16 +425,22 @@ const Index = () => {
         </header>
 
         <div className="mb-4">
-          <AudioPlayer streams={streams} currentTrack={now} onAnalyserReady={setAnalyser} onSeek={() => setSeekCount((c) => c + 1)} />
+          <AudioPlayer
+            streams={streams}
+            currentTrack={now}
+            onAnalyserReady={setAnalyser}
+            onSeek={() => setSeekCount((c) => c + 1)}
+          />
         </div>
 
         <section className="grid gap-4 md:grid-cols-2 min-w-0" aria-label="Demovibes panels">
           <article
             className="panel md:order-2 min-w-0 overflow-hidden transition-shadow duration-100"
             style={{
-              boxShadow: audioLevel > 0
-                ? `0 0 ${8 + audioLevel * 40}px hsl(var(--primary) / ${0.25 + audioLevel * 0.6})`
-                : undefined,
+              boxShadow:
+                audioLevel > 0
+                  ? `0 0 ${8 + audioLevel * 40}px hsl(var(--primary) / ${0.25 + audioLevel * 0.6})`
+                  : undefined,
             }}
           >
             <button
@@ -436,8 +465,7 @@ const Index = () => {
                           : undefined
                       }
                     >
-                      <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink>{" "}
-                      <SongPlatform songId={now.songId} />{" "}
+                      <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink> <SongPlatform songId={now.songId} />{" "}
                       <SongRating songId={now.songId} />
                     </p>
                     <p className="text-sm text-muted-foreground mb-3">
@@ -456,9 +484,7 @@ const Index = () => {
                       Time Left: <span className="text-foreground">{timeLeft}</span>
                     </p>
                     <div className="mt-3 flex items-center gap-3 flex-wrap">
-                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                        BPM
-                      </span>
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">BPM</span>
                       <span
                         className="neon-accent font-bold tabular-nums text-sm min-w-[2.5ch] inline-block"
                         title="Detected tempo from bass kicks"
@@ -479,12 +505,8 @@ const Index = () => {
                               style={{
                                 width: "0.85rem",
                                 height: "0.85rem",
-                                background: active
-                                  ? "hsl(var(--primary))"
-                                  : "hsl(var(--muted) / 0.4)",
-                                boxShadow: active
-                                  ? `0 0 ${6 + audioLevel * 16}px hsl(var(--primary) / 0.9)`
-                                  : "none",
+                                background: active ? "hsl(var(--primary))" : "hsl(var(--muted) / 0.4)",
+                                boxShadow: active ? `0 0 ${6 + audioLevel * 16}px hsl(var(--primary) / 0.9)` : "none",
                                 transform: active ? "scale(1.15)" : "scale(1)",
                               }}
                             />
@@ -493,20 +515,39 @@ const Index = () => {
                       </div>
                       {(() => {
                         const dot =
-                          bpmStatus === "locked" ? "hsl(var(--primary))" :
-                          bpmStatus === "detecting" ? "#facc15" :
-                          bpmStatus === "listening" ? "#38bdf8" :
-                          bpmStatus === "silent" ? "hsl(var(--muted-foreground))" :
-                          "#ef4444";
+                          bpmStatus === "locked"
+                            ? "hsl(var(--primary))"
+                            : bpmStatus === "detecting"
+                              ? "#facc15"
+                              : bpmStatus === "listening"
+                                ? "#38bdf8"
+                                : bpmStatus === "silent"
+                                  ? "hsl(var(--muted-foreground))"
+                                  : "#ef4444";
                         const label =
-                          bpmStatus === "locked" ? `locked (${bpm})` :
-                          bpmStatus === "detecting" ? "detecting…" :
-                          bpmStatus === "listening" ? "listening…" :
-                          bpmStatus === "silent" ? "silent (no audio energy)" :
-                          "no audio";
+                          bpmStatus === "locked"
+                            ? `locked (${bpm})`
+                            : bpmStatus === "detecting"
+                              ? "detecting…"
+                              : bpmStatus === "listening"
+                                ? "listening…"
+                                : bpmStatus === "silent"
+                                  ? "silent (no audio energy)"
+                                  : "no audio";
                         return (
-                          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground" title={`BPM status: ${label}`}>
-                            <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot, boxShadow: `0 0 6px ${dot}` }} />
+                          <span
+                            className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground"
+                            title={`BPM status: ${label}`}
+                          >
+                            <span
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: "50%",
+                                background: dot,
+                                boxShadow: `0 0 6px ${dot}`,
+                              }}
+                            />
                             {label}
                           </span>
                         );
@@ -522,12 +563,30 @@ const Index = () => {
                     </div>
                     {bpmDebugOpen && (
                       <div className="mt-2 p-2 border border-border rounded bg-muted/20 text-[11px] font-mono leading-snug">
-                        <div>status: <span className="text-foreground">{bpmStatus}</span></div>
-                        <div>bpm: <span className="text-foreground">{bpm || "--"}</span> · period: <span className="text-foreground">{Math.round(period)}ms</span></div>
-                        <div>confidence: <span className="text-foreground">{confidence.toFixed(2)}</span> · phase err: <span className="text-foreground">{phaseErrorMs >= 0 ? "+" : ""}{Math.round(phaseErrorMs)}ms</span></div>
-                        <div>window: <span className="text-foreground">{Math.round(windowMs / 1000)}s</span></div>
-                        <div>metronome ticks in window: <span className="text-foreground">{beatTimes.length}</span> (total {beatCount})</div>
-                        <div>last bass envelope: <span className="text-foreground">{lastBass.toFixed(3)}</span></div>
+                        <div>
+                          status: <span className="text-foreground">{bpmStatus}</span>
+                        </div>
+                        <div>
+                          bpm: <span className="text-foreground">{bpm || "--"}</span> · period:{" "}
+                          <span className="text-foreground">{Math.round(period)}ms</span>
+                        </div>
+                        <div>
+                          confidence: <span className="text-foreground">{confidence.toFixed(2)}</span> · phase err:{" "}
+                          <span className="text-foreground">
+                            {phaseErrorMs >= 0 ? "+" : ""}
+                            {Math.round(phaseErrorMs)}ms
+                          </span>
+                        </div>
+                        <div>
+                          window: <span className="text-foreground">{Math.round(windowMs / 1000)}s</span>
+                        </div>
+                        <div>
+                          metronome ticks in window: <span className="text-foreground">{beatTimes.length}</span> (total{" "}
+                          {beatCount})
+                        </div>
+                        <div>
+                          last bass envelope: <span className="text-foreground">{lastBass.toFixed(3)}</span>
+                        </div>
                         <div>
                           last compute:{" "}
                           <span className="text-foreground">
@@ -538,13 +597,10 @@ const Index = () => {
                         <div className="text-foreground break-all">
                           {beatTimes.length === 0
                             ? "—"
-                            : beatTimes
-                                .map((t) => `-${Math.round((performance.now() - t))}`)
-                                .join(", ")}
+                            : beatTimes.map((t) => `-${Math.round(performance.now() - t)}`).join(", ")}
                         </div>
                       </div>
                     )}
-
                   </>
                 ) : (
                   <p className="text-muted-foreground text-sm">No track info yet…</p>
@@ -572,8 +628,7 @@ const Index = () => {
                         <ExtLink href={artistUrl(q.artistId)} className="neon-accent">
                           {q.artist}
                         </ExtLink>{" "}
-                        — <ExtLink href={songUrl(q.songId)}>{q.song}</ExtLink>{" "}
-                        <SongPlatform songId={q.songId} />{" "}
+                        — <ExtLink href={songUrl(q.songId)}>{q.song}</ExtLink> <SongPlatform songId={q.songId} />{" "}
                         <SongRating songId={q.songId} />{" "}
                         <span className="text-xs text-muted-foreground">
                           ({formatDuration(q.lengthSec)} · req{" "}
@@ -606,8 +661,7 @@ const Index = () => {
                         <ExtLink href={artistUrl(h.artistId)} className="neon-accent">
                           {h.artist}
                         </ExtLink>{" "}
-                        — <ExtLink href={songUrl(h.songId)}>{h.song}</ExtLink>{" "}
-                        <SongPlatform songId={h.songId} />{" "}
+                        — <ExtLink href={songUrl(h.songId)}>{h.song}</ExtLink> <SongPlatform songId={h.songId} />{" "}
                         <SongRating songId={h.songId} />
                       </li>
                     ))}
@@ -664,7 +718,9 @@ const Index = () => {
                           </span>
                           <span className="text-muted-foreground">({formatOnelinerTime(entry.time)})</span>
                         </div>
-                        <p className="text-sm leading-snug mt-0.5 [overflow-wrap:anywhere] break-words">{renderBBCode(entry.text)}</p>
+                        <p className="text-sm leading-snug mt-0.5 [overflow-wrap:anywhere] break-words">
+                          {renderBBCode(entry.text)}
+                        </p>
                       </article>
                     ))
                   )}
@@ -757,11 +813,11 @@ const Index = () => {
           this is a compact viewer made by Qumran of the amazing Nectarine Demoscene Radio -{" "}
           <a
             className="text-primary hover:underline"
-            href="https://scenestam.net/"
+            href="https://scenestream.net/"
             target="_blank"
             rel="noopener noreferrer"
           >
-            https://scenestam.net/
+            https://scenestream.net/
           </a>
         </footer>
       </main>
