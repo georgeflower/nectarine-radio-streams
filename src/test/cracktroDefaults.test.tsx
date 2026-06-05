@@ -61,12 +61,12 @@ describe("Cracktro defaults and fullscreen behavior", () => {
     });
   });
 
-  it("shows goose life simulation by default with boing ball, info text, and queue", async () => {
+  it("shows classic geese by default with boing ball, info text, and queue", async () => {
     render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
 
     expect(await screen.findByText(/Skaven/i)).toBeInTheDocument();
-    expect(screen.getByTestId("goose-life-sim")).toBeInTheDocument();
-    expect(screen.queryAllByTestId("flying-goose")).toHaveLength(0);
+    expect(screen.queryByTestId("goose-life-sim")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("flying-goose")).toHaveLength(2);
     expect(screen.getByTestId("boing-ball")).toBeInTheDocument();
     expect(screen.getByTestId("floating-queue")).toBeInTheDocument();
   });

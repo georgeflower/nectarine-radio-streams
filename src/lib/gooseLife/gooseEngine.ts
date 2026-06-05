@@ -28,6 +28,7 @@ const FLY_SPAWN_MAX_RATIO = 0.65;
 const GROUND_SPAWN_MIN_RATIO = 0.82;
 const GROUND_SPAWN_MAX_RATIO = 0.92;
 const FLY_MAX_HEIGHT_RATIO = 0.74;
+const GROUND_MAX_HEIGHT_RATIO = 0.96;
 const CHASE_GROUND_DISTANCE_THRESHOLD = 170;
 
 const randomBetween = (min: number, max: number) => min + Math.random() * (max - min);
@@ -270,22 +271,34 @@ function applyRoamState(goose: Goose, dtSeconds: number, stage: StageBounds): Go
   if (!canFly(next) && next.state === "fly") next.state = "waddle";
 
   const flyMode = next.state === "fly" && canFly(next);
-  const roamSpeed = (flyMode ? 90 : 48) * SPEED_MULTIPLIER * next.speedModifier;
+  const roamSpeed = (flyMode ? 90 : 20) * SPEED_MULTIPLIER * next.speedModifier;
   const speed = Math.hypot(next.velocity.x, next.velocity.y);
+  const groundTop = floorY(stage);
+  const groundBottom = Math.max(groundTop + 10, stage.height * GROUND_MAX_HEIGHT_RATIO);
 
   if (speed < 5) {
     const angle = randomBetween(0, Math.PI * 2);
     next.velocity.x = Math.cos(angle) * roamSpeed;
-    next.velocity.y = Math.sin(angle) * roamSpeed * (flyMode ? 0.7 : 0.25);
+    next.velocity.y = Math.sin(angle) * roamSpeed * (flyMode ? 0.7 : 0.05);
   } else {
     next.velocity.x += (Math.random() - 0.5) * dtSeconds * roamSpeed * 0.9;
-    next.velocity.y += (Math.random() - 0.5) * dtSeconds * roamSpeed * (flyMode ? 0.5 : 0.18);
+    if (flyMode) {
+      next.velocity.y += (Math.random() - 0.5) * dtSeconds * roamSpeed * 0.5;
+    } else {
+      const targetY = clamp(next.position.y + (Math.random() - 0.5) * 26, groundTop, groundBottom);
+      next.velocity.y += (targetY - next.position.y) * dtSeconds * 12;
+      next.velocity.y *= 0.9;
+    }
   }
 
   const postSpeed = Math.hypot(next.velocity.x, next.velocity.y);
   if (postSpeed > roamSpeed) {
     next.velocity.x = (next.velocity.x / postSpeed) * roamSpeed;
     next.velocity.y = (next.velocity.y / postSpeed) * roamSpeed;
+  }
+  if (!flyMode) {
+    const maxGroundVerticalSpeed = roamSpeed * 0.22;
+    next.velocity.y = clamp(next.velocity.y, -maxGroundVerticalSpeed, maxGroundVerticalSpeed);
   }
 
   next.position.x += next.velocity.x * dtSeconds;
@@ -495,7 +508,12 @@ export function stepGooseLife(
       goose.nextBehaviorAt = nextBehaviorAt(now);
 
       const angle = randomBetween(0, Math.PI * 2);
-      const speed = (goose.state === "fly" ? 90 : goose.state === "sleep" ? 8 : goose.state === "play" ? 92 : 44) * SPEED_MULTIPLIER * goose.speedModifier;
+      const speed = (
+        goose.state === "fly" ? 90
+          : goose.state === "sleep" ? 8
+            : goose.state === "play" ? 62
+              : 20
+      ) * SPEED_MULTIPLIER * goose.speedModifier;
       goose.velocity = {
         x: Math.cos(angle) * speed,
         y: Math.sin(angle) * speed,
