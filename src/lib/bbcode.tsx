@@ -44,16 +44,19 @@ function EntityLink({
   href: string;
   fallback: string;
 }) {
-  const [info, setInfo] = useState<EntityInfo | undefined>(() => getCachedInfo(kind, id));
+  // Re-read directly from the cache on every render so that when a list
+  // shifts (e.g. new oneliner prepended) and React reuses this component
+  // instance with a different `id`, we don't keep showing the previous
+  // entity's cached title. We only hold a forceRender tick for subscriptions.
+  const [, forceRender] = useReducer((x: number) => x + 1, 0);
   useEffect(() => {
     if (!id) return;
-    if (!info?.title) requestInfo(kind, id);
-    const unsub = subscribe(() => {
-      const next = getCachedInfo(kind, id);
-      if (next?.title) setInfo(next);
-    });
+    requestInfo(kind, id);
+    const unsub = subscribe(forceRender);
     return unsub;
-  }, [kind, id, info?.title]);
+  }, [kind, id]);
+
+  const info = getCachedInfo(kind, id);
 
   const label = info?.title || fallback;
   const link = (
