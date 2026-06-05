@@ -83,6 +83,7 @@ async function flushQueue() {
   const batch = Array.from(queue.values()).slice(0, 20);
   queue.clear();
   try {
+    const { supabase } = await import("@/integrations/supabase/client");
     await supabase.functions.invoke(FUNCTION_NAME, {
       method: "POST",
       body: { tokens: batch },
@@ -136,6 +137,7 @@ export async function hydrateCloudLexiconOnce() {
   }
 
   try {
+    const { supabase } = await import("@/integrations/supabase/client");
     const { data, error } = await supabase.functions.invoke(FUNCTION_NAME, {
       method: "GET",
     });
