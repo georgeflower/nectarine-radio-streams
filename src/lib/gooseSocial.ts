@@ -11,6 +11,7 @@ import {
   type LexiconMood,
 } from "@/lib/gooseLearnedLexicon";
 import { findLearnedTrigger, pickLearnedPhrase } from "@/lib/gooseLearnedPhrases";
+import { queueOnelinerForCloud } from "@/lib/gooseLexiconCloud";
 import type { GooseSceneEra } from "@/lib/gooseSceneEra";
 import { GOOSE_DIALOGUES } from "@/lib/gooseDialogues";
 
@@ -88,6 +89,7 @@ export function noteRecentOneliner(username: string, text: string) {
   recentOnelinerTrail.push({ username, text: clean });
   while (recentOnelinerTrail.length > MAX_ONELINER_TRAIL) recentOnelinerTrail.shift();
   learnLexiconFromOneliner(clean, username);
+  queueOnelinerForCloud(clean);
 }
 
 let sceneEra: GooseSceneEra = "intro";
