@@ -64,6 +64,19 @@ const AMBIENT_SPEECH_INTERVAL_MS = 2600;
 const MIN_AMBIENT_SPEECH_DURATION_MS = 1800;
 const AMBIENT_SPEECH_DURATION_VARIANCE_MS = 1400;
 const ONELINER_SPEECH_DURATION_MS = 2800;
+const PLAY_BOUNCE_FREQUENCY = 1.4;
+const PLAY_BOUNCE_AMPLITUDE = 3.5;
+const WADDLE_BOUNCE_AMPLITUDE = 2.2;
+const WADDLE_SWAY_AMPLITUDE = 2.6;
+const PECK_FREQUENCY = 1.8;
+const PECK_AMPLITUDE = 3.4;
+const PECK_ROTATION_RATIO = 2.6;
+const SLEEP_HEAD_OFFSET_X = -0.8;
+const SLEEP_HEAD_OFFSET_Y = 3.2;
+const SLEEP_HEAD_ANGLE = 28;
+const MOURN_HEAD_OFFSET_X = -0.5;
+const MOURN_HEAD_OFFSET_Y = 2.4;
+const MOURN_HEAD_ANGLE = 18;
 
 function bodyOpacity(goose: Goose, now: number) {
   if (goose.alive) return 1;
@@ -290,23 +303,23 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
         );
         const groundedBounce =
           goose.state === "play"
-            ? Math.abs(Math.sin(phase * 1.4)) * 3.5 * spriteScale
+            ? Math.abs(Math.sin(phase * PLAY_BOUNCE_FREQUENCY)) * PLAY_BOUNCE_AMPLITUDE * spriteScale
             : goose.state === "waddle" || goose.state === "follow"
-              ? Math.abs(Math.sin(phase)) * 2.2 * spriteScale
+              ? Math.abs(Math.sin(phase)) * WADDLE_BOUNCE_AMPLITUDE * spriteScale
               : Math.sin(phase * 0.55) * 0.8 * spriteScale;
         const groundedSway =
           goose.state === "waddle" || goose.state === "follow"
-            ? Math.sin(phase * 0.8) * 2.6 * spriteScale
+            ? Math.sin(phase * 0.8) * WADDLE_SWAY_AMPLITUDE * spriteScale
             : 0;
 
         let headTransform = "translate(0px, 0px) rotate(0deg)";
         if (goose.state === "eat") {
-          const peck = Math.abs(Math.sin(phase * 1.8)) * 3.4 * spriteScale;
-          headTransform = `translate(0px, ${peck}px) rotate(${peck * 2.6}deg)`;
+          const peck = Math.abs(Math.sin(phase * PECK_FREQUENCY)) * PECK_AMPLITUDE * spriteScale;
+          headTransform = `translate(0px, ${peck}px) rotate(${peck * PECK_ROTATION_RATIO}deg)`;
         } else if (goose.state === "sleep") {
-          headTransform = `translate(${-0.8 * spriteScale}px, ${3.2 * spriteScale}px) rotate(28deg)`;
+          headTransform = `translate(${SLEEP_HEAD_OFFSET_X * spriteScale}px, ${SLEEP_HEAD_OFFSET_Y * spriteScale}px) rotate(${SLEEP_HEAD_ANGLE}deg)`;
         } else if (goose.state === "mourn") {
-          headTransform = `translate(${-0.5 * spriteScale}px, ${2.4 * spriteScale}px) rotate(18deg)`;
+          headTransform = `translate(${MOURN_HEAD_OFFSET_X * spriteScale}px, ${MOURN_HEAD_OFFSET_Y * spriteScale}px) rotate(${MOURN_HEAD_ANGLE}deg)`;
         } else if (goose.state === "play") {
           headTransform = `translate(${Math.sin(phase * 1.3) * 1.5 * spriteScale}px, ${Math.cos(phase * 1.2) * 0.8 * spriteScale}px) rotate(${Math.sin(phase * 1.4) * 14}deg)`;
         } else {
