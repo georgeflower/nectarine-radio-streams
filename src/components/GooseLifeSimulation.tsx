@@ -60,6 +60,10 @@ const AMBIENT_CHATTER: Partial<Record<Goose["state"], string[]>> = {
 
 const MAX_SPEECH_LENGTH = 42;
 const BASE_SPRITE_SCALE = 0.78;
+const AMBIENT_SPEECH_INTERVAL_MS = 2600;
+const MIN_AMBIENT_SPEECH_DURATION_MS = 1800;
+const AMBIENT_SPEECH_DURATION_VARIANCE_MS = 1400;
+const ONELINER_SPEECH_DURATION_MS = 2800;
 
 function bodyOpacity(goose: Goose, now: number) {
   if (goose.alive) return 1;
@@ -226,8 +230,12 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
       if (visibleSpeechCount > Math.max(1, Math.floor(speakers.length / 2))) return;
       if (Math.random() > 0.6) return;
       const goose = speakers[Math.floor(Math.random() * speakers.length)];
-      upsertSpeech(goose.id, chooseAmbientSpeech(goose), 1800 + Math.random() * 1400);
-    }, 2600);
+      upsertSpeech(
+        goose.id,
+        chooseAmbientSpeech(goose),
+        MIN_AMBIENT_SPEECH_DURATION_MS + Math.random() * AMBIENT_SPEECH_DURATION_VARIANCE_MS,
+      );
+    }, AMBIENT_SPEECH_INTERVAL_MS);
     return () => window.clearInterval(interval);
   }, []);
 
@@ -246,7 +254,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
     const speakers = current.geese.filter((goose) => goose.alive && goose.state !== "sleep");
     if (speakers.length === 0) return;
     const speaker = speakers[Math.floor(Math.random() * speakers.length)];
-    upsertSpeech(speaker.id, latest.text, 2800);
+    upsertSpeech(speaker.id, latest.text, ONELINER_SPEECH_DURATION_MS);
   }, [oneliners]);
 
   const living = useMemo(() => state.geese.filter((goose) => goose.alive), [state.geese]);
