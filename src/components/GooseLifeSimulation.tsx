@@ -81,6 +81,7 @@ const AMBIENT_SPEECH_INTERVAL_MS = 2600;
 const MIN_AMBIENT_SPEECH_DURATION_MS = 1800;
 const AMBIENT_SPEECH_DURATION_VARIANCE_MS = 1400;
 const AMBIENT_SPEECH_PROBABILITY = 0.62;
+const MAX_CONCURRENT_SPEECHES = 0;
 const ONELINER_SPEECH_DURATION_MS = 2800;
 const PERCH_UPDATE_INTERVAL_MS = 2600;
 const PHASE_OFFSET_MULTIPLIER_MS = 2000;
@@ -93,6 +94,14 @@ const PLAY_BOUNCE_FREQUENCY = 1.9;
 const PLAY_BOUNCE_AMPLITUDE = 4.1;
 const WADDLE_BOUNCE_AMPLITUDE = 2.8;
 const WADDLE_SWAY_AMPLITUDE = 3.2;
+const WADDLE_BODY_SWAY_AMPLITUDE = 1.8;
+const WADDLE_BODY_BOB_AMPLITUDE = 1.5;
+const WADDLE_BODY_TILT_DEGREES = 3.2;
+const WADDLE_HEAD_SWAY_AMPLITUDE = 2.2;
+const WADDLE_HEAD_BOB_AMPLITUDE = 1.2;
+const WADDLE_HEAD_TILT_DEGREES = 9;
+const WADDLE_CYCLE_FREQUENCY = 1.05;
+const WADDLE_HEAD_CYCLE_FREQUENCY = 1.2;
 const PECK_FREQUENCY = 1.8;
 const PECK_AMPLITUDE = 3.4;
 const PECK_ROTATION_RATIO = 2.6;
@@ -149,7 +158,7 @@ function getGooseVisualMode(goose: Goose): GooseVisualMode {
   if (!goose.alive || goose.state === "sleep" || goose.state === "mourn" || goose.state === "interact" || goose.state === "eat") return "perched";
   if (goose.state === "fly") return "fly";
   if (goose.state === "play") return speed > 160 && !isGosling(goose) ? "fly" : "run";
-  if (goose.state === "waddle" || goose.state === "follow" || goose.state === "idle") return speed > 120 ? "run" : "walk";
+  if (goose.state === "waddle" || goose.state === "follow" || goose.state === "idle") return "walk";
   return speed > 140 && !isGosling(goose) ? "fly" : "walk";
 }
 
@@ -184,6 +193,8 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
   const stateRef = useRef<GooseLifeState | null>(null);
   const latestOnelinerRef = useRef<OnelinerEntry | null>(oneliners[0] ?? null);
   const lastSpokenOnelinerKeyRef = useRef<string | null>(null);
+  const lastAmbientSpeakerRef = useRef<string | null>(null);
+  const pendingAmbientReplyRef = useRef<string | null>(null);
   const speechesRef = useRef<Record<string, GooseSpeech>>({});
   const boundsRef = useRef<StageBounds>({ width: window.innerWidth, height: window.innerHeight, perches: [] });
   const [bounds, setBounds] = useState<StageBounds>({ width: window.innerWidth, height: window.innerHeight, perches: [] });
@@ -309,9 +320,24 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
       );
       if (speakers.length === 0) return;
       const visibleSpeechCount = Object.keys(speechesRef.current).length;
-      if (visibleSpeechCount > Math.max(1, Math.floor(speakers.length / 2))) return;
-      if (Math.random() > AMBIENT_SPEECH_PROBABILITY) return;
-      const goose = speakers[Math.floor(Math.random() * speakers.length)];
+      // Keep speech strictly turn-based: one line at a time, then a reply.
+      if (visibleSpeechCount > MAX_CONCURRENT_SPEECHES) return;
+      let goose: Goose | null = null;
+      if (pendingAmbientReplyRef.current) {
+        goose = speakers.find((candidate) => candidate.id === pendingAmbientReplyRef.current) ?? null;
+        pendingAmbientReplyRef.current = null;
+      } else {
+        if (Math.random() > AMBIENT_SPEECH_PROBABILITY) return;
+        const preferred = speakers.filter((candidate) => candidate.id !== lastAmbientSpeakerRef.current);
+        const pickFrom = preferred.length > 0 ? preferred : speakers;
+        goose = pickFrom[Math.floor(Math.random() * pickFrom.length)] ?? null;
+      }
+      if (!goose) return;
+      const possibleRepliers = speakers.filter((candidate) => candidate.id !== goose.id);
+      if (possibleRepliers.length > 0) {
+        pendingAmbientReplyRef.current = possibleRepliers[Math.floor(Math.random() * possibleRepliers.length)].id;
+      }
+      lastAmbientSpeakerRef.current = goose.id;
       upsertSpeech(
         goose.id,
         chooseAmbientSpeech(goose),
@@ -390,6 +416,14 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
           goose.state === "waddle" || goose.state === "follow" || goose.state === "play"
             ? Math.sin(phase * (visualMode === "run" ? 1.6 : 0.8)) * WADDLE_SWAY_AMPLITUDE * spriteScale
             : 0;
+        const waddling = visualMode === "walk";
+        const walkCycle = Math.sin(phase * WADDLE_CYCLE_FREQUENCY);
+        const walkStrideX = waddling ? walkCycle * WADDLE_BODY_SWAY_AMPLITUDE * spriteScale : 0;
+        const walkStrideY = waddling ? Math.abs(walkCycle) * WADDLE_BODY_BOB_AMPLITUDE * spriteScale : 0;
+        const walkTilt = waddling ? walkCycle * WADDLE_BODY_TILT_DEGREES : 0;
+        const walkHeadNudgeX = waddling ? Math.sin(phase * WADDLE_HEAD_CYCLE_FREQUENCY) * WADDLE_HEAD_SWAY_AMPLITUDE * spriteScale : 0;
+        const walkHeadNudgeY = waddling ? Math.abs(Math.sin(phase * WADDLE_HEAD_CYCLE_FREQUENCY)) * WADDLE_HEAD_BOB_AMPLITUDE * spriteScale : 0;
+        const walkHeadTilt = waddling ? Math.sin(phase * WADDLE_HEAD_CYCLE_FREQUENCY) * WADDLE_HEAD_TILT_DEGREES : 0;
 
         let headTransform = "translate(0px, 0px) rotate(0deg)";
         if (goose.state === "eat") {
@@ -440,7 +474,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
                   width,
                   height,
                   imageRendering: "pixelated",
-                  opacity: visualMode === "fly" || visualMode === "walk" || visualMode === "run" ? 1 : 0,
+                  opacity: visualMode === "fly" || visualMode === "run" ? 1 : 0,
                 }}
               />
               <img
@@ -454,7 +488,8 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
                   width,
                   height,
                   imageRendering: "pixelated",
-                  opacity: visualMode === "perched" ? 1 : 0,
+                  opacity: visualMode === "perched" || visualMode === "walk" ? 1 : 0,
+                  transform: visualMode === "walk" ? `translate(${walkStrideX}px, ${walkStrideY}px) rotate(${walkTilt}deg)` : "none",
                 }}
               />
               <img
@@ -468,9 +503,11 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
                   width,
                   height,
                   imageRendering: "pixelated",
-                  opacity: visualMode === "perched" ? 1 : 0,
+                  opacity: visualMode === "perched" || visualMode === "walk" ? 1 : 0,
                   transformOrigin: `${pivotX}px ${pivotY}px`,
-                  transform: visualMode === "perched" ? headTransform : "none",
+                  transform: visualMode === "walk"
+                    ? `translate(${walkHeadNudgeX}px, ${walkHeadNudgeY}px) rotate(${walkHeadTilt}deg)`
+                    : visualMode === "perched" ? headTransform : "none",
                 }}
               />
             </div>

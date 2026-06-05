@@ -148,6 +148,23 @@ describe("gooseLife core invariants", () => {
     expect((updated?.position.y ?? 0)).toBeGreaterThanOrEqual(STAGE.height * 0.8);
   });
 
+  it("keeps waddling adults inside the lower floor band", () => {
+    const now = 3_600_000;
+    const waddler = makeGoose(now, {
+      id: "waddler",
+      ageHours: 12,
+      state: "waddle",
+      velocity: { x: 200, y: -260 },
+      position: { x: 300, y: 260 },
+      nextBehaviorAt: now + 10_000,
+    });
+
+    const next = stepGooseLife(makeState(now, [waddler]), now + 200, 16, STAGE);
+    const updated = next.geese.find((g) => g.id === "waddler");
+    expect(updated?.state).toBe("waddle");
+    expect((updated?.position.y ?? 0)).toBeGreaterThanOrEqual(STAGE.height * 0.8);
+  });
+
   it("moves sleeping geese toward perch targets", () => {
     const now = 3_700_000;
     const sleeper = makeGoose(now, {

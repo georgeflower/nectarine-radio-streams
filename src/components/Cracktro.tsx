@@ -376,10 +376,10 @@ const Cracktro = ({
   const [gooseLifeSimOn, setGooseLifeSimOn] = useState<boolean>(() => {
     try {
       const v = localStorage.getItem(STORAGE_GOOSE_LIFE_SIM);
-      // New installs default to the autonomous Goose Life simulation.
-      return v === null ? true : v === "1";
+      // Keep classic goose pair enabled by default for ball-play and food-fetch interactions.
+      return v === null ? false : v === "1";
     } catch {
-      return true;
+      return false;
     }
   });
   useEffect(() => {
