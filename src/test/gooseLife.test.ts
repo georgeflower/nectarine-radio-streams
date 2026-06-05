@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { HOUR_MS, LIFESPAN_HOURS, maybeApplyLatestOneliner, stepGooseLife, type Goose, type GooseLifeState } from "@/lib/gooseLife";
 
 const STAGE = { width: 1280, height: 720 };
+const MOURNING_DURATION_MS = 10 * 60_000;
 
 function makeGoose(now: number, seed: Partial<Goose>): Goose {
   return {
@@ -155,9 +156,9 @@ describe("gooseLife core invariants", () => {
     const duringFuneral = stepGooseLife(makeState(now, [dead, living]), now, 16, STAGE);
     const mourningGoose = duringFuneral.geese.find((g) => g.id === "living");
     expect(mourningGoose?.mood).toBe("mourning");
-    expect(mourningGoose?.mournUntil).toBe(now + 10 * 60_000);
+    expect(mourningGoose?.mournUntil).toBe(now + MOURNING_DURATION_MS);
 
-    const afterFuneral = stepGooseLife(duringFuneral, now + 10 * 60_000 + 10_000, 16, STAGE);
+    const afterFuneral = stepGooseLife(duringFuneral, now + MOURNING_DURATION_MS + 10_000, 16, STAGE);
     const recovered = afterFuneral.geese.find((g) => g.id === "living");
     expect(recovered?.mood).toBe("sad");
     expect(recovered?.state).toBe("idle");
@@ -171,6 +172,6 @@ describe("gooseLife core invariants", () => {
 
     const next = maybeApplyLatestOneliner(state, "rip Raster", "one", now + 1234);
     const reacted = next.geese.find((g) => g.id === "target");
-    expect(reacted?.mournUntil).toBe(now + 1234 + 10 * 60_000);
+    expect(reacted?.mournUntil).toBe(now + 1234 + MOURNING_DURATION_MS);
   });
 });
