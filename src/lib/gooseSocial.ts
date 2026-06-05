@@ -73,7 +73,7 @@ function buildContextualDialogue(now: number): string[] {
   if (learned) return [`${user} just unlocked: "${learned}"`, "Chatline certified. Confirmasse!"];
   const line = recentOneliner.text.length > 56 ? `${recentOneliner.text.slice(0, 53)}...` : recentOneliner.text;
   return pickUsageTracked("oneliner-dialogues", ONELINER_DIALOGUES).map((entry) =>
-    entry.replaceAll("{user}", user).replaceAll("{line}", line),
+    entry.replace(/\{user\}/g, user).replace(/\{line\}/g, line),
   );
 }
 export function getBallPos() {
