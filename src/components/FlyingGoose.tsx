@@ -21,223 +21,17 @@ import type { OnelinerEntry } from "@/lib/nectarine";
 import { detectOnelinerReaction } from "@/lib/onelinerReactions";
 import { detectGooseTriggerReaction } from "@/lib/gooseTriggerReactions";
 import { learnPhraseFromOneliner } from "@/lib/gooseLearnedPhrases";
-
-/**
- * Pixel-art goose drawn entirely in code (no image asset). Wanders the viewport
- * and periodically perches on title letters (elements with `data-goose-letter`).
- * Reacts to new oneliner posts: if the post contains a smiley code, the goose
- * mirrors it in a speech bubble; if it contains the word "goose", a giant
- * pixel-art heart pops above the bird.
- */
-
-// --- Sprite definition ---------------------------------------------------
-// 16-bit pixel goose. Facing right; flipped via scaleX(-1) when needed.
-// Palette: K outline, W white, L belly highlight, G mid shadow,
-//          O orange beak/feet, D dark orange (beak shadow), E eye.
-// 24 x 18 grid for richer shading than the old 20x14 sprite.
-
-// Common goose body + slim straight neck + small round head w/ eye + beak.
-// Identical across all 4 flying frames so the neck stays a consistent width
-// and the head reads as an actual goose head. Only wings change per frame.
-//
-// Layout (cols/rows):
-//   body         cols 4-13, rows 6-12
-//   neck (slim)  cols 9-14, rows 7-9  (2-row K outline + 1-row L fill)
-//   head         cols 15-18, rows 6-10 (with eye at col 16 row 7)
-//   beak         cols 19-22, rows 7-9
-const FRAMES: string[][] = [
-  // 0 — FLY: wings high (upstroke peak).
-  [
-    "...KK...................",
-    "..KGGK..................",
-    "..KWWGK.................",
-    "..KGWWGK................",
-    "...KGWWGK...............",
-    "....KGWWGK..............",
-    ".....KWWWWKK....KKKK....",
-    "....KWLLLLLLWKKKWEWWK...",
-    "....KWLLLLLLLLWWWWWKKDO.",
-    ".....KGLLLLLWKKKWWWWKKD.",
-    "......KGGGGGK....KKKK...",
-    ".......KKKKK............",
-    "........O.O.............",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-  ],
-  // 1 — FLY: wings mid-up.
-  [
-    "........................",
-    "...KKK..................",
-    "..KGGGK.................",
-    "..KGWWGKK...............",
-    "...KGWWWGK..............",
-    "....KGGWWGK.............",
-    ".....KWWWWKK....KKKK....",
-    "....KWLLLLLLWKKKWEWWK...",
-    "....KWLLLLLLLLWWWWWKKDO.",
-    ".....KGLLLLLWKKKWWWWKKD.",
-    "......KGGGGGK....KKKK...",
-    ".......KKKKK............",
-    "........O.O.............",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-  ],
-  // 2 — FLY: wings level / fully extended out to the side.
-  [
-    "........................",
-    "........................",
-    "..KKK...................",
-    ".KGGGK..................",
-    "KGWWWGK.................",
-    ".KGGWWGK................",
-    ".....KWWWWKK....KKKK....",
-    "....KWLLLLLLWKKKWEWWK...",
-    "....KWLLLLLLLLWWWWWKKDO.",
-    ".....KGLLLLLWKKKWWWWKKD.",
-    "......KGGGGGK....KKKK...",
-    ".......KKKKK............",
-    "........O.O.............",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-  ],
-  // 3 — FLY: wings down (downstroke).
-  [
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    ".....KWWWWKK....KKKK....",
-    "....KWLLLLLLWKKKWEWWK...",
-    "....KWLLLLLLLLWWWWWKKDO.",
-    ".....KGLLLLLWKKKWWWWKKD.",
-    "......KGGGGGK....KKKK...",
-    ".......KKKKK............",
-    "........O.O.............",
-    "....KGWWGK..............",
-    "...KGWWWWGK.............",
-    "..KGWWWWWGK.............",
-    "..KGWWWGK...............",
-    "...KKKK.................",
-  ],
-
-  // 4 — STANDING (full sprite, kept for compatibility / fallback)
-  [
-    "........KKKK............",
-    ".......KWWWWK...........",
-    ".......KWEWWWKKDO.......",
-    ".......KWWWWWKD.........",
-    "........KWWWK...........",
-    "........KWWK............",
-    "........KWWK............",
-    ".........KWWK...........",
-    ".........KWWK...........",
-    "..........KWWK..........",
-    "..........KWWWK.........",
-    ".........KWWWWWK........",
-    "........KWLLLLLWK.......",
-    ".......KWLLLLLLLWK......",
-    ".......KWLLLLLLLWK......",
-    "........KGGGGGGGK.......",
-    ".........KKKKKKK........",
-    "........O.....O.........",
-  ],
-  // 5 — STANDING BODY (static layer). No vertical neck collar — the whole
-  // neck lives in the head sprite, so when the head turns there are no
-  // leftover white pixels behind the rotating head.
-  [
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "..........KWWK..........",
-    ".........KWWWWWK........",
-    "........KWLLLLLWK.......",
-    ".......KWLLLLLLLWK......",
-    ".......KWLLLLLLLWK......",
-    "........KGGGGGGGK.......",
-    ".........KKKKKKK........",
-    "........O.....O.........",
-  ],
-  // 6 — STANDING HEAD (rotates / sways). Contains the FULL neck so the
-  // whole head+neck swings as one rigid piece, pivoting where the neck
-  // meets the body (col 11.5, row 10).
-  [
-    "..........KKKK..........",
-    ".........KWWWWK.........",
-    ".........KWEWWWKKDO.....",
-    ".........KWWWWWKD.......",
-    "..........KWWWK.........",
-    "..........KWWK..........",
-    "..........KWWK..........",
-    "..........KWWK..........",
-    "..........KWWK..........",
-    "..........KWWK..........",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-    "........................",
-  ],
-
-];
-
-
-
-
-type GooseVariant = "white" | "brown";
-
-const PALETTES: Record<GooseVariant, Record<string, string>> = {
-  white: {
-    K: "#1a1a1a",
-    W: "#ffffff",
-    L: "#e8eaee",
-    G: "#b8bcc2",
-    O: "#ff8a1f",
-    D: "#c95a00",
-    E: "#1a1a1a",
-  },
-  // Warm brown goose: chocolate outline, tan body, cream belly, yellow beak.
-  brown: {
-    K: "#2a1a0d",
-    W: "#8a5a32",
-    L: "#e6cfa8",
-    G: "#5a3a1f",
-    O: "#f2c542",
-    D: "#a07020",
-    E: "#0d0703",
-  },
-};
-
-const PIXEL = 3;
-const FRAME_W = 24;
-const FRAME_H = 18;
-const BASE_SPRITE_W = FRAME_W * PIXEL;
-const BASE_SPRITE_H = FRAME_H * PIXEL;
-const STAND_FRAME = 4;
-const STAND_BODY = 5;
-const STAND_HEAD = 6;
-const NECK_PIVOT_X_PX = 11.5 * PIXEL;
-const NECK_PIVOT_Y_PX = 10 * PIXEL;
+import {
+  BASE_SPRITE_H,
+  BASE_SPRITE_W,
+  buildGooseFrameDataUrls,
+  type GooseVariant,
+  NECK_PIVOT_X_PX,
+  NECK_PIVOT_Y_PX,
+  PIXEL,
+  STAND_BODY,
+  STAND_HEAD,
+} from "@/lib/gooseSprite";
 const BEAK_OFFSET_X_RATIO = 0.34;
 const BEAK_OFFSET_Y_RATIO = -0.12;
 const LETTER_PERCH_SINK = 10;
@@ -245,25 +39,6 @@ const WINDOW_PERCH_SINK = 2;
 
 const eatingGooseIds = new Set<number>();
 let nextGooseInstanceId = 1;
-
-
-function buildFrameSvgs(variant: GooseVariant = "white"): string[] {
-  const colors = PALETTES[variant];
-  return FRAMES.map((rows) => {
-    const rects: string[] = [];
-    rows.forEach((row, y) => {
-      for (let x = 0; x < row.length; x++) {
-        const c = row[x];
-        const color = colors[c];
-        if (!color) continue;
-        rects.push(
-          `<rect x="${x * PIXEL}" y="${y * PIXEL}" width="${PIXEL}" height="${PIXEL}" fill="${color}"/>`,
-        );
-      }
-    });
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${BASE_SPRITE_W}" height="${BASE_SPRITE_H}" viewBox="0 0 ${BASE_SPRITE_W} ${BASE_SPRITE_H}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
-  });
-}
 
 // --- Smiley detection ----------------------------------------------------
 // Build lookup once; sorted longest-first so e.g. ":facepalm2:" beats ":facepalm:".
@@ -434,9 +209,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
   }, [oneliners, variant]);
 
   useEffect(() => {
-    const frames = buildFrameSvgs(variant).map(
-      (svg) => "data:image/svg+xml;utf8," + encodeURIComponent(svg),
-    );
+    const frames = buildGooseFrameDataUrls(variant);
 
     const reducedMotion =
       typeof window !== "undefined" &&
