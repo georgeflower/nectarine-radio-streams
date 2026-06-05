@@ -10,7 +10,10 @@
 //
 // No realtime, no per-keystroke writes, no large payloads.
 
-import { supabase } from "@/integrations/supabase/client";
+// Note: the Supabase client is imported lazily inside the functions below.
+// Importing it at module load pulls in the auth auto-refresh timer which
+// interferes with fake timers in unit tests (and isn't needed until we
+// actually flush).
 import {
   classifyToken,
   getLearnedLexicon,
