@@ -59,11 +59,14 @@ const AMBIENT_CHATTER: Partial<Record<Goose["state"], string[]>> = {
 };
 
 const MAX_SPEECH_LENGTH = 42;
-const BASE_SPRITE_SCALE = 0.78;
+const DEFAULT_SPRITE_SCALE_FACTOR = 0.78;
 const AMBIENT_SPEECH_INTERVAL_MS = 2600;
 const MIN_AMBIENT_SPEECH_DURATION_MS = 1800;
 const AMBIENT_SPEECH_DURATION_VARIANCE_MS = 1400;
 const ONELINER_SPEECH_DURATION_MS = 2800;
+const PHASE_OFFSET_MULTIPLIER_MS = 2000;
+const FLY_FRAME_DURATION_MS = 110;
+const FLY_FRAME_COUNT = 4;
 const PLAY_BOUNCE_FREQUENCY = 1.4;
 const PLAY_BOUNCE_AMPLITUDE = 3.5;
 const WADDLE_BOUNCE_AMPLITUDE = 2.2;
@@ -148,7 +151,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
   );
   const spriteScale = useMemo(() => {
     const scale = Math.min(bounds.width / 1280, bounds.height / 720);
-    return BASE_SPRITE_SCALE * clamp(scale || 1, 0.7, 1.2);
+    return DEFAULT_SPRITE_SCALE_FACTOR * clamp(scale || 1, 0.7, 1.2);
   }, [bounds.height, bounds.width]);
   const spriteWidth = BASE_SPRITE_W * spriteScale;
   const spriteHeight = BASE_SPRITE_H * spriteScale;
@@ -257,6 +260,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
     if (!latest) return;
     const key = `${latest.time}|${latest.username}|${latest.text}`;
     if (lastSpokenOnelinerKeyRef.current === null) {
+      // Ignore the first item on mount so the flock only reacts to new chatter.
       lastSpokenOnelinerKeyRef.current = key;
       return;
     }
@@ -288,13 +292,13 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
         const opacity = bodyOpacity(goose, now);
         const seed = hashSeed(goose.id);
         const direction = goose.velocity.x < 0 ? -1 : 1;
-        const phaseMs = now + seed * 2000;
+        const phaseMs = now + seed * PHASE_OFFSET_MULTIPLIER_MS;
         const phase = phaseMs / 180;
         const variant = gooseVariant(goose);
         const frames = gooseFrames[variant];
         const speech = speeches[goose.id];
         const visualMode = getGooseVisualMode(goose);
-        const frameIndex = Math.floor((phaseMs / 110) % 4);
+        const frameIndex = Math.floor((phaseMs / FLY_FRAME_DURATION_MS) % FLY_FRAME_COUNT);
         const flyHeadBob = Math.sin(phase * 1.2) * spriteScale;
         const flyPitch = clamp(
           Math.atan2(goose.velocity.y, Math.max(12, Math.abs(goose.velocity.x))) * (180 / Math.PI),
