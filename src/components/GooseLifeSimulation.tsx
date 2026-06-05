@@ -48,6 +48,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
   const frameRef = useRef<number>(0);
   const persistAtRef = useRef<number>(0);
   const stateRef = useRef<GooseLifeState | null>(null);
+  const latestOnelinerRef = useRef<OnelinerEntry | null>(oneliners[0] ?? null);
   const [bounds, setBounds] = useState<StageBounds>({ width: window.innerWidth, height: window.innerHeight });
   const [state, setState] = useState<GooseLifeState>(() => loadGooseLifeState() ?? createInitialGooseLifeState(Date.now()));
   const [now, setNow] = useState(Date.now());
@@ -55,6 +56,9 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+  useEffect(() => {
+    latestOnelinerRef.current = oneliners[0] ?? null;
+  }, [oneliners]);
 
   useEffect(() => {
     const target = rootRef.current;
@@ -77,7 +81,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
       const tickNow = Date.now();
       setNow(tickNow);
       setState((prev) => {
-        const latest = oneliners[0];
+        const latest = latestOnelinerRef.current;
         const onelinerKey = latest ? `${latest.time}|${latest.username}|${latest.text}` : null;
         const withReaction = latest && onelinerKey
           ? maybeApplyLatestOneliner(prev, latest.text, onelinerKey)
@@ -96,7 +100,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
       cancelAnimationFrame(frameRef.current);
       if (stateRef.current) saveGooseLifeState(stateRef.current);
     };
-  }, [bounds, oneliners]);
+  }, [bounds]);
 
   const living = useMemo(() => state.geese.filter((goose) => goose.alive), [state.geese]);
   const maxAge = useMemo(

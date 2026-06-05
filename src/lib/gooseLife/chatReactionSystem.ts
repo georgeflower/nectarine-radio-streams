@@ -53,7 +53,7 @@ export function maybeApplyLatestOneliner(state: GooseLifeState, text: string, ke
   return {
     ...state,
     processedOnelinerKey: key,
-    geese: state.geese.map((goose, idx) => {
+    geese: state.geese.map((goose) => {
       if (!goose.alive) return goose;
       const selected = !target || goose.id === target.id;
       const next: Goose = { ...goose, relationships: { ...goose.relationships } };
@@ -65,9 +65,11 @@ export function maybeApplyLatestOneliner(state: GooseLifeState, text: string, ke
           y: (centerY - goose.position.y) * 0.08,
         };
       }
-      if (reaction.affinityBoost && idx < state.geese.length - 1) {
-        const partner = state.geese[idx + 1];
-        if (partner) next.relationships[partner.id] = (next.relationships[partner.id] ?? 0) + reaction.affinityBoost;
+      if (reaction.affinityBoost) {
+        for (const partner of state.geese) {
+          if (!partner.alive || partner.id === goose.id) continue;
+          next.relationships[partner.id] = (next.relationships[partner.id] ?? 0) + reaction.affinityBoost;
+        }
       }
       if (reaction.triggerMourning) {
         next.mood = "mourning";

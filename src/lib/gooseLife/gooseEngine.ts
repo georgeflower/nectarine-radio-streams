@@ -28,8 +28,10 @@ const randomPersonality = (): Goose["personality"] => {
 
 function randomName(used: Set<string>): string {
   const available = NAMES.filter((name) => !used.has(name));
-  return (available.length ? available : NAMES)[Math.floor(Math.random() * NAMES.length)] +
-    (available.length ? "" : ` ${Math.floor(Math.random() * 100)}`);
+  if (available.length > 0) {
+    return available[Math.floor(Math.random() * available.length)];
+  }
+  return `${NAMES[Math.floor(Math.random() * NAMES.length)]} ${Math.floor(Math.random() * 100)}`;
 }
 
 function createGoose(now: number, stage: StageBounds, seed: Partial<Goose>): Goose {

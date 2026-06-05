@@ -1101,7 +1101,7 @@ const Cracktro = ({
                   : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
               } ${gooseLifeSimOn ? "opacity-40 cursor-not-allowed" : ""}`}
               aria-pressed={gooseOn}
-              title="Toggle flying goose"
+              title={gooseLifeSimOn ? "Classic goose disabled while Life Sim is active" : "Toggle flying goose"}
               disabled={gooseLifeSimOn}
             >
               {gooseOn ? "ON" : "OFF"}
@@ -1117,7 +1117,7 @@ const Cracktro = ({
                   : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
               } ${gooseLifeSimOn ? "opacity-40 cursor-not-allowed" : ""}`}
               aria-pressed={brownGooseOn}
-              title="Toggle brown flying goose"
+              title={gooseLifeSimOn ? "Classic goose disabled while Life Sim is active" : "Toggle brown flying goose"}
               disabled={gooseLifeSimOn}
             >
               {brownGooseOn ? "ON" : "OFF"}

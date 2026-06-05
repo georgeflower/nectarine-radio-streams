@@ -14,7 +14,7 @@ export type GooseState =
 
 export interface Egg {
   laidAt: number;
-  hatchAfterHours: 4;
+  hatchAfterHours: number;
 }
 
 export interface Goose {
