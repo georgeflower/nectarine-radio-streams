@@ -82,6 +82,7 @@ const MIN_AMBIENT_SPEECH_DURATION_MS = 1800;
 const AMBIENT_SPEECH_DURATION_VARIANCE_MS = 1400;
 const AMBIENT_SPEECH_PROBABILITY = 0.62;
 const ONELINER_SPEECH_DURATION_MS = 2800;
+const PERCH_UPDATE_INTERVAL_MS = 2600;
 const PHASE_OFFSET_MULTIPLIER_MS = 2000;
 const FLY_FRAME_DURATION_MS = 110;
 const WALK_FRAME_DURATION_MS = 140;
@@ -250,7 +251,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(target);
-    const perchInterval = window.setInterval(resize, 1300);
+    const perchInterval = window.setInterval(resize, PERCH_UPDATE_INTERVAL_MS);
     return () => {
       ro.disconnect();
       window.clearInterval(perchInterval);
@@ -339,7 +340,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
   return (
     <div ref={rootRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 62 }} data-testid="goose-life-sim">
       <div className="absolute top-14 left-2 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground">
-        Goose Life · Day {currentDay}/{totalDays} · Age {maxAge.toFixed(1)}h · Flock {living.length}
+        Goose Life · Day {currentDay}/{totalDays} · Oldest {maxAge.toFixed(1)}h · Flock {living.length}
       </div>
       {state.geese.map((goose) => {
         if (goose.bodyRemoved) return null;

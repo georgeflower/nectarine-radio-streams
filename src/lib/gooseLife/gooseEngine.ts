@@ -23,6 +23,12 @@ const SPEED_MULTIPLIER = 4;
 const LOWER_BAND_RATIO = 0.8;
 const FOLLOW_SPACING = 30;
 const FOLLOW_LATERAL_SPACING = 12;
+const PERCH_SELECTION_RANDOMNESS = 24;
+const FLY_SPAWN_MAX_RATIO = 0.65;
+const GROUND_SPAWN_MIN_RATIO = 0.82;
+const GROUND_SPAWN_MAX_RATIO = 0.92;
+const FLY_MAX_HEIGHT_RATIO = 0.74;
+const CHASE_GROUND_DISTANCE_THRESHOLD = 170;
 
 const randomBetween = (min: number, max: number) => min + Math.random() * (max - min);
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -57,7 +63,7 @@ function choosePerch(stage: StageBounds, goose: Goose) {
   let bestScore = Number.POSITIVE_INFINITY;
   for (const perch of perches) {
     const distance = Math.hypot(perch.x - goose.position.x, perch.y - goose.position.y);
-    const score = distance + Math.random() * 24;
+    const score = distance + Math.random() * PERCH_SELECTION_RANDOMNESS;
     if (score < bestScore) {
       best = perch;
       bestScore = score;
@@ -69,7 +75,9 @@ function choosePerch(stage: StageBounds, goose: Goose) {
 function createGoose(now: number, stage: StageBounds, seed: Partial<Goose>): Goose {
   const margin = 40;
   const x = randomBetween(margin, Math.max(margin + 1, stage.width - margin));
-  const baseY = seed.state === "fly" ? randomBetween(margin, Math.max(margin + 1, stage.height * 0.65)) : randomBetween(stage.height * 0.82, Math.max(stage.height * 0.92, stage.height - margin));
+  const baseY = seed.state === "fly"
+    ? randomBetween(margin, Math.max(margin + 1, stage.height * FLY_SPAWN_MAX_RATIO))
+    : randomBetween(stage.height * GROUND_SPAWN_MIN_RATIO, Math.max(stage.height * GROUND_SPAWN_MAX_RATIO, stage.height - margin));
   const y = seed.position?.y ?? clamp(baseY, margin, stage.height - margin);
   const angle = randomBetween(0, Math.PI * 2);
   const speed = randomBetween(22, 42) * SPEED_MULTIPLIER;
@@ -129,7 +137,7 @@ function constrainToBounds(goose: Goose, stage: StageBounds) {
   const minX = 20;
   const maxX = Math.max(20, stage.width - 20);
   const minY = 40;
-  const flyMaxY = Math.max(minY + 20, stage.height * 0.74);
+  const flyMaxY = Math.max(minY + 20, stage.height * FLY_MAX_HEIGHT_RATIO);
   const groundMinY = floorY(stage);
   const maxY = Math.max(groundMinY + 10, stage.height - 24);
   const canGoFly = canFly(next) && (next.state === "fly" || next.state === "play");
@@ -185,8 +193,8 @@ function applyFollowState(goose: Goose, geese: Goose[], dtSeconds: number, stage
   const index = Math.max(0, siblings.findIndex((g) => g.id === goose.id));
   next.followIndex = index;
 
-  const heading = Math.atan2(mother.velocity.y, mother.velocity.x || 0.0001);
-  const facing = Number.isFinite(heading) ? heading : 0;
+  const headingMagnitude = Math.hypot(mother.velocity.x, mother.velocity.y);
+  const facing = headingMagnitude < 0.001 ? 0 : Math.atan2(mother.velocity.y, mother.velocity.x);
   const backX = Math.cos(facing + Math.PI);
   const backY = Math.sin(facing + Math.PI);
   const sideX = Math.cos(facing + Math.PI / 2);
@@ -239,7 +247,7 @@ function applyPlayState(goose: Goose, geese: Goose[], dtSeconds: number, stage: 
   const dx = target.position.x - next.position.x;
   const dy = target.position.y - next.position.y;
   const distance = Math.hypot(dx, dy);
-  const groundedChase = distance < 170;
+  const groundedChase = distance < CHASE_GROUND_DISTANCE_THRESHOLD;
   const chaseSpeed = (groundedChase ? 95 : 135) * SPEED_MULTIPLIER * next.speedModifier;
   next.velocity.x += (dx / Math.max(1, distance)) * chaseSpeed * dtSeconds;
   next.velocity.y += (dy / Math.max(1, distance)) * chaseSpeed * dtSeconds;
@@ -368,7 +376,7 @@ function updateReproduction(state: GooseLifeState, now: number, stage: StageBoun
     if (hatchable.length > 0) {
       const father = geese.find((g) => g.id === female.targetId && g.sex === "male" && g.alive);
       female.eggs = (female.eggs ?? []).filter((egg) => now - egg.laidAt < egg.hatchAfterHours * HOUR_MS);
-      for (let idx = 0; idx < hatchable.length; idx++) {
+      for (let goslingIndex = 0; goslingIndex < hatchable.length; goslingIndex++) {
         geese.push(
           createGoose(now, stage, {
             name: randomName(new Set(geese.map((g) => g.name))),
@@ -381,9 +389,9 @@ function updateReproduction(state: GooseLifeState, now: number, stage: StageBoun
             paletteShift: Math.floor(randomBetween(-40, 40)),
             parentIds: father ? [female.id, father.id] : [female.id],
             isGosling: true,
-            followIndex: idx,
+            followIndex: goslingIndex,
             position: {
-              x: female.position.x - (idx + 1) * FOLLOW_SPACING,
+              x: female.position.x - (goslingIndex + 1) * FOLLOW_SPACING,
               y: floorY(stage),
             },
           }),

@@ -118,6 +118,54 @@ describe("gooseLife core invariants", () => {
     randomSpy.mockRestore();
   });
 
+  it("keeps goslings grounded even when marked as flying", () => {
+    const now = 3_500_000;
+    const gosling = makeGoose(now, {
+      id: "gosling",
+      ageHours: 1,
+      state: "fly",
+      isGosling: true,
+      parentIds: ["female"],
+      velocity: { x: 220, y: -120 },
+      position: { x: 420, y: 220 },
+      nextBehaviorAt: now + 10_000,
+    });
+    const mother = makeGoose(now, {
+      id: "female",
+      sex: "female",
+      ageHours: 12,
+      position: { x: 430, y: 620 },
+      velocity: { x: 40, y: 0 },
+      state: "waddle",
+    });
+
+    const next = stepGooseLife(makeState(now, [mother, gosling]), now + 200, 16, STAGE);
+    const updated = next.geese.find((g) => g.id === "gosling");
+    expect(updated?.state).not.toBe("fly");
+    expect((updated?.position.y ?? 0)).toBeGreaterThanOrEqual(STAGE.height * 0.8);
+  });
+
+  it("moves sleeping geese toward perch targets", () => {
+    const now = 3_700_000;
+    const sleeper = makeGoose(now, {
+      id: "sleepy",
+      state: "sleep",
+      ageHours: 12,
+      position: { x: 640, y: 690 },
+      velocity: { x: 0, y: 0 },
+      nextBehaviorAt: now + 60_000,
+    });
+    const stageWithPerch = {
+      ...STAGE,
+      perches: [{ x: 640, y: 480, kind: "window" as const }],
+    };
+
+    const next = stepGooseLife(makeState(now, [sleeper]), now + 800, 800, stageWithPerch);
+    const updated = next.geese.find((g) => g.id === "sleepy");
+    expect(updated?.position.y ?? 999).toBeLessThan(690);
+    expect(updated?.perchTarget?.kind).toBe("window");
+  });
+
   it("marks geese dead when they reach lifespan", () => {
     const now = 4_000_000;
     const elder = makeGoose(now, {
