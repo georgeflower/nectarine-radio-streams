@@ -52,8 +52,8 @@ const AMBIENT_CHATTER: Partial<Record<Goose["state"], string[]>> = {
   fly: ["flap flap", "air route clear", "zoom honk"],
   eat: ["snack time", "crumb patrol", "nom nom"],
   sleep: ["zzz", "soft honk..."],
-  play: ["wheee", "tag youre it", "happy flap"],
-  interact: ["hiya honk", "good goose day", "lets chat"],
+  play: ["wheee", "tag you're it", "happy flap"],
+  interact: ["hiya honk", "good goose day", "let's chat"],
   mourn: ["...", "miss you"],
   follow: ["wait up", "right behind you", "tiny flap"],
 };
@@ -120,7 +120,7 @@ function gooseVariant(goose: Goose): GooseVariant {
   return goose.sex === "female" ? "brown" : "white";
 }
 
-function getGooseVisualMode(goose: Goose) {
+function getGooseVisualMode(goose: Goose): GooseVisualMode {
   const speed = Math.hypot(goose.velocity.x, goose.velocity.y);
   if (!goose.alive || goose.state === "sleep" || goose.state === "mourn") return "perched";
   if (goose.state === "fly") return "fly";
