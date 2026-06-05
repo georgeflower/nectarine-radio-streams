@@ -3,6 +3,7 @@ import Visualizer, { type VisualizerStyle } from "./Visualizer";
 import BeatOverlay from "./BeatOverlay";
 import FloatingWindow from "./FloatingWindow";
 import FlyingGoose from "./FlyingGoose";
+import GooseLifeSimulation from "./GooseLifeSimulation";
 import BoingBall from "./BoingBall";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl } from "@/lib/nectarine";
@@ -56,6 +57,7 @@ const STORAGE_INFOBAR = "cracktro-infobar-on";
 const STORAGE_FPS_COUNTER = "cracktro-fps-counter";
 const STORAGE_SCENE_ERAS = "cracktro-scene-eras";
 const STORAGE_SCENE_ERA_LISTEN_MS = "cracktro-scene-era-listen-ms";
+const STORAGE_GOOSE_LIFE_SIM = "cracktro-goose-life-sim";
 const MAX_FRAME_TIME_MS = 100;
 const FPS_EMA_ALPHA = 0.1;
 const LOW_FPS_THRESHOLD = 28;
@@ -371,6 +373,22 @@ const Cracktro = ({
       /* ignore */
     }
   }, [boingOn]);
+  const [gooseLifeSimOn, setGooseLifeSimOn] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem(STORAGE_GOOSE_LIFE_SIM);
+      // New installs default to the autonomous Goose Life simulation.
+      return v === null ? true : v === "1";
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_GOOSE_LIFE_SIM, gooseLifeSimOn ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [gooseLifeSimOn]);
   const [sceneErasOn, setSceneErasOn] = useState<boolean>(() => {
     try {
       return localStorage.getItem(STORAGE_SCENE_ERAS) === "1";
@@ -734,8 +752,14 @@ const Cracktro = ({
       <StageProvider element={stageEl}>
         <Visualizer analyser={analyser} style={effectiveStyle} />
         <BeatOverlay analyser={analyser} enabled />
-        {gooseOn && <FlyingGoose oneliners={oneliners} />}
-        {brownGooseOn && <FlyingGoose oneliners={oneliners} variant="brown" />}
+        {gooseLifeSimOn ? (
+          <GooseLifeSimulation oneliners={oneliners} />
+        ) : (
+          <>
+            {gooseOn && <FlyingGoose oneliners={oneliners} />}
+            {brownGooseOn && <FlyingGoose oneliners={oneliners} variant="brown" />}
+          </>
+        )}
         {boingOn && <BoingBall />}
 
         <button
@@ -1076,9 +1100,10 @@ const Cracktro = ({
                 gooseOn
                   ? "border-primary bg-primary/20 text-foreground"
                   : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              }`}
+              } ${gooseLifeSimOn ? "opacity-40 cursor-not-allowed" : ""}`}
               aria-pressed={gooseOn}
-              title="Toggle flying goose"
+              title={gooseLifeSimOn ? "Classic goose disabled while Life Sim is active" : "Toggle flying goose"}
+              disabled={gooseLifeSimOn}
             >
               {gooseOn ? "ON" : "OFF"}
             </button>
@@ -1091,11 +1116,26 @@ const Cracktro = ({
                 brownGooseOn
                   ? "border-primary bg-primary/20 text-foreground"
                   : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              }`}
+              } ${gooseLifeSimOn ? "opacity-40 cursor-not-allowed" : ""}`}
               aria-pressed={brownGooseOn}
-              title="Toggle brown flying goose"
+              title={gooseLifeSimOn ? "Classic goose disabled while Life Sim is active" : "Toggle brown flying goose"}
+              disabled={gooseLifeSimOn}
             >
               {brownGooseOn ? "ON" : "OFF"}
+            </button>
+            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Life Sim</span>
+            <button
+              type="button"
+              onClick={() => setGooseLifeSimOn((v) => !v)}
+              className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                gooseLifeSimOn
+                  ? "border-primary bg-primary/20 text-foreground"
+                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+              }`}
+              aria-pressed={gooseLifeSimOn}
+              title="Toggle goose life simulation"
+            >
+              {gooseLifeSimOn ? "ON" : "OFF"}
             </button>
 
             <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Boing</span>

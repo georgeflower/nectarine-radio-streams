@@ -15,6 +15,10 @@ vi.mock("../components/FlyingGoose", () => ({
   default: () => <div data-testid="flying-goose" />,
 }));
 
+vi.mock("../components/GooseLifeSimulation", () => ({
+  default: () => <div data-testid="goose-life-sim" />,
+}));
+
 vi.mock("../components/BoingBall", () => ({
   default: () => <div data-testid="boing-ball" />,
 }));
@@ -57,13 +61,23 @@ describe("Cracktro defaults and fullscreen behavior", () => {
     });
   });
 
-  it("shows white and brown geese, boing ball, info text, and queue by default", async () => {
+  it("shows goose life simulation by default with boing ball, info text, and queue", async () => {
     render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
 
     expect(await screen.findByText(/Skaven/i)).toBeInTheDocument();
-    expect(screen.getAllByTestId("flying-goose")).toHaveLength(2);
+    expect(screen.getByTestId("goose-life-sim")).toBeInTheDocument();
+    expect(screen.queryAllByTestId("flying-goose")).toHaveLength(0);
     expect(screen.getByTestId("boing-ball")).toBeInTheDocument();
     expect(screen.getByTestId("floating-queue")).toBeInTheDocument();
+  });
+
+  it("falls back to two classic geese when life simulation is turned off", async () => {
+    localStorage.setItem("cracktro-goose-life-sim", "0");
+    render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
+
+    await screen.findByText(/Skaven/i);
+    expect(screen.queryByTestId("goose-life-sim")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("flying-goose")).toHaveLength(2);
   });
 
   it("exits fullscreen back to in-browser view without opening a floating window", async () => {
