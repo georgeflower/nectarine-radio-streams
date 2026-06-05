@@ -43,6 +43,13 @@ export interface Goose {
   bodyFadeStartAt?: number;
   bodyRemoved?: boolean;
   parentIds?: [string, string] | [string];
+  isGosling?: boolean;
+  followIndex?: number;
+  perchTarget?: {
+    x: number;
+    y: number;
+    kind: "letter" | "window" | "floor";
+  };
 }
 
 export interface GooseLifeState {
@@ -57,4 +64,9 @@ export interface GooseLifeState {
 export interface StageBounds {
   width: number;
   height: number;
+  perches?: Array<{
+    x: number;
+    y: number;
+    kind: "letter" | "window" | "floor";
+  }>;
 }

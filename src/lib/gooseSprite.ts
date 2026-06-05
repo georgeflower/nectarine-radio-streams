@@ -1,4 +1,4 @@
-export type GooseVariant = "white" | "brown";
+export type GooseVariant = "white" | "brown" | "gosling-white" | "gosling-brown";
 
 const FRAMES: string[][] = [
   [
@@ -161,6 +161,24 @@ const PALETTES: Record<GooseVariant, Record<string, string>> = {
     O: "#f2c542",
     D: "#a07020",
     E: "#0d0703",
+  },
+  "gosling-white": {
+    K: "#3a2a1e",
+    W: "#f8df7f",
+    L: "#ffeeb0",
+    G: "#d1ba66",
+    O: "#ff9a2f",
+    D: "#c86d1a",
+    E: "#2b1f17",
+  },
+  "gosling-brown": {
+    K: "#3a2718",
+    W: "#d8a567",
+    L: "#f2cf93",
+    G: "#a06d3f",
+    O: "#ffb347",
+    D: "#c5832d",
+    E: "#2b1a10",
   },
 };
 

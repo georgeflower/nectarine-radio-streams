@@ -19,9 +19,18 @@ const DEFAULT_STAGE: StageBounds = { width: 1280, height: 720 };
 const REPRODUCTION_COOLDOWN_MS = 45_000;
 const REPRODUCTION_TICK_CHANCE = 0.0045;
 const SLEEP_DEATH_CHANCE_PER_HOUR = 0.00035;
+const SPEED_MULTIPLIER = 4;
+const LOWER_BAND_RATIO = 0.8;
+const FOLLOW_SPACING = 30;
+const FOLLOW_LATERAL_SPACING = 12;
+const PERCH_SELECTION_RANDOMNESS = 24;
+const FLY_SPAWN_MAX_RATIO = 0.65;
+const GROUND_SPAWN_MIN_RATIO = 0.82;
+const GROUND_SPAWN_MAX_RATIO = 0.92;
+const FLY_MAX_HEIGHT_RATIO = 0.74;
+const CHASE_GROUND_DISTANCE_THRESHOLD = 170;
 
 const randomBetween = (min: number, max: number) => min + Math.random() * (max - min);
-
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
 const randomPersonality = (): Goose["personality"] => {
@@ -31,18 +40,47 @@ const randomPersonality = (): Goose["personality"] => {
 
 function randomName(used: Set<string>): string {
   const available = NAMES.filter((name) => !used.has(name));
-  if (available.length > 0) {
-    return available[Math.floor(Math.random() * available.length)];
-  }
+  if (available.length > 0) return available[Math.floor(Math.random() * available.length)];
   return `${NAMES[Math.floor(Math.random() * NAMES.length)]} ${Math.floor(Math.random() * 100)}`;
+}
+
+function isGosling(goose: Goose) {
+  return (!!goose.isGosling || !!goose.parentIds) && goose.ageHours < 6;
+}
+
+function canFly(goose: Goose) {
+  return !isGosling(goose) && goose.alive;
+}
+
+function floorY(stage: StageBounds) {
+  return stage.height * LOWER_BAND_RATIO;
+}
+
+function choosePerch(stage: StageBounds, goose: Goose) {
+  const perches = stage.perches ?? [];
+  if (perches.length === 0) return { x: goose.position.x, y: floorY(stage), kind: "floor" as const };
+  let best = perches[Math.floor(Math.random() * perches.length)];
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (const perch of perches) {
+    const distance = Math.hypot(perch.x - goose.position.x, perch.y - goose.position.y);
+    const score = distance + Math.random() * PERCH_SELECTION_RANDOMNESS;
+    if (score < bestScore) {
+      best = perch;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 function createGoose(now: number, stage: StageBounds, seed: Partial<Goose>): Goose {
   const margin = 40;
   const x = randomBetween(margin, Math.max(margin + 1, stage.width - margin));
-  const y = randomBetween(margin, Math.max(margin + 1, stage.height - margin));
+  const baseY = seed.state === "fly"
+    ? randomBetween(margin, Math.max(margin + 1, stage.height * FLY_SPAWN_MAX_RATIO))
+    : randomBetween(stage.height * GROUND_SPAWN_MIN_RATIO, Math.max(stage.height * GROUND_SPAWN_MAX_RATIO, stage.height - margin));
+  const y = seed.position?.y ?? clamp(baseY, margin, stage.height - margin);
   const angle = randomBetween(0, Math.PI * 2);
-  const speed = randomBetween(22, 42);
+  const speed = randomBetween(22, 42) * SPEED_MULTIPLIER;
   return {
     id: seed.id ?? crypto.randomUUID(),
     name: seed.name ?? "Goose",
@@ -69,6 +107,9 @@ function createGoose(now: number, stage: StageBounds, seed: Partial<Goose>): Goo
     bodyFadeStartAt: seed.bodyFadeStartAt,
     bodyRemoved: seed.bodyRemoved ?? false,
     parentIds: seed.parentIds,
+    isGosling: seed.isGosling ?? false,
+    followIndex: seed.followIndex,
+    perchTarget: seed.perchTarget,
   };
 }
 
@@ -91,25 +132,93 @@ export function createInitialGooseLifeState(now = Date.now(), stage: StageBounds
   };
 }
 
-function applyMovement(goose: Goose, dtSeconds: number, stage: StageBounds, geese: Goose[]): Goose {
-  if (!goose.alive) return goose;
-  const next = { ...goose, position: { ...goose.position }, velocity: { ...goose.velocity } };
+function constrainToBounds(goose: Goose, stage: StageBounds) {
+  const next = goose;
+  const minX = 20;
+  const maxX = Math.max(20, stage.width - 20);
+  const minY = 40;
+  const flyMaxY = Math.max(minY + 20, stage.height * FLY_MAX_HEIGHT_RATIO);
+  const groundMinY = floorY(stage);
+  const maxY = Math.max(groundMinY + 10, stage.height - 24);
+  const canGoFly = canFly(next) && next.state === "fly";
 
-  if (next.state === "sleep" || next.state === "mourn") {
-    next.velocity.x *= 0.92;
-    next.velocity.y *= 0.92;
+  if (next.position.x < minX || next.position.x > maxX) {
+    next.velocity.x *= -1;
+    next.position.x = clamp(next.position.x, minX, maxX);
   }
 
-  if (next.state === "follow" && next.parentIds?.length) {
-    const parent = geese.find((g) => g.id === next.parentIds?.[0] || g.id === next.parentIds?.[1]);
-    if (parent) {
-      next.velocity.x += (parent.position.x - next.position.x) * 0.6 * dtSeconds;
-      next.velocity.y += (parent.position.y - next.position.y) * 0.6 * dtSeconds;
+  if (canGoFly) {
+    if (next.position.y < minY || next.position.y > flyMaxY) {
+      next.velocity.y *= -1;
+      next.position.y = clamp(next.position.y, minY, flyMaxY);
     }
+    return next;
   }
 
-  const maxSpeed = 70 * next.speedModifier;
+  next.position.y = clamp(next.position.y, groundMinY, maxY);
+  if (next.position.y >= maxY && next.velocity.y > 0) next.velocity.y *= -0.45;
+  if (next.position.y <= groundMinY && next.velocity.y < 0) next.velocity.y *= -0.45;
+  return next;
+}
+
+function applyPerchState(goose: Goose, dtSeconds: number, stage: StageBounds): Goose {
+  const next = { ...goose, position: { ...goose.position }, velocity: { ...goose.velocity } };
+  const perch = next.perchTarget ?? choosePerch(stage, next);
+  next.perchTarget = perch;
+  const dx = perch.x - next.position.x;
+  const dy = perch.y - next.position.y;
+  const distance = Math.hypot(dx, dy);
+  const settleSpeed = (next.state === "sleep" ? 70 : 120) * SPEED_MULTIPLIER;
+  if (distance > 2) {
+    const step = Math.min(distance, settleSpeed * dtSeconds);
+    next.position.x += (dx / Math.max(1, distance)) * step;
+    next.position.y += (dy / Math.max(1, distance)) * step;
+  }
+  next.velocity.x *= 0.68;
+  next.velocity.y *= 0.68;
+  return constrainToBounds(next, stage);
+}
+
+function applyFollowState(goose: Goose, geese: Goose[], dtSeconds: number, stage: StageBounds): Goose {
+  const next = { ...goose, position: { ...goose.position }, velocity: { ...goose.velocity } };
+  const parentCandidates = geese.filter((g) =>
+    g.alive && !isGosling(g) && (g.id === goose.parentIds?.[0] || g.id === goose.parentIds?.[1]),
+  );
+  const mother = parentCandidates.find((g) => g.sex === "female") ?? parentCandidates[0];
+  if (!mother) return applyPerchState(next, dtSeconds, stage);
+
+  const siblings = geese
+    .filter((g) => g.parentIds?.[0] === mother.id && isGosling(g) && g.alive)
+    .sort((a, b) => a.birthTimestamp - b.birthTimestamp || a.id.localeCompare(b.id));
+  const index = Math.max(0, siblings.findIndex((g) => g.id === goose.id));
+  next.followIndex = index;
+
+  const headingMagnitude = Math.hypot(mother.velocity.x, mother.velocity.y);
+  const facing = headingMagnitude < 0.001 ? 0 : Math.atan2(mother.velocity.y, mother.velocity.x);
+  const backX = Math.cos(facing + Math.PI);
+  const backY = Math.sin(facing + Math.PI);
+  const sideX = Math.cos(facing + Math.PI / 2);
+  const sideY = Math.sin(facing + Math.PI / 2);
+  const lineStep = index + 1;
+  const lateral = ((index % 2 === 0 ? -1 : 1) * Math.floor((index + 1) / 2)) * FOLLOW_LATERAL_SPACING;
+  const target = {
+    x: mother.position.x + backX * FOLLOW_SPACING * lineStep + sideX * lateral,
+    y: Math.max(floorY(stage), mother.position.y + backY * FOLLOW_SPACING * lineStep + sideY * lateral),
+  };
+
+  const dx = target.x - next.position.x;
+  const dy = target.y - next.position.y;
+  const distance = Math.hypot(dx, dy);
+  const followSpeed = 95 * SPEED_MULTIPLIER * next.speedModifier;
+  if (distance > 1) {
+    next.velocity.x += (dx / Math.max(1, distance)) * followSpeed * dtSeconds * 2;
+    next.velocity.y += (dy / Math.max(1, distance)) * followSpeed * dtSeconds * 2;
+  }
+  next.velocity.x *= 0.89;
+  next.velocity.y *= 0.82;
+
   const speed = Math.hypot(next.velocity.x, next.velocity.y);
+  const maxSpeed = followSpeed;
   if (speed > maxSpeed) {
     next.velocity.x = (next.velocity.x / speed) * maxSpeed;
     next.velocity.y = (next.velocity.y / speed) * maxSpeed;
@@ -117,17 +226,81 @@ function applyMovement(goose: Goose, dtSeconds: number, stage: StageBounds, gees
 
   next.position.x += next.velocity.x * dtSeconds;
   next.position.y += next.velocity.y * dtSeconds;
+  return constrainToBounds(next, stage);
+}
 
-  if (next.position.x < 20 || next.position.x > stage.width - 20) {
-    next.velocity.x *= -1;
-    next.position.x = clamp(next.position.x, 20, Math.max(20, stage.width - 20));
-  }
-  if (next.position.y < 40 || next.position.y > stage.height - 30) {
-    next.velocity.y *= -1;
-    next.position.y = clamp(next.position.y, 40, Math.max(40, stage.height - 30));
+function applyPlayState(goose: Goose, geese: Goose[], dtSeconds: number, stage: StageBounds): Goose {
+  const next = { ...goose, position: { ...goose.position }, velocity: { ...goose.velocity } };
+  const goslings = geese.filter((g) => g.alive && isGosling(g));
+  if (goslings.length === 0 || isGosling(next)) {
+    next.state = isGosling(next) ? "follow" : "waddle";
+    return applyMovement(next, dtSeconds, stage, geese);
   }
 
-  return next;
+  const target = goslings.reduce((best, g) => {
+    const d = Math.hypot(g.position.x - next.position.x, g.position.y - next.position.y);
+    if (!best || d < best.distance) return { goose: g, distance: d };
+    return best;
+  }, null as { goose: Goose; distance: number } | null)?.goose;
+  if (!target) return applyMovement(next, dtSeconds, stage, geese);
+
+  const dx = target.position.x - next.position.x;
+  const dy = target.position.y - next.position.y;
+  const distance = Math.hypot(dx, dy);
+  const groundedChase = distance < CHASE_GROUND_DISTANCE_THRESHOLD;
+  const chaseSpeed = (groundedChase ? 95 : 135) * SPEED_MULTIPLIER * next.speedModifier;
+  next.velocity.x += (dx / Math.max(1, distance)) * chaseSpeed * dtSeconds;
+  next.velocity.y += (dy / Math.max(1, distance)) * chaseSpeed * dtSeconds;
+
+  if (groundedChase) next.position.y = Math.max(next.position.y, floorY(stage));
+
+  const speed = Math.hypot(next.velocity.x, next.velocity.y);
+  if (speed > chaseSpeed) {
+    next.velocity.x = (next.velocity.x / speed) * chaseSpeed;
+    next.velocity.y = (next.velocity.y / speed) * chaseSpeed;
+  }
+
+  next.position.x += next.velocity.x * dtSeconds;
+  next.position.y += next.velocity.y * dtSeconds;
+  return constrainToBounds(next, stage);
+}
+
+function applyRoamState(goose: Goose, dtSeconds: number, stage: StageBounds): Goose {
+  const next = { ...goose, position: { ...goose.position }, velocity: { ...goose.velocity } };
+  if (!canFly(next) && next.state === "fly") next.state = "waddle";
+
+  const flyMode = next.state === "fly" && canFly(next);
+  const roamSpeed = (flyMode ? 90 : 48) * SPEED_MULTIPLIER * next.speedModifier;
+  const speed = Math.hypot(next.velocity.x, next.velocity.y);
+
+  if (speed < 5) {
+    const angle = randomBetween(0, Math.PI * 2);
+    next.velocity.x = Math.cos(angle) * roamSpeed;
+    next.velocity.y = Math.sin(angle) * roamSpeed * (flyMode ? 0.7 : 0.25);
+  } else {
+    next.velocity.x += (Math.random() - 0.5) * dtSeconds * roamSpeed * 0.9;
+    next.velocity.y += (Math.random() - 0.5) * dtSeconds * roamSpeed * (flyMode ? 0.5 : 0.18);
+  }
+
+  const postSpeed = Math.hypot(next.velocity.x, next.velocity.y);
+  if (postSpeed > roamSpeed) {
+    next.velocity.x = (next.velocity.x / postSpeed) * roamSpeed;
+    next.velocity.y = (next.velocity.y / postSpeed) * roamSpeed;
+  }
+
+  next.position.x += next.velocity.x * dtSeconds;
+  next.position.y += next.velocity.y * dtSeconds;
+  return constrainToBounds(next, stage);
+}
+
+function applyMovement(goose: Goose, dtSeconds: number, stage: StageBounds, geese: Goose[]): Goose {
+  if (!goose.alive) return goose;
+  if (goose.state === "sleep" || goose.state === "mourn" || goose.state === "interact" || goose.state === "eat") {
+    return applyPerchState(goose, dtSeconds, stage);
+  }
+  if (goose.state === "follow") return applyFollowState(goose, geese, dtSeconds, stage);
+  if (goose.state === "play") return applyPlayState(goose, geese, dtSeconds, stage);
+  return applyRoamState(goose, dtSeconds, stage);
 }
 
 function maybeDie(goose: Goose, now: number, dtSeconds: number): Goose {
@@ -157,6 +330,7 @@ function maybeDie(goose: Goose, now: number, dtSeconds: number): Goose {
     funeralEndsAt,
     bodyFadeStartAt: funeralEndsAt,
     velocity: { x: 0, y: 0 },
+    perchTarget: { x: goose.position.x, y: goose.position.y, kind: "floor" },
   };
 }
 
@@ -180,6 +354,7 @@ function updateReproduction(state: GooseLifeState, now: number, stage: StageBoun
         female.pregnancyUntil = now + HOUR_MS;
         female.mood = "happy";
         female.state = "interact";
+        female.perchTarget = choosePerch(stage, female);
         lastReproductionAt = now;
         female.targetId = mate.id;
         mate.relationships[female.id] = (mate.relationships[female.id] ?? 60) + 3;
@@ -193,14 +368,15 @@ function updateReproduction(state: GooseLifeState, now: number, stage: StageBoun
       const eggCount = 1 + Math.floor(Math.random() * 3);
       const eggs: Egg[] = Array.from({ length: eggCount }, () => ({ laidAt: now, hatchAfterHours: 4 }));
       female.eggs = [...(female.eggs ?? []), ...eggs];
-      female.state = "idle";
+      female.state = "waddle";
+      female.perchTarget = { x: female.position.x, y: floorY(stage), kind: "floor" };
     }
 
     const hatchable = (female.eggs ?? []).filter((egg) => now - egg.laidAt >= egg.hatchAfterHours * HOUR_MS);
     if (hatchable.length > 0) {
       const father = geese.find((g) => g.id === female.targetId && g.sex === "male" && g.alive);
       female.eggs = (female.eggs ?? []).filter((egg) => now - egg.laidAt < egg.hatchAfterHours * HOUR_MS);
-      for (const _ of hatchable) {
+      for (let goslingIndex = 0; goslingIndex < hatchable.length; goslingIndex++) {
         geese.push(
           createGoose(now, stage, {
             name: randomName(new Set(geese.map((g) => g.name))),
@@ -209,9 +385,15 @@ function updateReproduction(state: GooseLifeState, now: number, stage: StageBoun
             birthTimestamp: now,
             mood: "playful",
             state: "follow",
-            speedModifier: randomBetween(0.7, 1.15),
+            speedModifier: randomBetween(0.9, 1.3),
             paletteShift: Math.floor(randomBetween(-40, 40)),
             parentIds: father ? [female.id, father.id] : [female.id],
+            isGosling: true,
+            followIndex: goslingIndex,
+            position: {
+              x: female.position.x - (goslingIndex + 1) * FOLLOW_SPACING,
+              y: floorY(stage),
+            },
           }),
         );
       }
@@ -261,6 +443,7 @@ function updateFuneralMourning(geese: Goose[], now: number): { geese: Goose[]; f
       mood: "mourning" as const,
       state: "mourn" as const,
       mournUntil,
+      perchTarget: { x: deadWithFuneral.position.x, y: deadWithFuneral.position.y, kind: "floor" as const },
       velocity: {
         x: (deadWithFuneral.position.x - goose.position.x) * 0.03,
         y: (deadWithFuneral.position.y - goose.position.y) * 0.03,
@@ -280,6 +463,7 @@ export function stepGooseLife(
   const safeStage: StageBounds = {
     width: Math.max(320, stage.width || DEFAULT_STAGE.width),
     height: Math.max(220, stage.height || DEFAULT_STAGE.height),
+    perches: stage.perches ?? [{ x: (stage.width || DEFAULT_STAGE.width) / 2, y: (stage.height || DEFAULT_STAGE.height) * LOWER_BAND_RATIO, kind: "floor" }],
   };
 
   let geese = state.geese.map((original) => {
@@ -300,10 +484,18 @@ export function stepGooseLife(
         (other) => other.id !== goose.id && other.alive && Math.hypot(other.position.x - goose.position.x, other.position.y - goose.position.y) < 180,
       ).length;
       goose.state = chooseNextBehavior(goose, nearbyCount);
+      if (!canFly(goose) && goose.state === "fly") goose.state = "waddle";
+      if (goose.state === "sleep" || goose.state === "interact" || goose.state === "eat" || goose.state === "mourn") {
+        goose.perchTarget = choosePerch(safeStage, goose);
+      } else if (goose.state === "waddle" || goose.state === "idle" || goose.state === "follow") {
+        goose.perchTarget = { x: goose.position.x, y: floorY(safeStage), kind: "floor" };
+      } else {
+        goose.perchTarget = undefined;
+      }
       goose.nextBehaviorAt = nextBehaviorAt(now);
 
       const angle = randomBetween(0, Math.PI * 2);
-      const speed = (goose.state === "fly" ? 65 : goose.state === "sleep" ? 5 : 28) * goose.speedModifier;
+      const speed = (goose.state === "fly" ? 90 : goose.state === "sleep" ? 8 : goose.state === "play" ? 92 : 44) * SPEED_MULTIPLIER * goose.speedModifier;
       goose.velocity = {
         x: Math.cos(angle) * speed,
         y: Math.sin(angle) * speed,
