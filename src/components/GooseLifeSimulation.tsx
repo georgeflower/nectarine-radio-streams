@@ -249,11 +249,11 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
       nextBounds.perches = collectPerches(target, nextBounds);
       const prev = boundsRef.current;
       const prevPerches = prev.perches ?? [];
-      const nextPerches = nextBounds.perches ?? [];
+      const nextPerches = nextBounds.perches;
       const sameSize = prev.width === nextBounds.width && prev.height === nextBounds.height;
       const samePerches =
         prevPerches.length === nextPerches.length &&
-        prevPerches.every((p, i) => p.x === nextPerches[i]?.x && p.y === nextPerches[i]?.y && p.kind === nextPerches[i]?.kind);
+        prevPerches.every((p, i) => p.x === nextPerches[i].x && p.y === nextPerches[i].y && p.kind === nextPerches[i].kind);
       if (sameSize && samePerches) return;
       boundsRef.current = nextBounds;
       setBounds(nextBounds);
