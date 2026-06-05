@@ -63,10 +63,12 @@ const DEFAULT_SPRITE_SCALE_FACTOR = 0.78;
 const AMBIENT_SPEECH_INTERVAL_MS = 2600;
 const MIN_AMBIENT_SPEECH_DURATION_MS = 1800;
 const AMBIENT_SPEECH_DURATION_VARIANCE_MS = 1400;
+const AMBIENT_SPEECH_PROBABILITY = 0.6;
 const ONELINER_SPEECH_DURATION_MS = 2800;
 const PHASE_OFFSET_MULTIPLIER_MS = 2000;
 const FLY_FRAME_DURATION_MS = 110;
 const FLY_FRAME_COUNT = 4;
+const MIN_HORIZONTAL_VELOCITY_FOR_PITCH = 12;
 const PLAY_BOUNCE_FREQUENCY = 1.4;
 const PLAY_BOUNCE_AMPLITUDE = 3.5;
 const WADDLE_BOUNCE_AMPLITUDE = 2.2;
@@ -244,7 +246,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
       if (speakers.length === 0) return;
       const visibleSpeechCount = Object.keys(speechesRef.current).length;
       if (visibleSpeechCount > Math.max(1, Math.floor(speakers.length / 2))) return;
-      if (Math.random() > 0.6) return;
+      if (Math.random() > AMBIENT_SPEECH_PROBABILITY) return;
       const goose = speakers[Math.floor(Math.random() * speakers.length)];
       upsertSpeech(
         goose.id,
@@ -301,7 +303,10 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
         const frameIndex = Math.floor((phaseMs / FLY_FRAME_DURATION_MS) % FLY_FRAME_COUNT);
         const flyHeadBob = Math.sin(phase * 1.2) * spriteScale;
         const flyPitch = clamp(
-          Math.atan2(goose.velocity.y, Math.max(12, Math.abs(goose.velocity.x))) * (180 / Math.PI),
+          Math.atan2(
+            goose.velocity.y,
+            Math.max(MIN_HORIZONTAL_VELOCITY_FOR_PITCH, Math.abs(goose.velocity.x)),
+          ) * (180 / Math.PI),
           -22,
           22,
         );

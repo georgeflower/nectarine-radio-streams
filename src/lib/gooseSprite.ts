@@ -194,6 +194,6 @@ function buildFrameSvgs(variant: GooseVariant): string[] {
 
 export function buildGooseFrameDataUrls(variant?: GooseVariant): string[] {
   return buildFrameSvgs(variant ?? "white").map(
-    (svg) => "data:image/svg+xml;utf8," + encodeURIComponent(svg),
+    (svg) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg),
   );
 }
