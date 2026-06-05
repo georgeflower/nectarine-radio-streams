@@ -137,6 +137,10 @@ const RECENT_ONELINER_WINDOW_MS = 85_000;
 // Minimum gap between contextual goose dialogues (70s).
 const DIALOGUE_COOLDOWN_MS = 70_000;
 const BALL_PLAY_COOLDOWN_MS = 180_000;
+// Snack-break interval: at least 9 minutes between feedings.
+const FLY_AWAY_COOLDOWN_MS = 540_000;
+const FLY_AWAY_CHANCE = 0.15;
+
 const DIALOGUE_COOLDOWN_BY_ERA: Record<GooseSceneEra, number> = {
   intro: DIALOGUE_COOLDOWN_MS,
   // Gradual cooldown reduction (~11-34%) so later eras feel livelier without spam.
@@ -277,6 +281,25 @@ const FOOD_EAT_LINES = [
   "Crunch level: MAXIMUM",
 ];
 const FOOD_RESUME_LINES = ["Alright, back to the ball!", "Round two, let's bump!"];
+
+// Large chatter pool (~500 lines) drawn from the demoscene dialogue set.
+// Used for in-between banter during ball-play wind-down and snack breaks
+// so the geese never feel like they're repeating the same handful of lines.
+const CHATTER_POOL: string[] = (() => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const pair of GOOSE_DIALOGUES) {
+    for (const line of pair) {
+      const clean = (line ?? "").trim();
+      if (!clean || seen.has(clean)) continue;
+      seen.add(clean);
+      out.push(clean);
+      if (out.length >= 500) return out;
+    }
+  }
+  return out;
+})();
+
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
