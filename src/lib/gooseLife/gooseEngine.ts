@@ -29,6 +29,9 @@ const GROUND_SPAWN_MIN_RATIO = 0.82;
 const GROUND_SPAWN_MAX_RATIO = 0.92;
 const FLY_MAX_HEIGHT_RATIO = 0.74;
 const GROUND_MAX_HEIGHT_RATIO = 0.96;
+const WADDLE_VERTICAL_VARIANCE = 26;
+const WADDLE_VERTICAL_SPRING_STRENGTH = 12;
+const GROUND_VERTICAL_SPEED_RATIO = 0.22;
 const CHASE_GROUND_DISTANCE_THRESHOLD = 170;
 
 const randomBetween = (min: number, max: number) => min + Math.random() * (max - min);
@@ -285,8 +288,9 @@ function applyRoamState(goose: Goose, dtSeconds: number, stage: StageBounds): Go
     if (flyMode) {
       next.velocity.y += (Math.random() - 0.5) * dtSeconds * roamSpeed * 0.5;
     } else {
-      const targetY = clamp(next.position.y + (Math.random() - 0.5) * 26, groundTop, groundBottom);
-      next.velocity.y += (targetY - next.position.y) * dtSeconds * 12;
+      const verticalRange = Math.max(0, Math.min(WADDLE_VERTICAL_VARIANCE, groundBottom - groundTop));
+      const targetY = groundTop + ((Math.sin(next.position.x / 90) + 1) * 0.5) * verticalRange;
+      next.velocity.y += (targetY - next.position.y) * dtSeconds * WADDLE_VERTICAL_SPRING_STRENGTH;
       next.velocity.y *= 0.9;
     }
   }
@@ -297,7 +301,7 @@ function applyRoamState(goose: Goose, dtSeconds: number, stage: StageBounds): Go
     next.velocity.y = (next.velocity.y / postSpeed) * roamSpeed;
   }
   if (!flyMode) {
-    const maxGroundVerticalSpeed = roamSpeed * 0.22;
+    const maxGroundVerticalSpeed = roamSpeed * GROUND_VERTICAL_SPEED_RATIO;
     next.velocity.y = clamp(next.velocity.y, -maxGroundVerticalSpeed, maxGroundVerticalSpeed);
   }
 

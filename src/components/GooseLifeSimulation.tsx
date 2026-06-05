@@ -81,6 +81,7 @@ const AMBIENT_SPEECH_INTERVAL_MS = 2600;
 const MIN_AMBIENT_SPEECH_DURATION_MS = 1800;
 const AMBIENT_SPEECH_DURATION_VARIANCE_MS = 1400;
 const AMBIENT_SPEECH_PROBABILITY = 0.62;
+const MAX_CONCURRENT_SPEECHES = 0;
 const ONELINER_SPEECH_DURATION_MS = 2800;
 const PERCH_UPDATE_INTERVAL_MS = 2600;
 const PHASE_OFFSET_MULTIPLIER_MS = 2000;
@@ -99,6 +100,8 @@ const WADDLE_BODY_TILT_DEGREES = 3.2;
 const WADDLE_HEAD_SWAY_AMPLITUDE = 2.2;
 const WADDLE_HEAD_BOB_AMPLITUDE = 1.2;
 const WADDLE_HEAD_TILT_DEGREES = 9;
+const WADDLE_CYCLE_FREQUENCY = 1.05;
+const WADDLE_HEAD_CYCLE_FREQUENCY = 1.2;
 const PECK_FREQUENCY = 1.8;
 const PECK_AMPLITUDE = 3.4;
 const PECK_ROTATION_RATIO = 2.6;
@@ -317,7 +320,8 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
       );
       if (speakers.length === 0) return;
       const visibleSpeechCount = Object.keys(speechesRef.current).length;
-      if (visibleSpeechCount > 0) return;
+      // Keep speech strictly turn-based: one line at a time, then a reply.
+      if (visibleSpeechCount > MAX_CONCURRENT_SPEECHES) return;
       let goose: Goose | null = null;
       if (pendingAmbientReplyRef.current) {
         goose = speakers.find((candidate) => candidate.id === pendingAmbientReplyRef.current) ?? null;
@@ -329,9 +333,9 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
         goose = pickFrom[Math.floor(Math.random() * pickFrom.length)] ?? null;
       }
       if (!goose) return;
-      const possibleReply = speakers.filter((candidate) => candidate.id !== goose.id);
-      if (possibleReply.length > 0) {
-        pendingAmbientReplyRef.current = possibleReply[Math.floor(Math.random() * possibleReply.length)]?.id ?? null;
+      const possibleRepliers = speakers.filter((candidate) => candidate.id !== goose.id);
+      if (possibleRepliers.length > 0) {
+        pendingAmbientReplyRef.current = possibleRepliers[Math.floor(Math.random() * possibleRepliers.length)].id;
       }
       lastAmbientSpeakerRef.current = goose.id;
       upsertSpeech(
@@ -413,13 +417,13 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
             ? Math.sin(phase * (visualMode === "run" ? 1.6 : 0.8)) * WADDLE_SWAY_AMPLITUDE * spriteScale
             : 0;
         const waddling = visualMode === "walk";
-        const walkCycle = Math.sin(phase * 1.05);
+        const walkCycle = Math.sin(phase * WADDLE_CYCLE_FREQUENCY);
         const walkStrideX = waddling ? walkCycle * WADDLE_BODY_SWAY_AMPLITUDE * spriteScale : 0;
         const walkStrideY = waddling ? Math.abs(walkCycle) * WADDLE_BODY_BOB_AMPLITUDE * spriteScale : 0;
         const walkTilt = waddling ? walkCycle * WADDLE_BODY_TILT_DEGREES : 0;
-        const walkHeadNudgeX = waddling ? Math.sin(phase * 1.2) * WADDLE_HEAD_SWAY_AMPLITUDE * spriteScale : 0;
-        const walkHeadNudgeY = waddling ? Math.abs(Math.sin(phase * 1.2)) * WADDLE_HEAD_BOB_AMPLITUDE * spriteScale : 0;
-        const walkHeadTilt = waddling ? Math.sin(phase * 1.2) * WADDLE_HEAD_TILT_DEGREES : 0;
+        const walkHeadNudgeX = waddling ? Math.sin(phase * WADDLE_HEAD_CYCLE_FREQUENCY) * WADDLE_HEAD_SWAY_AMPLITUDE * spriteScale : 0;
+        const walkHeadNudgeY = waddling ? Math.abs(Math.sin(phase * WADDLE_HEAD_CYCLE_FREQUENCY)) * WADDLE_HEAD_BOB_AMPLITUDE * spriteScale : 0;
+        const walkHeadTilt = waddling ? Math.sin(phase * WADDLE_HEAD_CYCLE_FREQUENCY) * WADDLE_HEAD_TILT_DEGREES : 0;
 
         let headTransform = "translate(0px, 0px) rotate(0deg)";
         if (goose.state === "eat") {
