@@ -16,7 +16,6 @@ import {
 } from "./nectarine";
 import {
   EntityKind,
-  EntityInfo,
   getCachedInfo,
   requestInfo,
   subscribe,
