@@ -3,6 +3,7 @@ import type { OnelinerEntry } from "@/lib/nectarine";
 import {
   createInitialGooseLifeState,
   dayFromAgeHours,
+  LIFESPAN_HOURS,
   loadGooseLifeState,
   maybeApplyLatestOneliner,
   saveGooseLifeState,
@@ -112,7 +113,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
   return (
     <div ref={rootRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 62 }} data-testid="goose-life-sim">
       <div className="absolute top-14 left-2 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground">
-        Goose Life · Day {currentDay}/48 · Flock {living.length}
+        Goose Life · Day {currentDay}/{LIFESPAN_HOURS} · Flock {living.length}
       </div>
       {state.geese.map((goose) => {
         if (goose.bodyRemoved) return null;

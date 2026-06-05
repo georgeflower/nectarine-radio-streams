@@ -16,6 +16,9 @@ const NAMES = [
 ];
 
 const DEFAULT_STAGE: StageBounds = { width: 1280, height: 720 };
+const REPRODUCTION_COOLDOWN_MS = 45_000;
+const REPRODUCTION_TICK_CHANCE = 0.0045;
+const SLEEP_DEATH_CHANCE_PER_HOUR = 0.00035;
 
 const randomBetween = (min: number, max: number) => min + Math.random() * (max - min);
 
@@ -127,7 +130,7 @@ function applyMovement(goose: Goose, dtSeconds: number, stage: StageBounds, gees
   return next;
 }
 
-function maybeDie(goose: Goose, now: number): Goose {
+function maybeDie(goose: Goose, now: number, dtSeconds: number): Goose {
   if (!goose.alive) {
     if (goose.funeralEndsAt && now >= goose.funeralEndsAt) {
       return {
@@ -140,7 +143,8 @@ function maybeDie(goose: Goose, now: number): Goose {
   }
 
   const deadByAge = goose.ageHours >= LIFESPAN_HOURS;
-  const randomSleepDeath = goose.state === "sleep" && Math.random() < 0.0000018;
+  const sleepDeathChanceThisTick = (SLEEP_DEATH_CHANCE_PER_HOUR / 3600) * dtSeconds;
+  const randomSleepDeath = goose.state === "sleep" && Math.random() < sleepDeathChanceThisTick;
   if (!deadByAge && !randomSleepDeath) return goose;
 
   const funeralEndsAt = now + 10 * 60_000;
@@ -170,7 +174,7 @@ function updateReproduction(state: GooseLifeState, now: number, stage: StageBoun
         const proximity = Math.hypot(female.position.x - male.position.x, female.position.y - male.position.y);
         return affinity >= 60 && proximity < 170;
       });
-      if (mate && now - state.lastReproductionAt > 45_000 && Math.random() < 0.0045) {
+      if (mate && now - state.lastReproductionAt > REPRODUCTION_COOLDOWN_MS && Math.random() < REPRODUCTION_TICK_CHANCE) {
         female.pregnant = true;
         female.pregnancyUntil = now + HOUR_MS;
         female.mood = "happy";
@@ -192,9 +196,7 @@ function updateReproduction(state: GooseLifeState, now: number, stage: StageBoun
 
     const hatchable = (female.eggs ?? []).filter((egg) => now - egg.laidAt >= egg.hatchAfterHours * HOUR_MS);
     if (hatchable.length > 0) {
-      const father = females.length + males.length > 1
-        ? geese.find((g) => g.id === female.targetId && g.sex === "male" && g.alive) ?? males[0]
-        : undefined;
+      const father = geese.find((g) => g.id === female.targetId && g.sex === "male" && g.alive);
       female.eggs = (female.eggs ?? []).filter((egg) => now - egg.laidAt < egg.hatchAfterHours * HOUR_MS);
       for (const _ of hatchable) {
         geese.push(
@@ -281,7 +283,7 @@ export function stepGooseLife(
   let geese = state.geese.map((original) => {
     let goose = { ...original, relationships: { ...original.relationships }, eggs: [...(original.eggs ?? [])] };
     goose.ageHours = ageFromBirth(goose.birthTimestamp, now);
-    goose = maybeDie(goose, now);
+    goose = maybeDie(goose, now, dtSeconds);
 
     if (!goose.alive) return goose;
 
