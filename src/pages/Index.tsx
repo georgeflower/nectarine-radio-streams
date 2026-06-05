@@ -28,6 +28,7 @@ import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
+import { hydrateCloudLexiconOnce } from "@/lib/gooseLexiconCloud";
 
 function SongRating({ songId }: { songId: string }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
@@ -183,6 +184,11 @@ const Index = () => {
       // ignore
     }
   }, [vizStyle]);
+
+  useEffect(() => {
+    void hydrateCloudLexiconOnce();
+  }, []);
+
 
   const [fontScale, setFontScale] = useState<number>(() => {
     try {
