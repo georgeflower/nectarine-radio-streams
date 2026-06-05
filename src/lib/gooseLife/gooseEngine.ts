@@ -162,6 +162,7 @@ function maybeDie(goose: Goose, now: number, dtSeconds: number): Goose {
 
 function updateReproduction(state: GooseLifeState, now: number, stage: StageBounds): GooseLifeState {
   const geese = state.geese.map((goose) => ({ ...goose, relationships: { ...goose.relationships }, eggs: [...(goose.eggs ?? [])] }));
+  let lastReproductionAt = state.lastReproductionAt;
 
   const livingAdults = geese.filter((g) => g.alive && g.ageHours > 6 && g.mood !== "mourning");
   const females = livingAdults.filter((g) => g.sex === "female");
@@ -174,11 +175,12 @@ function updateReproduction(state: GooseLifeState, now: number, stage: StageBoun
         const proximity = Math.hypot(female.position.x - male.position.x, female.position.y - male.position.y);
         return affinity >= 60 && proximity < 170;
       });
-      if (mate && now - state.lastReproductionAt > REPRODUCTION_COOLDOWN_MS && Math.random() < REPRODUCTION_TICK_CHANCE) {
+      if (mate && now - lastReproductionAt > REPRODUCTION_COOLDOWN_MS && Math.random() < REPRODUCTION_TICK_CHANCE) {
         female.pregnant = true;
         female.pregnancyUntil = now + HOUR_MS;
         female.mood = "happy";
         female.state = "interact";
+        lastReproductionAt = now;
         female.targetId = mate.id;
         mate.relationships[female.id] = (mate.relationships[female.id] ?? 60) + 3;
         female.relationships[mate.id] = (female.relationships[mate.id] ?? 60) + 3;
@@ -216,7 +218,7 @@ function updateReproduction(state: GooseLifeState, now: number, stage: StageBoun
     }
   }
 
-  return { ...state, geese, lastReproductionAt: now };
+  return { ...state, geese, lastReproductionAt };
 }
 
 function applySocialInteraction(geese: Goose[]) {

@@ -85,7 +85,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
         const latest = latestOnelinerRef.current;
         const onelinerKey = latest ? `${latest.time}|${latest.username}|${latest.text}` : null;
         const withReaction = latest && onelinerKey
-          ? maybeApplyLatestOneliner(prev, latest.text, onelinerKey)
+          ? maybeApplyLatestOneliner(prev, latest.text, onelinerKey, tickNow)
           : prev;
         const stepped = stepGooseLife(withReaction, tickNow, dt, bounds);
         if (tickNow >= persistAtRef.current) {
@@ -109,11 +109,12 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
     [state.geese],
   );
   const currentDay = dayFromAgeHours(maxAge);
+  const totalDays = dayFromAgeHours(LIFESPAN_HOURS);
 
   return (
     <div ref={rootRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 62 }} data-testid="goose-life-sim">
       <div className="absolute top-14 left-2 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground">
-        Goose Life · Day {currentDay}/{LIFESPAN_HOURS} · Flock {living.length}
+        Goose Life · Day {currentDay}/{totalDays} · Flock {living.length}
       </div>
       {state.geese.map((goose) => {
         if (goose.bodyRemoved) return null;

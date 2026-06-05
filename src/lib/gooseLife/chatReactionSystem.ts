@@ -38,7 +38,7 @@ export function parseChatReaction(text: string, geese: Goose[]): ChatReaction | 
   return targetName ? { targetName } : null;
 }
 
-export function maybeApplyLatestOneliner(state: GooseLifeState, text: string, key: string): GooseLifeState {
+export function maybeApplyLatestOneliner(state: GooseLifeState, text: string, key: string, now: number): GooseLifeState {
   if (state.processedOnelinerKey === key) return state;
   const reaction = parseChatReaction(text, state.geese.filter((g) => g.alive));
   if (!reaction) return { ...state, processedOnelinerKey: key };
@@ -74,7 +74,7 @@ export function maybeApplyLatestOneliner(state: GooseLifeState, text: string, ke
       if (reaction.triggerMourning) {
         next.mood = "mourning";
         next.state = "mourn";
-        next.mournUntil = Date.now() + 10 * 60_000;
+        next.mournUntil = now + 10 * 60_000;
       }
       return next;
     }),
