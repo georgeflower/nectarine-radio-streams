@@ -31,6 +31,9 @@ function makeGoose(now: number, seed: Partial<Goose>): Goose {
     bodyRemoved: seed.bodyRemoved ?? false,
     targetId: seed.targetId,
     parentIds: seed.parentIds,
+    isGosling: seed.isGosling ?? false,
+    followIndex: seed.followIndex,
+    perchTarget: seed.perchTarget,
   };
 }
 

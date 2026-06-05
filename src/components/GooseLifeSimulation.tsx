@@ -131,7 +131,7 @@ function normalizeSpeech(text: string) {
 }
 
 function isGosling(goose: Goose) {
-  return !!goose.isGosling || (!!goose.parentIds && goose.ageHours < 6);
+  return (!!goose.isGosling || !!goose.parentIds) && goose.ageHours < 6;
 }
 
 function chooseAmbientSpeech(goose: Goose) {
@@ -185,6 +185,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
   const latestOnelinerRef = useRef<OnelinerEntry | null>(oneliners[0] ?? null);
   const lastSpokenOnelinerKeyRef = useRef<string | null>(null);
   const speechesRef = useRef<Record<string, GooseSpeech>>({});
+  const boundsRef = useRef<StageBounds>({ width: window.innerWidth, height: window.innerHeight, perches: [] });
   const [bounds, setBounds] = useState<StageBounds>({ width: window.innerWidth, height: window.innerHeight, perches: [] });
   const [state, setState] = useState<GooseLifeState>(() => loadGooseLifeState() ?? createInitialGooseLifeState(Date.now()));
   const [now, setNow] = useState(Date.now());
@@ -246,6 +247,15 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
       const r = target.getBoundingClientRect();
       const nextBounds: StageBounds = { width: r.width, height: r.height, perches: [] };
       nextBounds.perches = collectPerches(target, nextBounds);
+      const prev = boundsRef.current;
+      const prevPerches = prev.perches ?? [];
+      const nextPerches = nextBounds.perches ?? [];
+      const sameSize = prev.width === nextBounds.width && prev.height === nextBounds.height;
+      const samePerches =
+        prevPerches.length === nextPerches.length &&
+        prevPerches.every((p, i) => p.x === nextPerches[i]?.x && p.y === nextPerches[i]?.y && p.kind === nextPerches[i]?.kind);
+      if (sameSize && samePerches) return;
+      boundsRef.current = nextBounds;
       setBounds(nextBounds);
     };
     resize();

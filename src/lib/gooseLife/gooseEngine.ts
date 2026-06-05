@@ -45,7 +45,7 @@ function randomName(used: Set<string>): string {
 }
 
 function isGosling(goose: Goose) {
-  return !!goose.isGosling || (!!goose.parentIds && goose.ageHours < 6);
+  return (!!goose.isGosling || !!goose.parentIds) && goose.ageHours < 6;
 }
 
 function canFly(goose: Goose) {
@@ -140,7 +140,7 @@ function constrainToBounds(goose: Goose, stage: StageBounds) {
   const flyMaxY = Math.max(minY + 20, stage.height * FLY_MAX_HEIGHT_RATIO);
   const groundMinY = floorY(stage);
   const maxY = Math.max(groundMinY + 10, stage.height - 24);
-  const canGoFly = canFly(next) && (next.state === "fly" || next.state === "play");
+  const canGoFly = canFly(next) && next.state === "fly";
 
   if (next.position.x < minX || next.position.x > maxX) {
     next.velocity.x *= -1;
