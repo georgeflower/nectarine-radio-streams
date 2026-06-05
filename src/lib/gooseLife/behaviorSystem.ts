@@ -14,7 +14,21 @@ export const nextBehaviorAt = (now: number) => now + (20_000 + Math.random() * 2
 
 export function chooseNextBehavior(goose: Goose, nearbyCount: number): GooseState {
   if (!goose.alive) return "mourn";
-  if (goose.parentIds && goose.ageHours < 6) return "follow";
+  if (goose.parentIds && goose.ageHours < 6) {
+    if (goose.ageHours < 1.2) return Math.random() < 0.8 ? "follow" : "waddle";
+    if (goose.ageHours < 3.5) {
+      const pick = Math.random();
+      if (pick < 0.45) return "follow";
+      if (pick < 0.72) return "waddle";
+      if (pick < 0.87) return "play";
+      return "sleep";
+    }
+    const pick = Math.random();
+    if (pick < 0.4) return "follow";
+    if (pick < 0.65) return "waddle";
+    if (pick < 0.88) return "play";
+    return "eat";
+  }
   if (goose.mood === "mourning") return "mourn";
 
   const weights = { ...WEIGHTS_BY_MOOD[goose.mood] };

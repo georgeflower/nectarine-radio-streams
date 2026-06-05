@@ -22,6 +22,7 @@ import {
   STAND_BODY,
   STAND_HEAD,
 } from "@/lib/gooseSprite";
+import { GOOSE_DIALOGUES } from "@/lib/gooseDialogues";
 
 type Props = {
   oneliners?: OnelinerEntry[];
@@ -32,7 +33,7 @@ type GooseSpeech = {
   until: number;
 };
 
-type GooseVisualMode = "fly" | "ground" | "perched";
+type GooseVisualMode = "fly" | "walk" | "run" | "perched";
 
 const stateLabel: Record<Goose["state"], string> = {
   idle: "idle",
@@ -46,33 +47,51 @@ const stateLabel: Record<Goose["state"], string> = {
   follow: "follow",
 };
 
-const AMBIENT_CHATTER: Partial<Record<Goose["state"], string[]>> = {
-  idle: ["honk", "just vibing", "nice day"],
-  waddle: ["waddle waddle", "coming through", "beep beak"],
-  fly: ["flap flap", "air route clear", "zoom honk"],
-  eat: ["snack time", "crumb patrol", "nom nom"],
-  sleep: ["zzz", "soft honk..."],
-  play: ["wheee", "tag you're it", "happy flap"],
-  interact: ["hiya honk", "good goose day", "let's chat"],
-  mourn: ["...", "miss you"],
-  follow: ["wait up", "right behind you", "tiny flap"],
-};
+const CLASSIC_CHATTER_POOL: string[] = (() => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const pair of GOOSE_DIALOGUES) {
+    for (const line of pair) {
+      const clean = line.trim();
+      if (!clean || seen.has(clean)) continue;
+      seen.add(clean);
+      out.push(clean);
+    }
+  }
+  return out;
+})();
+
+const GOSLING_CHATTER = [
+  "peep peep!",
+  "honkito!",
+  "tiny flap!",
+  "beep beep honk",
+  "mama wait!",
+  "crumb crumb!",
+  "wobble wobble",
+  "pip pip!",
+  "boing chirp!",
+  "goose baby zoom!",
+];
 
 const MAX_SPEECH_LENGTH = 42;
 const DEFAULT_SPRITE_SCALE_FACTOR = 0.78;
+const GOSLING_SCALE_FACTOR = 0.58;
 const AMBIENT_SPEECH_INTERVAL_MS = 2600;
 const MIN_AMBIENT_SPEECH_DURATION_MS = 1800;
 const AMBIENT_SPEECH_DURATION_VARIANCE_MS = 1400;
-const AMBIENT_SPEECH_PROBABILITY = 0.6;
+const AMBIENT_SPEECH_PROBABILITY = 0.62;
 const ONELINER_SPEECH_DURATION_MS = 2800;
 const PHASE_OFFSET_MULTIPLIER_MS = 2000;
 const FLY_FRAME_DURATION_MS = 110;
+const WALK_FRAME_DURATION_MS = 140;
+const RUN_FRAME_DURATION_MS = 80;
 const FLY_FRAME_COUNT = 4;
 const MIN_HORIZONTAL_VELOCITY_FOR_PITCH = 12;
-const PLAY_BOUNCE_FREQUENCY = 1.4;
-const PLAY_BOUNCE_AMPLITUDE = 3.5;
-const WADDLE_BOUNCE_AMPLITUDE = 2.2;
-const WADDLE_SWAY_AMPLITUDE = 2.6;
+const PLAY_BOUNCE_FREQUENCY = 1.9;
+const PLAY_BOUNCE_AMPLITUDE = 4.1;
+const WADDLE_BOUNCE_AMPLITUDE = 2.8;
+const WADDLE_SWAY_AMPLITUDE = 3.2;
 const PECK_FREQUENCY = 1.8;
 const PECK_AMPLITUDE = 3.4;
 const PECK_ROTATION_RATIO = 2.6;
@@ -110,25 +129,51 @@ function normalizeSpeech(text: string) {
     : collapsed;
 }
 
+function isGosling(goose: Goose) {
+  return !!goose.isGosling || (!!goose.parentIds && goose.ageHours < 6);
+}
+
 function chooseAmbientSpeech(goose: Goose) {
-  const options = AMBIENT_CHATTER[goose.state] ?? AMBIENT_CHATTER.idle ?? [];
-  if (options.length === 0) return "";
-  return options[Math.floor(Math.random() * options.length)];
+  if (isGosling(goose)) return GOSLING_CHATTER[Math.floor(Math.random() * GOSLING_CHATTER.length)] ?? "peep!";
+  return CLASSIC_CHATTER_POOL[Math.floor(Math.random() * CLASSIC_CHATTER_POOL.length)] ?? "honk";
 }
 
 function gooseVariant(goose: Goose): GooseVariant {
+  if (isGosling(goose)) return goose.sex === "female" ? "gosling-brown" : "gosling-white";
   return goose.sex === "female" ? "brown" : "white";
 }
 
 function getGooseVisualMode(goose: Goose): GooseVisualMode {
   const speed = Math.hypot(goose.velocity.x, goose.velocity.y);
-  if (!goose.alive || goose.state === "sleep" || goose.state === "mourn") return "perched";
+  if (!goose.alive || goose.state === "sleep" || goose.state === "mourn" || goose.state === "interact" || goose.state === "eat") return "perched";
   if (goose.state === "fly") return "fly";
-  if (goose.state === "waddle" || goose.state === "follow") return "ground";
-  if (goose.state === "play") return speed > 36 ? "fly" : "ground";
-  if (goose.state === "eat") return "ground";
-  if (goose.state === "interact") return "perched";
-  return speed > 44 ? "fly" : "perched";
+  if (goose.state === "play") return speed > 160 && !isGosling(goose) ? "fly" : "run";
+  if (goose.state === "waddle" || goose.state === "follow" || goose.state === "idle") return speed > 120 ? "run" : "walk";
+  return speed > 140 && !isGosling(goose) ? "fly" : "walk";
+}
+
+function collectPerches(root: HTMLDivElement, bounds: StageBounds): StageBounds["perches"] {
+  const stageRect = root.getBoundingClientRect();
+  const picked: NonNullable<StageBounds["perches"]> = [];
+  const elems = document.querySelectorAll<HTMLElement>("[data-goose-letter], [data-goose-perch]");
+
+  elems.forEach((el) => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const x = rect.left - stageRect.left + rect.width * 0.5;
+    const y = rect.top - stageRect.top + rect.height * 0.25;
+    picked.push({
+      x: clamp(x, 24, Math.max(24, bounds.width - 24)),
+      y: clamp(y, 50, Math.max(50, bounds.height - 24)),
+      kind: el.hasAttribute("data-goose-letter") ? "letter" : "window",
+    });
+  });
+
+  const floorY = bounds.height * 0.84;
+  picked.push({ x: bounds.width * 0.15, y: floorY, kind: "floor" });
+  picked.push({ x: bounds.width * 0.5, y: floorY, kind: "floor" });
+  picked.push({ x: bounds.width * 0.85, y: floorY, kind: "floor" });
+  return picked;
 }
 
 const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
@@ -139,7 +184,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
   const latestOnelinerRef = useRef<OnelinerEntry | null>(oneliners[0] ?? null);
   const lastSpokenOnelinerKeyRef = useRef<string | null>(null);
   const speechesRef = useRef<Record<string, GooseSpeech>>({});
-  const [bounds, setBounds] = useState<StageBounds>({ width: window.innerWidth, height: window.innerHeight });
+  const [bounds, setBounds] = useState<StageBounds>({ width: window.innerWidth, height: window.innerHeight, perches: [] });
   const [state, setState] = useState<GooseLifeState>(() => loadGooseLifeState() ?? createInitialGooseLifeState(Date.now()));
   const [now, setNow] = useState(Date.now());
   const [speeches, setSpeeches] = useState<Record<string, GooseSpeech>>({});
@@ -148,6 +193,8 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
     () => ({
       white: buildGooseFrameDataUrls("white"),
       brown: buildGooseFrameDataUrls("brown"),
+      "gosling-white": buildGooseFrameDataUrls("gosling-white"),
+      "gosling-brown": buildGooseFrameDataUrls("gosling-brown"),
     }),
     [],
   );
@@ -196,12 +243,18 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
     if (!target) return;
     const resize = () => {
       const r = target.getBoundingClientRect();
-      setBounds({ width: r.width, height: r.height });
+      const nextBounds: StageBounds = { width: r.width, height: r.height, perches: [] };
+      nextBounds.perches = collectPerches(target, nextBounds);
+      setBounds(nextBounds);
     };
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(target);
-    return () => ro.disconnect();
+    const perchInterval = window.setInterval(resize, 1300);
+    return () => {
+      ro.disconnect();
+      window.clearInterval(perchInterval);
+    };
   }, []);
 
   useEffect(() => {
@@ -262,7 +315,6 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
     if (!latest) return;
     const key = `${latest.time}|${latest.username}|${latest.text}`;
     if (lastSpokenOnelinerKeyRef.current === null) {
-      // Ignore the first item on mount so the flock only reacts to new chatter.
       lastSpokenOnelinerKeyRef.current = key;
       return;
     }
@@ -287,10 +339,16 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
   return (
     <div ref={rootRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 62 }} data-testid="goose-life-sim">
       <div className="absolute top-14 left-2 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground">
-        Goose Life · Day {currentDay}/{totalDays} · Flock {living.length}
+        Goose Life · Day {currentDay}/{totalDays} · Age {maxAge.toFixed(1)}h · Flock {living.length}
       </div>
       {state.geese.map((goose) => {
         if (goose.bodyRemoved) return null;
+        const gosling = isGosling(goose);
+        const spriteSizeScale = gosling ? GOSLING_SCALE_FACTOR : 1;
+        const width = spriteWidth * spriteSizeScale;
+        const height = spriteHeight * spriteSizeScale;
+        const pivotX = headPivotX * spriteSizeScale;
+        const pivotY = headPivotY * spriteSizeScale;
         const opacity = bodyOpacity(goose, now);
         const seed = hashSeed(goose.id);
         const direction = goose.velocity.x < 0 ? -1 : 1;
@@ -300,7 +358,8 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
         const frames = gooseFrames[variant];
         const speech = speeches[goose.id];
         const visualMode = getGooseVisualMode(goose);
-        const frameIndex = Math.floor((phaseMs / FLY_FRAME_DURATION_MS) % FLY_FRAME_COUNT);
+        const frameDuration = visualMode === "run" ? RUN_FRAME_DURATION_MS : visualMode === "walk" ? WALK_FRAME_DURATION_MS : FLY_FRAME_DURATION_MS;
+        const frameIndex = Math.floor((phaseMs / frameDuration) % FLY_FRAME_COUNT);
         const flyHeadBob = Math.sin(phase * 1.2) * spriteScale;
         const flyPitch = clamp(
           Math.atan2(
@@ -317,8 +376,8 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
               ? Math.abs(Math.sin(phase)) * WADDLE_BOUNCE_AMPLITUDE * spriteScale
               : Math.sin(phase * 0.55) * 0.8 * spriteScale;
         const groundedSway =
-          goose.state === "waddle" || goose.state === "follow"
-            ? Math.sin(phase * 0.8) * WADDLE_SWAY_AMPLITUDE * spriteScale
+          goose.state === "waddle" || goose.state === "follow" || goose.state === "play"
+            ? Math.sin(phase * (visualMode === "run" ? 1.6 : 0.8)) * WADDLE_SWAY_AMPLITUDE * spriteScale
             : 0;
 
         let headTransform = "translate(0px, 0px) rotate(0deg)";
@@ -330,15 +389,15 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
         } else if (goose.state === "mourn") {
           headTransform = `translate(${MOURN_HEAD_OFFSET_X * spriteScale}px, ${MOURN_HEAD_OFFSET_Y * spriteScale}px) rotate(${MOURN_HEAD_ANGLE}deg)`;
         } else if (goose.state === "play") {
-          headTransform = `translate(${Math.sin(phase * 1.3) * 1.5 * spriteScale}px, ${Math.cos(phase * 1.2) * 0.8 * spriteScale}px) rotate(${Math.sin(phase * 1.4) * 14}deg)`;
+          headTransform = `translate(${Math.sin(phase * 1.3) * 1.7 * spriteScale}px, ${Math.cos(phase * 1.2) * 0.9 * spriteScale}px) rotate(${Math.sin(phase * 1.6) * 18}deg)`;
         } else {
           headTransform = `translate(${Math.sin(phase * 0.7) * 1.6 * spriteScale}px, ${Math.cos(phase * 0.9) * 0.7 * spriteScale}px) rotate(${Math.sin(phase * 0.7) * 12}deg)`;
         }
 
         const spriteTransform =
           visualMode === "fly"
-            ? `translate3d(${goose.position.x - spriteWidth / 2}px, ${goose.position.y - spriteHeight / 2 + flyHeadBob}px, 0) rotate(${direction < 0 ? -flyPitch : flyPitch}deg) scaleX(${direction})`
-            : `translate3d(${goose.position.x - spriteWidth / 2 + groundedSway}px, ${goose.position.y - spriteHeight / 2 + groundedBounce}px, 0) scaleX(${direction})`;
+            ? `translate3d(${goose.position.x - width / 2}px, ${goose.position.y - height / 2 + flyHeadBob}px, 0) rotate(${direction < 0 ? -flyPitch : flyPitch}deg) scaleX(${direction})`
+            : `translate3d(${goose.position.x - width / 2 + groundedSway}px, ${goose.position.y - height / 2 + groundedBounce}px, 0) scaleX(${direction})`;
 
         return (
           <Fragment key={goose.id}>
@@ -347,8 +406,8 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
               style={{
                 left: 0,
                 top: 0,
-                width: spriteWidth,
-                height: spriteHeight,
+                width,
+                height,
                 opacity,
                 transform: spriteTransform,
                 transformOrigin: "center center",
@@ -362,45 +421,45 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
               <img
                 src={frames[frameIndex]}
                 alt=""
-                width={spriteWidth}
-                height={spriteHeight}
+                width={width}
+                height={height}
                 style={{
                   position: "absolute",
                   inset: 0,
-                  width: spriteWidth,
-                  height: spriteHeight,
+                  width,
+                  height,
                   imageRendering: "pixelated",
-                  opacity: visualMode === "fly" ? 1 : 0,
+                  opacity: visualMode === "fly" || visualMode === "walk" || visualMode === "run" ? 1 : 0,
                 }}
               />
               <img
                 src={frames[STAND_BODY]}
                 alt=""
-                width={spriteWidth}
-                height={spriteHeight}
+                width={width}
+                height={height}
                 style={{
                   position: "absolute",
                   inset: 0,
-                  width: spriteWidth,
-                  height: spriteHeight,
+                  width,
+                  height,
                   imageRendering: "pixelated",
-                  opacity: visualMode === "fly" ? 0 : 1,
+                  opacity: visualMode === "perched" ? 1 : 0,
                 }}
               />
               <img
                 src={frames[STAND_HEAD]}
                 alt=""
-                width={spriteWidth}
-                height={spriteHeight}
+                width={width}
+                height={height}
                 style={{
                   position: "absolute",
                   inset: 0,
-                  width: spriteWidth,
-                  height: spriteHeight,
+                  width,
+                  height,
                   imageRendering: "pixelated",
-                  opacity: visualMode === "fly" ? 0 : 1,
-                  transformOrigin: `${headPivotX}px ${headPivotY}px`,
-                  transform: visualMode === "fly" ? "none" : headTransform,
+                  opacity: visualMode === "perched" ? 1 : 0,
+                  transformOrigin: `${pivotX}px ${pivotY}px`,
+                  transform: visualMode === "perched" ? headTransform : "none",
                 }}
               />
             </div>
@@ -408,19 +467,19 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
               className="absolute left-1/2 whitespace-nowrap rounded-sm bg-card/65 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-foreground"
               style={{
                 left: goose.position.x,
-                top: goose.position.y - spriteHeight / 2 - 16,
+                top: goose.position.y - height / 2 - 16,
                 opacity,
                 transform: "translateX(-50%)",
               }}
             >
-              {goose.name} · {stateLabel[goose.state]}
+              {goose.name} · {gosling ? "gosling" : stateLabel[goose.state]}
             </div>
             {speech && speech.until > now && (
               <div
                 className="absolute rounded-md border border-foreground/80 bg-white px-2 py-1 text-[10px] font-black uppercase tracking-wide text-black shadow-[2px_2px_0_rgba(0,0,0,0.35)]"
                 style={{
                   left: goose.position.x + 6,
-                  top: goose.position.y - spriteHeight / 2 - 22,
+                  top: goose.position.y - height / 2 - 22,
                   opacity,
                   transform: "translateY(-100%)",
                   maxWidth: 180,
@@ -432,7 +491,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
             {goose.pregnant && (
               <div
                 className="absolute text-[10px]"
-                style={{ left: goose.position.x + spriteWidth * 0.2, top: goose.position.y - spriteHeight * 0.25, opacity }}
+                style={{ left: goose.position.x + width * 0.2, top: goose.position.y - height * 0.25, opacity }}
               >
                 🥚
               </div>
@@ -440,7 +499,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
             {goose.eggs && goose.eggs.length > 0 && (
               <div
                 className="absolute whitespace-nowrap text-[9px] text-foreground/90"
-                style={{ left: goose.position.x - spriteWidth * 0.35, top: goose.position.y + spriteHeight * 0.2, opacity }}
+                style={{ left: goose.position.x - width * 0.35, top: goose.position.y + height * 0.2, opacity }}
               >
                 {goose.eggs.length} eggs
               </div>
