@@ -14,7 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      goose_lexicon: {
+        Row: {
+          category: string
+          last_seen_at: string
+          seen: number
+          style_flags: string[]
+          token: string
+        }
+        Insert: {
+          category?: string
+          last_seen_at?: string
+          seen?: number
+          style_flags?: string[]
+          token: string
+        }
+        Update: {
+          category?: string
+          last_seen_at?: string
+          seen?: number
+          style_flags?: string[]
+          token?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

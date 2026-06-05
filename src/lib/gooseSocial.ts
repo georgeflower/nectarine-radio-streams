@@ -11,6 +11,7 @@ import {
   type LexiconMood,
 } from "@/lib/gooseLearnedLexicon";
 import { findLearnedTrigger, pickLearnedPhrase } from "@/lib/gooseLearnedPhrases";
+import { queueOnelinerForCloud } from "@/lib/gooseLexiconCloud";
 import type { GooseSceneEra } from "@/lib/gooseSceneEra";
 import { GOOSE_DIALOGUES } from "@/lib/gooseDialogues";
 
@@ -88,6 +89,7 @@ export function noteRecentOneliner(username: string, text: string) {
   recentOnelinerTrail.push({ username, text: clean });
   while (recentOnelinerTrail.length > MAX_ONELINER_TRAIL) recentOnelinerTrail.shift();
   learnLexiconFromOneliner(clean, username);
+  queueOnelinerForCloud(clean);
 }
 
 let sceneEra: GooseSceneEra = "intro";
@@ -137,6 +139,10 @@ const RECENT_ONELINER_WINDOW_MS = 85_000;
 // Minimum gap between contextual goose dialogues (70s).
 const DIALOGUE_COOLDOWN_MS = 70_000;
 const BALL_PLAY_COOLDOWN_MS = 180_000;
+// Snack-break interval: at least 9 minutes between feedings.
+const FLY_AWAY_COOLDOWN_MS = 540_000;
+const FLY_AWAY_CHANCE = 0.15;
+
 const DIALOGUE_COOLDOWN_BY_ERA: Record<GooseSceneEra, number> = {
   intro: DIALOGUE_COOLDOWN_MS,
   // Gradual cooldown reduction (~11-34%) so later eras feel livelier without spam.
@@ -278,6 +284,25 @@ const FOOD_EAT_LINES = [
 ];
 const FOOD_RESUME_LINES = ["Alright, back to the ball!", "Round two, let's bump!"];
 
+// Large chatter pool (~500 lines) drawn from the demoscene dialogue set.
+// Used for in-between banter during ball-play wind-down and snack breaks
+// so the geese never feel like they're repeating the same handful of lines.
+const CHATTER_POOL: string[] = (() => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const pair of GOOSE_DIALOGUES) {
+    for (const line of pair) {
+      const clean = (line ?? "").trim();
+      if (!clean || seen.has(clean)) continue;
+      seen.add(clean);
+      out.push(clean);
+      if (out.length >= 500) return out;
+    }
+  }
+  return out;
+})();
+
+
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -409,12 +434,19 @@ async function runBallPlay() {
     mood = "idle";
     return;
   }
-  // Wind down + sleep
+  // Wind down with extra chatter pulled from the 500-line pool.
   mood = "sleeping";
   pairAfterPlay[0].say("Phew! :)", 1800);
   await wait(1600);
   if (getPair()) pairAfterPlay[1].say("Tired now... :sleepy:", 1800);
   await wait(1800);
+  const chatterRounds = 4 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < chatterRounds; i++) {
+    const activePair = getPair();
+    if (!activePair) break;
+    activePair[i % 2].say(pickUsageTracked("chatter-pool", CHATTER_POOL), 2200);
+    await wait(2400);
+  }
   // Sleep for a little while — alternating Zzz
   const zzzRounds = 5 + Math.floor(Math.random() * 4);
   for (let i = 0; i < zzzRounds; i++) {
@@ -424,6 +456,7 @@ async function runBallPlay() {
   }
   mood = "idle";
 }
+
 
 async function runFlyAway() {
   const pair = getPair();
@@ -461,12 +494,17 @@ async function runFlyAway() {
       for (const g of geese.values()) g.setSitting(true);
       await wait(1200); // let them fly to a perch and settle
       const eatStart = Date.now();
-      const MIN_EAT_MS = 20_000;
+      const MIN_EAT_MS = 35_000;
       let i = 0;
       while (Date.now() - eatStart < MIN_EAT_MS) {
         const activePair = getPair();
         if (!activePair) break;
-        activePair[i % 2].say(pick(FOOD_EAT_LINES), 2200);
+        // Alternate between snack-specific lines and the broader chatter pool
+        // so the snack break feels more like a real conversation.
+        const line = i % 2 === 0
+          ? pick(FOOD_EAT_LINES)
+          : pickUsageTracked("chatter-pool", CHATTER_POOL);
+        activePair[i % 2].say(line, 2200);
         i++;
         await wait(2400);
       }
@@ -476,6 +514,7 @@ async function runFlyAway() {
         if (pairAfterSnack) pairAfterSnack[0].say(pick(FOOD_RESUME_LINES), 2200);
       }
     }
+
 
   } finally {
     clearFlyAwayState();
@@ -489,7 +528,7 @@ async function step() {
   const now = Date.now();
   if (pair && mood === "idle") {
     // Priority: fly-away > ball-play > regular chat.
-    if (now - lastFlyAwayAt > 240_000 && Math.random() < 0.25) {
+    if (now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS && Math.random() < FLY_AWAY_CHANCE) {
       lastFlyAwayAt = now;
       await runFlyAway();
     } else if (canStartBallPlay(now)) {

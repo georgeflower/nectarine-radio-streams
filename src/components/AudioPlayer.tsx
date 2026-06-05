@@ -477,7 +477,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady, onSeek }: Props) 
   }, [volumeOpen]);
 
   return (
-    <div className="panel !p-2">
+    <div className="panel !p-2 relative" style={{ zIndex: 70 }}>
       <div className="flex items-center gap-2 w-full">
         <button
           type="button"
@@ -528,7 +528,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady, onSeek }: Props) 
             )}
           </button>
           {volumeOpen && (
-            <div className="absolute right-0 top-full mt-1 z-20 bg-card border border-border rounded-sm p-2 flex flex-col items-center gap-2 shadow-lg">
+            <div className="absolute right-0 top-full mt-1 z-[100] bg-card border border-border rounded-sm p-2 flex flex-col items-center gap-2 shadow-lg">
               <input
                 type="range"
                 min={0}
