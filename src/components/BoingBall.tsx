@@ -313,7 +313,7 @@ const BoingBall = () => {
       ref={canvasRef}
       aria-hidden="true"
       className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 6 }}
+      style={{ zIndex: 20 }}
     />
   );
 };
