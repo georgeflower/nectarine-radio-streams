@@ -3,7 +3,9 @@ import {
   getBallPlayDirective,
   getGoosePositions,
   reportBallBump,
+  setBallAvailable,
   setBallPos,
+  subscribeFamilyEvents,
 } from "@/lib/gooseSocial";
 
 /**
