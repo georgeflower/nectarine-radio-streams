@@ -522,7 +522,6 @@ const MOTHER_CARE_LINES = [
   "Aren't you adorable :D",
   "Eat up, little ones",
   "Follow mama!",
-  "Mind the ball, babies!",
   "Look at you grow!",
   "Such fluffballs <3",
   "Don't wander too far!",
