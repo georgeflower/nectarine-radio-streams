@@ -590,6 +590,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       restingFromTiredness = false;
       tiredRestReleaseAt = 0;
       perchEl = null;
+      waddlingOnGround = false;
       heading = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
       targetHeading = heading;
       speed = scale(180);
@@ -602,6 +603,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       imgBody.style.opacity = "0";
       imgHead.style.opacity = "0";
     };
+
 
 
 
