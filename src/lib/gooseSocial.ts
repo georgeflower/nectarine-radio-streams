@@ -609,6 +609,15 @@ export function reactToOnelinerSmiley(fromVariant: GooseRole) {
   }, 1400);
 }
 
+// Make a random registered goose say a line (used for song-rating chatter
+// triggered when the now-playing track changes).
+export function sayFromAnyGoose(text: string, durationMs = 2400) {
+  const all = Array.from(geese.values());
+  if (all.length === 0) return;
+  const speaker = all[Math.floor(Math.random() * all.length)];
+  speaker.say(text, durationMs);
+}
+
 export const __testing = {
   runBallPlay,
   runFlyAway,
