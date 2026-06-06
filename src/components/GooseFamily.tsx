@@ -34,7 +34,6 @@ import {
   type Egg,
 } from "@/lib/gooseLife/eggHatch";
 import {
-  ADULT_COLORS,
   COLOR_FILTER,
   formatAge,
   getRoster,
