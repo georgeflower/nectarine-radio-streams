@@ -263,9 +263,6 @@ const BoingBall = () => {
           const dy = y - chaserPos.y;
           const dist = Math.hypot(dx, dy);
           const collisionRadius = r + gooseCollisionPadding();
-          // Add a small velocity-based cushion so high-speed visual touches
-          // still register as bumps instead of tunneling (skipping overlap
-          // between frames due to fast movement) through the radius.
           const approachPadding = Math.max(
             minApproachPadding(),
             Math.hypot(vx, vy) * dt * APPROACH_PADDING_VELOCITY_FACTOR,
@@ -284,6 +281,35 @@ const BoingBall = () => {
             spinDir = ux < 0 ? 1 : -1;
             lastGooseBumpAt = now;
             reportBallBump(directive.chaser);
+          }
+        }
+      } else {
+        // No active ball-play: ball deflects off any goose it touches
+        // (contact radius == ball radius, not the padded play radius).
+        const positions = getGoosePositions();
+        if (positions && now - lastGooseBumpAt > BUMP_COOLDOWN_MS) {
+          for (const role of Object.keys(positions) as Array<keyof typeof positions>) {
+            const p = positions[role];
+            const dx = x - p.x;
+            const dy = y - p.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0 && dist <= r) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const vDotN = vx * nx + vy * ny;
+              // Reflect velocity along the contact normal (only if approaching).
+              if (vDotN < 0) {
+                vx = (vx - 2 * vDotN * nx) * bounce;
+                vy = (vy - 2 * vDotN * ny) * bounce;
+              }
+              // Separation push so the ball doesn't stick inside.
+              const overlap = r - dist + 2;
+              x += nx * overlap;
+              y += ny * overlap;
+              spinDir = nx < 0 ? 1 : -1;
+              lastGooseBumpAt = now;
+              break;
+            }
           }
         }
       }

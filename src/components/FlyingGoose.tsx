@@ -588,10 +588,23 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       };
 
       // Reposition the bubble above the goose every frame while visible.
+      // Clamp horizontally + vertically so it never escapes the stage.
       const positionBubble = (cx: number, cy: number) => {
         if (!reactionUntilRef.current) return;
-        bubble.style.left = `${cx}px`;
-        bubble.style.top = `${cy - spriteH() / 2 - scale(6)}px`;
+        const bw = bubble.offsetWidth || 80;
+        const bh = bubble.offsetHeight || 24;
+        const PAD = 6;
+        let left = cx;
+        // The bubble uses translate("8px -100%") + transformOrigin "left bottom".
+        // After translate the bubble's left edge sits at (left + 8 - bw); clamp left
+        // so that left edge >= PAD and right edge (left + 8) <= w - PAD.
+        if (left + 8 - bw < PAD) left = PAD + bw - 8;
+        if (left + 8 > w - PAD) left = w - PAD - 8;
+        let top = cy - spriteH() / 2 - scale(6);
+        // top is the bubble's bottom anchor (translate -100%). Bubble top = top - bh.
+        if (top - bh < PAD) top = cy + spriteH() / 2 + scale(6) + bh; // flip below
+        bubble.style.left = `${left}px`;
+        bubble.style.top = `${top}px`;
       };
 
       const positionFoodBag = () => {
