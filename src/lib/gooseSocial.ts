@@ -155,13 +155,18 @@ let lastDialogueAt = 0;
 let lastBallPlayAt = 0;
 let lastFlyAwayAt = 0;
 // Earliest wall-clock at which the mother is allowed to lay eggs again. Bumped
-// 10–15 minutes into the future every time a batch of goslings grows up.
+// 15–22 minutes into the future every time a batch of goslings grows up.
 let reproductionEarliestAt = 0;
+// Wall-clock when the most recent brood ended (used for the post-hatch settle gate).
+let lastBroodEndAt = 0;
 familyListeners.add((ev) => {
   if (ev.type === "goslings-grown") {
-    reproductionEarliestAt = Date.now() + (10 + Math.random() * 5) * 60_000;
+    reproductionEarliestAt = Date.now() + (15 + Math.random() * 7) * 60_000;
+  } else if (ev.type === "brood-end") {
+    lastBroodEndAt = Date.now();
   }
 });
+
 let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
 let recentOneliner: { username: string; text: string; at: number } | null = null;
