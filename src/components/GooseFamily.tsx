@@ -748,7 +748,7 @@ const GooseFamily = () => {
               style={{ position: "absolute", inset: 0, width: goslingW, height: goslingH,
                 imageRendering: "pixelated",
                 transformOrigin: `${NECK_PIVOT_X_PX * sceneScale * GOSLING_SCALE_FACTOR}px ${NECK_PIVOT_Y_PX * sceneScale * GOSLING_SCALE_FACTOR}px`,
-                transform: `translate(${headTX}px, ${headTY}px) rotate(${headTilt}deg)` }} />
+                transform: `translate(${bodyTX + headTX}px, ${bodyTY + headTY}px) rotate(${headTilt}deg)` }} />
             {bubble && (
               <div style={{
                 position: "absolute",
