@@ -121,6 +121,7 @@ type FamilyAdult = {
   activity: AdultActivity;
   activityUntil: number;
   playHopPhase: number;
+  descending?: boolean;
 };
 
 function rand(a: number, b: number) { return a + Math.random() * (b - a); }
@@ -537,38 +538,55 @@ const GooseFamily = () => {
         } else {
           // Rotate through varied activities: waddle, rest/sit, socialise,
           // play. Each one lasts ~6–15s, then a new activity is rolled.
-          if (wallNow >= a.activityUntil) {
-            const r = Math.random();
-            a.activity = r < 0.32 ? "waddle"
-              : r < 0.52 ? "sit"
-              : r < 0.72 ? "socialise"
-              : r < 0.88 ? "play"
-              : "fly";
-            a.activityUntil = wallNow + 6000 + Math.random() * 9000;
-            if (a.activity === "waddle" || a.activity === "socialise") {
-              a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-200, 200)));
-              a.targetY = rand(ceilingY, adultFloorY);
-            }
-            if (a.activity === "socialise") {
-              const others = adultsRef.current.filter((x) => x.id !== a.id);
-              if (others.length > 0) {
-                const peer = others[Math.floor(Math.random() * others.length)];
-                a.targetX = Math.max(80, Math.min(w - 80, peer.x + rand(-30, 30)));
-                a.targetY = peer.y + rand(-10, 10);
+          if (wallNow >= a.activityUntil && !a.descending) {
+            // If currently flying and the window ends, enter descending
+            // phase instead of teleport-dropping to the floor.
+            if (a.activity === "fly" && Math.abs(a.y - adultFloorY) > 4) {
+              a.descending = true;
+              a.targetY = adultFloorY;
+              // keep going toward a sensible landing x near current position
+              a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-120, 120)));
+            } else {
+              const r = Math.random();
+              a.activity = r < 0.32 ? "waddle"
+                : r < 0.52 ? "sit"
+                : r < 0.72 ? "socialise"
+                : r < 0.88 ? "play"
+                : "fly";
+              a.activityUntil = wallNow + 6000 + Math.random() * 9000;
+              if (a.activity === "waddle" || a.activity === "socialise") {
+                a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-200, 200)));
+                a.targetY = adultFloorY;
               }
-            }
-            if (a.activity === "sit") {
-              a.targetY = adultFloorY;
-            }
-            if (a.activity === "play") {
-              a.playHopPhase = 0;
-              a.targetY = adultFloorY;
-            }
-            if (a.activity === "fly") {
-              // Take off and fly somewhere in the upper region for ~8-12s.
-              a.targetX = Math.max(60, Math.min(w - 60, a.x + rand(-260, 260)));
-              a.targetY = rand(h * 0.2, h * 0.5);
-              a.activityUntil = wallNow + 8000 + Math.random() * 4000;
+              if (a.activity === "socialise") {
+                const others = adultsRef.current.filter((x) => x.id !== a.id);
+                if (others.length > 0) {
+                  const peer = others[Math.floor(Math.random() * others.length)];
+                  a.targetX = Math.max(80, Math.min(w - 80, peer.x + rand(-30, 30)));
+                  a.targetY = adultFloorY;
+                }
+              }
+              if (a.activity === "sit") {
+                a.targetY = adultFloorY;
+              }
+              if (a.activity === "play") {
+                a.playHopPhase = 0;
+                a.targetY = adultFloorY;
+              }
+              if (a.activity === "fly") {
+                // Take off — ensure target X is meaningfully far away so
+                // the goose actually traverses instead of flipping in place.
+                const minTravel = 160;
+                const sign = Math.random() < 0.5 ? -1 : 1;
+                const span = minTravel + Math.random() * 220;
+                let tx = a.x + sign * span;
+                if (tx < 80 || tx > w - 80) tx = a.x - sign * span;
+                a.targetX = Math.max(60, Math.min(w - 60, tx));
+                a.targetY = rand(h * 0.2, h * 0.5);
+                a.activityUntil = wallNow + 9000 + Math.random() * 4000;
+                a.dir = a.targetX > a.x ? 1 : -1;
+                a.descending = false;
+              }
             }
           }
           if (a.activity === "sit") {
@@ -578,8 +596,12 @@ const GooseFamily = () => {
             a.phase += dt * 1.4;
             if (Math.random() < 0.01) a.dir = (Math.random() < 0.5 ? -1 : 1) as 1 | -1;
           } else if (a.activity === "fly") {
-            // Fly toward target with quicker movement; no floor clamp.
-            a.dir = a.targetX > a.x ? 1 : -1;
+            // Fly toward target. Only flip facing direction when the
+            // horizontal delta is meaningful, to avoid mid-air flicker.
+            const dxToTarget = a.targetX - a.x;
+            if (Math.abs(dxToTarget) > 30) {
+              a.dir = dxToTarget > 0 ? 1 : -1;
+            }
             const speed = 60;
             const stepX = a.dir * speed * sceneScale * dt;
             const dyTotal = a.targetY - a.y;
@@ -587,11 +609,28 @@ const GooseFamily = () => {
             a.x = Math.max(20, Math.min(w - 20, a.x + stepX));
             a.y = Math.max(20, Math.min(adultFloorY, a.y + stepY));
             a.phase += dt * 1.6;
+            // Reached fly target before window ends — pick a new airborne target
+            // in the upper band so the goose keeps cruising instead of stalling.
+            if (!a.descending && Math.abs(dxToTarget) < 24 && Math.abs(dyTotal) < 24) {
+              const sign = Math.random() < 0.5 ? -1 : 1;
+              const span = 160 + Math.random() * 220;
+              let tx = a.x + sign * span;
+              if (tx < 80 || tx > w - 80) tx = a.x - sign * span;
+              a.targetX = Math.max(60, Math.min(w - 60, tx));
+              a.targetY = rand(h * 0.2, h * 0.5);
+            }
+            // Landed from descent — clear fly state so next tick rolls a ground activity.
+            if (a.descending && Math.abs(a.y - adultFloorY) < 2) {
+              a.descending = false;
+              a.activity = "waddle";
+              a.activityUntil = wallNow; // trigger fresh roll next frame
+              a.y = adultFloorY;
+            }
           } else {
-            // waddle + socialise: walk toward targetX/targetY.
+            // waddle + socialise: walk along the floor band only.
             if (Math.abs(a.targetX - a.x) < 18) {
               a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-180, 180)));
-              a.targetY = rand(ceilingY, adultFloorY);
+              a.targetY = adultFloorY;
             }
             a.dir = a.targetX > a.x ? 1 : -1;
             const speed = a.activity === "socialise" ? 34 : 28;
@@ -599,7 +638,7 @@ const GooseFamily = () => {
             const dyTotal = a.targetY - a.y;
             const stepY = Math.sign(dyTotal) * Math.min(Math.abs(dyTotal), speed * 0.7 * sceneScale * dt);
             a.x = Math.max(20, Math.min(w - 20, a.x + stepX));
-            a.y = Math.max(ceilingY - 10, Math.min(adultFloorY, a.y + stepY));
+            a.y = Math.max(adultFloorY - 4, Math.min(adultFloorY, a.y + stepY));
             a.phase += dt;
           }
         }
