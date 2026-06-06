@@ -7,6 +7,7 @@ import {
   setBallPos,
   subscribeFamilyEvents,
 } from "@/lib/gooseSocial";
+import { getQuarterPeriodMs } from "@/lib/gooseBeat";
 
 /**
  * Classic Amiga "Boing" ball — checkered sphere bouncing across the screen.
@@ -79,7 +80,7 @@ const BoingBall = () => {
     let parkT = 0; // 0..1 progress
     const PARK_DURATION = 1.2; // seconds
     const RETURN_DURATION = 0.8;
-    const SHELF_SCALE = 0.15;
+    const SHELF_SCALE = 0.25;
     let parkStartX = 0, parkStartY = 0;
     const shelfAnchorX = () => stageWidth * 0.82;
     const shelfAnchorY = () => stageHeight * 0.20;
@@ -357,8 +358,13 @@ const BoingBall = () => {
         spin += 2.4 * dt;
         if (parkT >= 1) parkMode = "parked";
       } else if (parkMode === "parked") {
+        const quarter = getQuarterPeriodMs();
+        // Half-sine "hop" on each quarter-note (4/4 time). Small amplitude so
+        // it reads as gentle bouncing on the shelf.
+        const phase = (now % quarter) / quarter;
+        const hop = Math.sin(phase * Math.PI);
         x = shelfAnchorX();
-        y = shelfAnchorY();
+        y = shelfAnchorY() - hop * 9 * sceneScale;
         renderScale = SHELF_SCALE;
         spin += 0.6 * dt;
       } else if (parkMode === "returning") {

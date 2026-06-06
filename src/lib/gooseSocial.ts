@@ -171,19 +171,23 @@ const MAX_ONELINER_TRAIL = 14;
 
 // Prefer chat tied to recent oneliners (85s), then fall back to ambient banter.
 const RECENT_ONELINER_WINDOW_MS = 85_000;
-// Minimum gap between contextual goose dialogues (70s).
-const DIALOGUE_COOLDOWN_MS = 70_000;
+// Minimum gap between contextual goose dialogues (110s — slower pace).
+const DIALOGUE_COOLDOWN_MS = 110_000;
 const BALL_PLAY_COOLDOWN_MS = 180_000;
 // Snack-break interval: at least 9 minutes between feedings.
 const FLY_AWAY_COOLDOWN_MS = 540_000;
 const FLY_AWAY_CHANCE = 0.15;
+// Standalone reproduction trigger: how often the family may try to lay a
+// fresh clutch outside of a snack break.
+const REPRODUCTION_COOLDOWN_MS = 12 * 60_000;
+let lastReproductionAt = 0;
 
 const DIALOGUE_COOLDOWN_BY_ERA: Record<GooseSceneEra, number> = {
   intro: DIALOGUE_COOLDOWN_MS,
-  // Gradual cooldown reduction (~11-34%) so later eras feel livelier without spam.
-  warmed: 62_000,
-  party: 54_000,
-  veteran: 46_000,
+  // Gradual cooldown reduction so later eras feel livelier without spam.
+  warmed: 95_000,
+  party: 80_000,
+  veteran: 70_000,
 };
 const LEXICON_DIALOGUE_LINES = [
   "Local lexicon synced.",
@@ -414,8 +418,8 @@ async function runDialogue(lines: string[]) {
   if (!pair) return;
   for (let i = 0; i < lines.length; i++) {
     const g = pair[i % 2];
-    g.say(lines[i], 2400);
-    await wait(2600);
+    g.say(lines[i], 3400);
+    await wait(4200);
     if (!getPair()) return;
   }
 }
@@ -441,9 +445,9 @@ async function runBallPlay() {
       const chaser = activePair[chaserIdx];
       const receiver = activePair[1 - chaserIdx];
 
-      chaser.say(pick(CHASE_LINES), 900);
-      await wait(500);
-      chaser.say(pick(PLAY_LINES), 900);
+      chaser.say(pick(CHASE_LINES), 1900);
+      await wait(700);
+      chaser.say(pick(PLAY_LINES), 1900);
       const maxBumpDuration = BUMP_TIMEOUT_BASE_MS + Math.random() * BUMP_TIMEOUT_RANDOM_MS;
       const bumpStart = Date.now();
       const bumpMarker = lastBumpEvent?.at ?? 0;
@@ -460,14 +464,14 @@ async function runBallPlay() {
           bumpToward: latestReceiver.getPosition(),
         };
         if (bumpedSince(latestChaser.variant, bumpMarker)) {
-          latestReceiver.say(pick(RECEIVE_LINES), 900);
+          latestReceiver.say(pick(RECEIVE_LINES), 1900);
           chaserIdx = 1 - chaserIdx;
           break;
         }
         await wait(BUMP_CHECK_INTERVAL_MS);
       }
       clearBallPlayState();
-      await wait(550 + Math.random() * 220);
+      await wait(1200 + Math.random() * 400);
     }
   } finally {
     clearBallPlayState();
@@ -481,23 +485,23 @@ async function runBallPlay() {
   }
   // Wind down with extra chatter pulled from the 500-line pool.
   mood = "sleeping";
-  pairAfterPlay[0].say("Phew! :)", 1800);
-  await wait(1600);
-  if (getPair()) pairAfterPlay[1].say("Tired now... :sleepy:", 1800);
-  await wait(1800);
+  pairAfterPlay[0].say("Phew! :)", 2800);
+  await wait(3100);
+  if (getPair()) pairAfterPlay[1].say("Tired now... :sleepy:", 2800);
+  await wait(3200);
   const chatterRounds = 4 + Math.floor(Math.random() * 4);
   for (let i = 0; i < chatterRounds; i++) {
     const activePair = getPair();
     if (!activePair) break;
-    activePair[i % 2].say(pickUsageTracked("chatter-pool", CHATTER_POOL), 2200);
-    await wait(2400);
+    activePair[i % 2].say(pickUsageTracked("chatter-pool", CHATTER_POOL), 3200);
+    await wait(3900);
   }
   // Sleep for a little while — alternating Zzz
   const zzzRounds = 5 + Math.floor(Math.random() * 4);
   for (let i = 0; i < zzzRounds; i++) {
     if (!getPair()) break;
-    pair[i % 2].say(pick(SLEEPY_LINES), 2200);
-    await wait(2300);
+    pair[i % 2].say(pick(SLEEPY_LINES), 3200);
+    await wait(3600);
   }
   mood = "idle";
 }
@@ -518,7 +522,6 @@ const MOTHER_CARE_LINES = [
   "Aren't you adorable :D",
   "Eat up, little ones",
   "Follow mama!",
-  "Mind the ball, babies!",
   "Look at you grow!",
   "Such fluffballs <3",
   "Don't wander too far!",
@@ -549,7 +552,7 @@ async function runReproductionPhase() {
   await wait(2400);
   const landed = mother.getPosition();
   emitFamilyEvent({ type: "incubation-start", x: landed.x, y: landed.y });
-  mother.say(pick(INCUBATION_LINES), 2600);
+  mother.say(pick(INCUBATION_LINES), 3600);
 
   // Father provisioning state machine.
   type FatherState = "idle" | "away" | "delivering";
@@ -561,69 +564,67 @@ async function runReproductionPhase() {
     if (fatherState === "idle") {
       father.setFetchingFood(true);
       father.setAway(true);
-      father.say(pick(FOOD_FETCH_LINES), 2200);
+      father.say(pick(FOOD_FETCH_LINES), 3200);
       fatherState = "away";
-      fatherUntil = Date.now() + 7000;
+      fatherUntil = Date.now() + 9000;
     } else if (fatherState === "away") {
       father.setAway(false);
       father.setFetchingFood(false);
       father.setFoodBag(true);
-      father.say(pick(FATHER_FEED_LINES), 2200);
+      father.say(pick(FATHER_FEED_LINES), 3200);
       const target = mother.getPosition();
       emitFamilyEvent({ type: "feed-delivery", targetX: target.x });
       fatherState = "delivering";
-      fatherUntil = Date.now() + 6000;
+      fatherUntil = Date.now() + 7500;
     } else {
       father.setFoodBag(false);
       fatherState = "idle";
-      fatherUntil = Date.now() + 2500;
+      fatherUntil = Date.now() + 3500;
     }
   };
 
-  // Listen for all-eggs-hatched so we can leave incubation chatter behind
-  // as soon as the last gosling pops — mother shouldn't keep talking about
-  // eggs that no longer exist.
   let allHatched = false;
   const unsubHatch = subscribeFamilyEvents((ev) => {
     if (ev.type === "all-eggs-hatched") allHatched = true;
   });
 
   // Incubation phase: up to ~60s, but cuts short the moment the last egg
-  // hatches so mother can switch to parenting mode.
+  // hatches so mother can switch to parenting mode. Chatter is rationed
+  // so she doesn't talk every 3 seconds while just sitting.
   const INCUBATION_MS = 60_000;
   const incEnd = Date.now() + INCUBATION_MS;
   let chatterIdx = 0;
   while (Date.now() < incEnd && getPair() && !allHatched) {
     stepFather();
-    if (chatterIdx % 2 === 0) mother.say(pick(INCUBATION_LINES), 2400);
+    if (chatterIdx % 3 === 0) mother.say(pick(INCUBATION_LINES), 3400);
     chatterIdx++;
-    await wait(3000);
+    await wait(4500);
   }
   emitFamilyEvent({ type: "incubation-end" });
 
-  // Once eggs hatch, mother gets up and waddles with the goslings instead of
-  // sitting like she's still warming them.
   if (allHatched) mother.setIncubating(false);
 
-  // Brood phase: ~90s. Mother stays nearby chatting care lines; father keeps
-  // fetching food (now feeding goslings too).
+  // Brood phase: ~90s.
   const BROOD_MS = 90_000;
   const broodEnd = Date.now() + BROOD_MS;
   while (Date.now() < broodEnd && getPair()) {
     stepFather();
-    if (chatterIdx % 2 === 0) mother.say(pick(MOTHER_CARE_LINES), 2400);
+    if (chatterIdx % 3 === 0) mother.say(pick(MOTHER_CARE_LINES), 3400);
     chatterIdx++;
-    await wait(3000);
+    await wait(4500);
   }
 
   unsubHatch();
 
-  // Release mother.
   mother.setIncubating(false);
   father.setFoodBag(false);
   father.setFetchingFood(false);
   father.setAway(false);
   emitFamilyEvent({ type: "brood-end" });
+  lastReproductionAt = Date.now();
+  // Fallback so a fresh clutch is guaranteed eligible even if
+  // `goslings-grown` is somehow missed.
+  reproductionEarliestAt = Date.now() + REPRODUCTION_COOLDOWN_MS;
 }
 
 
@@ -637,32 +638,32 @@ async function runFlyAway() {
   const staying = pair[1 - whichIdx];
   try {
     leaving.setFetchingFood(true);
-    leaving.say(pick(FOOD_FETCH_LINES), 2400);
-    await wait(1400);
+    leaving.say(pick(FOOD_FETCH_LINES), 3400);
+    await wait(2200);
     if (!getPair()) return;
     leaving.setAway(true);
-    // Lonely partner chatters while the other goose fetches snacks.
-    const lonelyRounds = 4 + Math.floor(Math.random() * 3);
+    // Lonely partner chatters quietly while waiting — fewer lines, longer gaps.
+    const lonelyRounds = 2 + Math.floor(Math.random() * 2);
     for (let i = 0; i < lonelyRounds; i++) {
-      await wait(3500 + Math.random() * 2500);
+      await wait(6500 + Math.random() * 3500);
       if (!getPair()) break;
-      staying.say(pick(LONELY_LINES), 2400);
+      staying.say(pick(LONELY_LINES), 3400);
     }
-    await wait(1200);
+    await wait(2000);
     leaving.setAway(false);
-    await wait(320);
+    await wait(500);
     leaving.setFoodBag(true);
     leaving.setFetchingFood(false);
-    await wait(2200);
+    await wait(3200);
     if (getPair()) {
-      leaving.say(pick(FOOD_RETURN_LINES), 2200);
-      await wait(2000);
-      if (getPair()) staying.say("Yum, perfect timing! :D", 2200);
+      leaving.say(pick(FOOD_RETURN_LINES), 3200);
+      await wait(3200);
+      if (getPair()) staying.say("Yum, perfect timing! :D", 3200);
     }
 
     if (getPair()) {
       for (const g of geese.values()) g.setSitting(true);
-      await wait(1200); // let them fly to a perch and settle
+      await wait(1600);
       emitFamilyEvent({ type: "snack-start", positions: getGoosePositions() });
       const eatStart = Date.now();
       const MIN_EAT_MS = 35_000;
@@ -670,36 +671,46 @@ async function runFlyAway() {
       while (Date.now() - eatStart < MIN_EAT_MS) {
         const activePair = getPair();
         if (!activePair) break;
-        // Alternate between snack-specific lines and the broader chatter pool
-        // so the snack break feels more like a real conversation.
-        const line = i % 2 === 0
-          ? pick(FOOD_EAT_LINES)
-          : pickUsageTracked("chatter-pool", CHATTER_POOL);
-        activePair[i % 2].say(line, 2200);
+        // Quiet eating: only speak on every other beat, longer gaps.
+        if (i % 2 === 0) {
+          const line = (i / 2) % 2 === 0
+            ? pick(FOOD_EAT_LINES)
+            : pickUsageTracked("chatter-pool", CHATTER_POOL);
+          activePair[(i / 2) % 2].say(line, 3200);
+        }
         i++;
-        await wait(2400);
+        await wait(4500);
       }
       if (getPair()) {
-        await wait(700);
+        await wait(1000);
         const pairAfterSnack = getPair();
-        if (pairAfterSnack) pairAfterSnack[0].say(pick(FOOD_RESUME_LINES), 2200);
+        if (pairAfterSnack) pairAfterSnack[0].say(pick(FOOD_RESUME_LINES), 3200);
       }
       emitFamilyEvent({ type: "snack-end" });
 
-      // === REPRODUCTION: mother flies down, lays eggs, sits to incubate;
-      //     father runs food-fetch loop; then a 90s brood phase. Skipped
-      //     when the last clutch of goslings is still growing up (we want
-      //     a 10–15 min gap after grow-up before laying again). ===
+      // === REPRODUCTION (snack-coupled). ===
       if (Date.now() >= reproductionEarliestAt) {
         await runReproductionPhase();
       }
     }
 
-
-
   } finally {
     clearFlyAwayState();
     mood = "idle";
+  }
+}
+
+// True when no eggs or goslings remain in the family — used to gate the
+// standalone reproduction trigger.
+function familyHasLiveOffspring(): boolean {
+  try {
+    const eggs = localStorage.getItem("cracktro-goose-eggs-v2");
+    const goslings = localStorage.getItem("cracktro-goose-goslings-v1");
+    const hasEggs = !!eggs && eggs !== "[]" && JSON.parse(eggs).length > 0;
+    const hasGoslings = !!goslings && goslings !== "[]" && JSON.parse(goslings).length > 0;
+    return hasEggs || hasGoslings;
+  } catch {
+    return false;
   }
 }
 
@@ -708,8 +719,18 @@ async function step() {
   const pair = getPair();
   const now = Date.now();
   if (pair && mood === "idle") {
-    // Priority: fly-away > ball-play > regular chat.
-    if (now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS && Math.random() < FLY_AWAY_CHANCE) {
+    // Priority: standalone reproduction > fly-away > ball-play > regular chat.
+    // Only fires once reproductionEarliestAt has been explicitly set (i.e.
+    // after a first clutch has grown up or finished brooding).
+    if (
+      reproductionEarliestAt > 0 &&
+      now >= reproductionEarliestAt &&
+      now - lastReproductionAt >= REPRODUCTION_COOLDOWN_MS &&
+      !familyHasLiveOffspring()
+    ) {
+      lastReproductionAt = now;
+      await runReproductionPhase();
+    } else if (now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS && Math.random() < FLY_AWAY_CHANCE) {
       lastFlyAwayAt = now;
       await runFlyAway();
     } else if (canStartBallPlay(now)) {
@@ -727,7 +748,7 @@ async function step() {
     }
   }
   if (running) {
-    schedulerTimer = setTimeout(step, 2500);
+    schedulerTimer = setTimeout(step, 4000);
   }
 }
 
@@ -797,6 +818,8 @@ export const __testing = {
     lastDialogueAt = 0;
     lastBallPlayAt = 0;
     lastFlyAwayAt = 0;
+    lastReproductionAt = 0;
+    reproductionEarliestAt = 0;
     lastBumpEvent = null;
     recentOneliner = null;
     recentOnelinerTrail = [];

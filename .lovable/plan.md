@@ -1,68 +1,58 @@
-## 1. Goslings not turning into geese
+## 1. Originals + grown adults share the floor
 
-`GROW_UP_MS` is currently 3 min, but the user wants 8 min for goslings to become adults.
+In `src/components/FlyingGoose.tsx` (white + brown originals): add a periodic "land & waddle" mood (~every 60–120 s) where the goose flies down to the floor band (bottom 20 % of the stage), waddles for ~10–20 s, then takes off again. Reuse the existing perch/landing machinery, but pick a floor Y in `[h*0.8, floorY]` instead of a letter/window perch.
 
-Fix:
-- Change `GROW_UP_MS` from `3 * 60_000` to `8 * 60_000` in `src/components/GooseFamily.tsx`.
-- `gooseFamilyRoster.ts`: add `isPlaceholderName(name)` helper (matches `"Gosling"`, empty, or whitespace-only names).
-- `GooseFamily.tsx` `loadGoslings()`: when backfilling legacy goslings, assign a real unique name via `pickUniqueName(takenSet)` instead of `"Gosling"`, and update the matching roster entry name.
-- Promotion block (~line 393): if the existing roster name is placeholder or missing, assign a unique name so the promoted adult gets a real identity.
-- Mount effect (~line 208): sweep roster — any `kind: "gosling"` whose `wallNow - bornAt > GROW_UP_MS` with no matching live gosling in `goslingsRef` gets promoted to `kind: "adult"` (real name + adult color) and pushed into `adultsRef`. Also rename any `kind: "adult"` entries still called `"Gosling"`.
+In `src/components/GooseFamily.tsx`: occasionally let promoted family adults take off and fly briefly (new activity `"fly"`, ~8–12 s) before re-landing in the floor band. Adds an `airborneY` target sampled in `[h*0.2, h*0.5]` so they visually leave the floor.
 
-## 2. Neck wobble pivots from the body
+## 2. Neck still has gap
 
-Both gosling head (line 672) and family-adult head (line 729) use `transformOrigin: "center center"`, so the head rotates around its midpoint and appears to detach from the body. `FlyingGoose.tsx` already uses the sprite-grid neck base at `(11.5, 10)` in `PIXEL` units (`NECK_PIVOT_X_PX`, `NECK_PIVOT_Y_PX`).
+Body and head currently translate independently — when the body translates `(bodyTX, bodyTY)`, the head doesn't move with it, so a visible gap opens.
 
-Fix in `GooseFamily.tsx`:
-- Import `NECK_PIVOT_X_PX` and `NECK_PIVOT_Y_PX` from `@/lib/gooseSprite`.
-- Gosling head `img`: `transformOrigin: \`${NECK_PIVOT_X_PX * sceneScale * GOSLING_SCALE_FACTOR}px ${NECK_PIVOT_Y_PX * sceneScale * GOSLING_SCALE_FACTOR}px\``.
-- Family-adult head `img`: `transformOrigin: \`${NECK_PIVOT_X_PX * sceneScale}px ${NECK_PIVOT_Y_PX * sceneScale}px\``.
-- Leave the outer wrapper and body `transformOrigin` unchanged (wrapper still handles `scaleX(dir)` mirroring).
+Fix in `GooseFamily.tsx` (both gosling and adult head `<img>` blocks): make the head transform inherit the body translate so they stay glued:
 
-## 3. Promoted adults join the full social life
+```text
+transform: translate(bodyTX + headTX, bodyTY + headTY) rotate(headTilt)
+transformOrigin: NECK_PIVOT_X * scale + bodyTX  (same for Y)
+```
 
-`FamilyAdult` instances are rendered by `GooseFamily` but never registered with `gooseSocial`, so they cannot play ball, fly away, or participate in dialogue.
+Also apply the same fix in `FlyingGoose.tsx` waddle branch where the original geese render head/body separately.
 
-Fix:
-- Expose public `registerGoose(api: GooseAPI)` / `unregisterGoose(api: GooseAPI)` from `gooseSocial.ts` (currently exists only in the `__testing` block).
-- Build a lightweight adapter for each `FamilyAdult` that implements the full `GooseAPI` interface, mapping social directives to local adult state (new fields: `away`, `chaseTarget`, `ballPlayActive`).
-- Register each promoted adult immediately upon creation.
-- Tick loop in `GooseFamily` honors `away` (hide sprite), `chaseTarget` (move toward ball target), `ballPlayActive` (pause normal activity rotation).
-- Ball-play (`runBallPlay`) picks any two registered geese, not only `white`/`brown`.
-- Dialogue scheduling includes family adults via their registered `say` method.
-- Family adults use `variant: "family"` so dialogue pools work.
+## 3. Slower, calmer chatter
 
-## 4. All adults roam the floor band
+In `src/lib/gooseSocial.ts`:
+- Bump every `say(text, durationMs)` call by ~1000 ms (e.g. 2200 → 3200, 1800 → 2800, 900 → 1900).
+- Increase inter-line waits in `runBallPlay`, `runFlyAway`, `runReproductionPhase`, `runDialogue` by ~1500 ms.
+- Raise `DIALOGUE_COOLDOWN_MS` 70 s → 110 s and proportionally bump `DIALOGUE_COOLDOWN_BY_ERA`.
+- Slow scheduler tick from 2500 ms → 4000 ms.
+- Snack break (sitting + eating loop): increase `await wait(2400)` → `4500` and only emit a snack line every 2nd iteration. Same treatment for the lonely partner while waiting for the food run.
 
-All adult geese (originals + family adults) should sometimes walk on the floor between the very bottom and 20% up from the bottom.
+## 4. Second clutch of eggs
 
-Fix:
-- When the activity is `waddle` or `socialise`, set `targetY` in the range `[h * 0.8, floorY]` (bottom 20% of screen).
-- For originals (white/brown), this means overriding their normal perch-target logic when the floor-roam activity is active. `gooseSocial.ts` sets `grounded: true` on the goose during this window.
-- For family adults, the same `targetY` sampling applies natively in `GooseFamily`.
+In `gooseSocial.ts`:
+- After a successful `runReproductionPhase()`, set a fallback `reproductionEarliestAt = Date.now() + 12 * 60_000` so the next clutch is guaranteed eligible 12 min later even if the `goslings-grown` event was missed.
+- Add a standalone scheduler hook: in `step()`, if `mood === "idle"`, `Date.now() >= reproductionEarliestAt`, and the family currently has 0 live goslings, allow `runReproductionPhase()` to start directly without requiring a snack break. Cooldown the path with `lastReproductionAt`.
+- On boot, initialize `reproductionEarliestAt = 0` so first clutch still happens naturally.
 
-## 5. Ball parks on a far-away shelf during brood
+## 5. Ball shelf polish
 
-While the mother is incubating eggs or caring for goslings, the ball cannot be played with.
+In `src/components/BoingBall.tsx`:
+- `SHELF_SCALE`: 0.15 → 0.25.
+- Hide the ball position from `setBallPos` (already done) AND clear `ballPlayDirective` so no goose will speak about the ball. In `gooseSocial.ts`, when `ballAvailable === false`, skip ball-related lines entirely in `buildContextualDialogue` (filter `BALL_CHATTER_TAGS` or check pre-emptively before scheduling `runBallPlay`/snack lines mentioning the ball).
+- Filter `MOTHER_CARE_LINES` to remove "Mind the ball, babies!" while parked (or guard with `getBallAvailable()`).
 
-Fix in `BoingBall.tsx`:
-- Listen for family events `incubation-start` and `brood-end`.
-- On `incubation-start`:
-  - Render a small pixel-art shelf near the right top at 20% down (`x = w * 0.78`, `y = h * 0.20`). Animate it sliding in from the right.
-  - Animate the ball from its current position to the shelf anchor while scaling from `1` to `0.15` (1200 ms, ease-in-out). This creates the visual of the ball going farther away and shrinking.
-  - Disable ball physics and block `gooseSocial` ball-play via a new `setBallAvailable(false)` gate.
-- On `brood-end` (all goslings promoted to adults, no eggs left):
-  - Reverse the ball animation: scale `0.15` to `1` and translate back to a stage-center landing point (800 ms ease-out), then resume physics.
-  - Animate the shelf retracting out to the right (500 ms ease-in).
-  - Re-enable `setBallAvailable(true)`.
-- `gooseSocial.ts`: add `setBallAvailable(boolean)` guard and skip `runBallPlay` while false.
+## 6. Ball bounces to beat (4/4) while parked
 
-## Files touched
-- `src/components/GooseFamily.tsx` — `GROW_UP_MS`, placeholder-name backfill, stuck-gosling rescue, neck pivot `transformOrigin`, register family adults with social, floor-roam band.
-- `src/lib/gooseFamilyRoster.ts` — `isPlaceholderName` helper.
-- `src/lib/gooseSocial.ts` — public `registerGoose`/`unregisterGoose`/`setBallAvailable`, pick any two registered geese for ball-play, emit `brood-end`.
-- `src/components/BoingBall.tsx` — shelf overlay, park/return animations, physics gate.
-- `src/components/FlyingGoose.tsx` — `grounded` support for floor-roam, neck pivot reuse.
-- `src/test/gooseSocial.test.ts` — small test for `setBallAvailable` blocking ball-play.
+- Add a tiny module `src/lib/gooseBeat.ts` with `setBpm(n)`, `getBpm()`, and a `subscribeBeat(cb)` pub/sub that fires a tick every quarter-note based on `performance.now()` and the current BPM (no audio coupling needed). Default 120 BPM until a real value is set.
+- In `src/pages/Index.tsx`, where `useBpm` returns the live BPM, call `setBpm(bpmDebug.bpm)` whenever it changes.
+- In `BoingBall.tsx` parked render block: compute `bounceY = -Math.abs(Math.sin(now * Math.PI / quarterMs)) * 6 * sceneScale` so the parked ball does a small 4/4 hop on the shelf in sync with the music. No effect in `live` mode.
 
-No design-token, schema, or backend changes.
+## Technical notes (files touched)
+
+- `src/components/GooseFamily.tsx` — adult `fly` activity, head-follows-body transform.
+- `src/components/FlyingGoose.tsx` — periodic floor-land for originals; head-follows-body transform.
+- `src/components/BoingBall.tsx` — shelf scale 0.25, BPM bounce, suppress ball-speak signal.
+- `src/lib/gooseSocial.ts` — chatter pacing, fallback reproduction trigger, ball-line gating.
+- `src/lib/gooseBeat.ts` (new) — BPM pub/sub.
+- `src/pages/Index.tsx` — publish BPM into the new store.
+
+No schema, backend, or design-token changes. Existing tests in `gooseSocial.test.ts` continue to pass; pacing constants are numeric only.

@@ -23,6 +23,7 @@ import {
 import AudioPlayer from "@/components/AudioPlayer";
 import Visualizer, { useAudioLevel, useBpm, type VisualizerStyle } from "@/components/Visualizer";
 import BeatOverlay from "@/components/BeatOverlay";
+import { setBpm } from "@/lib/gooseBeat";
 import Cracktro from "@/components/Cracktro";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
@@ -316,6 +317,12 @@ const Index = () => {
     confidence,
   } = useBpm(analyser, true, trackKey);
   void tick;
+
+  // Publish BPM to the lightweight shared store so non-React renderers
+  // (e.g. the parked BoingBall) can sync small animations to the beat.
+  useEffect(() => {
+    if (bpm > 0) setBpm(bpm);
+  }, [bpm]);
 
   return (
     <div className="crt min-h-screen relative overflow-x-hidden">
