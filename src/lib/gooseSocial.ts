@@ -132,7 +132,7 @@ export function subscribeFamilyEvents(listener: FamilyListener) {
   familyListeners.add(listener);
   return () => familyListeners.delete(listener);
 }
-function emitFamilyEvent(event: FamilyEvent) {
+export function emitFamilyEvent(event: FamilyEvent) {
   for (const l of familyListeners) {
     try { l(event); } catch { /* ignore listener errors */ }
   }
@@ -607,6 +607,15 @@ export function reactToOnelinerSmiley(fromVariant: GooseRole) {
   setTimeout(() => {
     if (getPair()) partner.say(pick(ONELINER_REACTION_RESPONSES), 1800);
   }, 1400);
+}
+
+// Make a random registered goose say a line (used for song-rating chatter
+// triggered when the now-playing track changes).
+export function sayFromAnyGoose(text: string, durationMs = 2400) {
+  const all = Array.from(geese.values());
+  if (all.length === 0) return;
+  const speaker = all[Math.floor(Math.random() * all.length)];
+  speaker.say(text, durationMs);
 }
 
 export const __testing = {

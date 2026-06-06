@@ -5,12 +5,25 @@ import FloatingWindow from "./FloatingWindow";
 import FlyingGoose from "./FlyingGoose";
 import GooseFamily from "./GooseFamily";
 import BoingBall from "./BoingBall";
+import RosterWindow from "./RosterWindow";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl } from "@/lib/nectarine";
 import { StageProvider } from "@/lib/stage";
 import { renderBBCode } from "@/lib/bbcode";
 import { getSceneEraConfig, getSceneEraFromListeningMs } from "@/lib/gooseSceneEra";
-import { setGoosePerformanceState, setGooseSceneEra } from "@/lib/gooseSocial";
+import { sayFromAnyGoose, setGoosePerformanceState, setGooseSceneEra } from "@/lib/gooseSocial";
+import { pickRatingLine } from "@/lib/gooseSongChatter";
+import {
+  formatMmSs,
+  getMourningActive,
+  getPlayerTime,
+  getWindowSize,
+  setWindowSize,
+  subscribeMourning,
+  subscribePlayerTime,
+  type WindowSize,
+} from "@/lib/cracktroUi";
+import { clearRoster } from "@/lib/gooseFamilyRoster";
 import Flag from "./Flag";
 
 type OnlineUser = { name: string; flag: string };
@@ -63,12 +76,13 @@ const LOW_FPS_THRESHOLD = 28;
 const LOW_FPS_SUSTAINED_MS = 12_000;
 const FPS_HUD_UPDATE_INTERVAL_MS = 250;
 
-type PanelId = "oneliner" | "online" | "queue" | "history";
+type PanelId = "oneliner" | "online" | "queue" | "history" | "roster";
 const PANELS: { id: PanelId; label: string }[] = [
   { id: "oneliner", label: "Oneliner" },
   { id: "online", label: "Online" },
   { id: "queue", label: "Up Next" },
   { id: "history", label: "Recent" },
+  { id: "roster", label: "Geese" },
 ];
 const STORAGE_PANELS = "cracktro-panels-on";
 
@@ -156,7 +170,7 @@ const Cracktro = ({
   const [fps, setFps] = useState<number | null>(null);
   const [lowFpsDetected, setLowFpsDetected] = useState(false);
   const [panelsOn, setPanelsOn] = useState<Record<PanelId, boolean>>(() => {
-    const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: true, history: false };
+    const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: true, history: false, roster: false };
     try {
       const raw = localStorage.getItem(STORAGE_PANELS);
       if (raw) {
@@ -218,6 +232,36 @@ const Cracktro = ({
   const platform = info?.platformName ?? "";
   const rating = typeof info?.rating === "number" ? info.rating : undefined;
   const votes = info?.votes;
+
+  // Window/info-box size selector (S/M/L), persisted via cracktroUi.
+  const [windowSize, setWindowSizeState] = useState<WindowSize>(getWindowSize());
+  const applyWindowSize = useCallback((s: WindowSize) => {
+    setWindowSize(s);
+    setWindowSizeState(s);
+  }, []);
+
+  // Mourning ritual: scrollers + info box fade & desaturate.
+  const [mourning, setMourning] = useState(getMourningActive());
+  useEffect(() => subscribeMourning(() => setMourning(getMourningActive())), []);
+
+  // Live elapsed/total from the audio player.
+  const [, setTimeTick] = useState(0);
+  useEffect(() => subscribePlayerTime(() => setTimeTick((t) => (t + 1) % 1_000_000)), []);
+  const { currentTime, duration } = getPlayerTime();
+
+  // Song-rating chatter — fire once per (track, ratingTier) combo.
+  const lastChatterKeyRef = useRef<string>("");
+  useEffect(() => {
+    if (rating === undefined || (!title && !artist)) return;
+    const key = `${title}|${artist}|${Math.floor(rating)}`;
+    if (key === lastChatterKeyRef.current) return;
+    lastChatterKeyRef.current = key;
+    const line = pickRatingLine(rating, artist);
+    if (!line) return;
+    const t = window.setTimeout(() => sayFromAnyGoose(line, 3000), 1800);
+    return () => window.clearTimeout(t);
+  }, [title, artist, rating]);
+
 
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -780,7 +824,14 @@ const Cracktro = ({
             ref={canvasRef}
             aria-hidden="true"
             className="absolute left-0 right-0 pointer-events-none"
-            style={{ top: "50%", transform: "translateY(-50%)", zIndex: 5 }}
+            style={{
+              top: "50%",
+              transform: "translateY(-50%)",
+              zIndex: 5,
+              opacity: mourning ? 0.25 : 1,
+              filter: mourning ? "grayscale(0.85) brightness(0.55)" : undefined,
+              transition: "opacity 1200ms ease-out, filter 1200ms ease-out",
+            }}
           />
         )}
 
@@ -794,6 +845,10 @@ const Cracktro = ({
               background: `linear-gradient(to top, hsla(20,25%,4%,${sceneEraConfig.infoBarOpacity}), hsla(20,25%,4%,0))`,
               paddingTop: "1.5rem",
               paddingBottom: "1.5rem",
+              opacity: mourning ? 0.4 : 1,
+              filter: mourning ? "grayscale(0.85)" : undefined,
+              transition: "opacity 1200ms ease-out, filter 1200ms ease-out",
+              fontSize: `${windowSize === "s" ? 0.85 : windowSize === "l" ? 1.2 : 1}em`,
             }}
           >
             <div className="mx-auto max-w-6xl px-6 text-center">
@@ -818,7 +873,7 @@ const Cracktro = ({
               >
                 by {artist || "Unknown Artist"}
               </p>
-              {(platform || rating !== undefined) && (
+              {(platform || rating !== undefined || duration > 0) && (
                 <p
                   className="text-foreground uppercase tracking-[0.3em] mt-3"
                   style={{ fontSize: "clamp(0.95rem, 1.8vw, 1.5rem)" }}
@@ -829,6 +884,14 @@ const Cracktro = ({
                     <span>
                       ★ {rating.toFixed(2)}
                       {votes ? ` (${votes})` : ""}
+                    </span>
+                  )}
+                  {(platform || rating !== undefined) && duration > 0 && (
+                    <span className="mx-3 opacity-50">·</span>
+                  )}
+                  {duration > 0 && (
+                    <span className="tabular-nums">
+                      {formatMmSs(currentTime)} / {formatMmSs(duration)}
                     </span>
                   )}
                 </p>
@@ -952,6 +1015,15 @@ const Cracktro = ({
             )}
           </FloatingWindow>
         )}
+
+        {panelsOn.roster && (
+          <RosterWindow
+            defaultX={Math.max(16, (typeof window !== "undefined" ? window.innerWidth : 1200) - 320)}
+            defaultY={120}
+            onClose={() => togglePanel("roster")}
+          />
+        )}
+
 
         <button
           type="button"
@@ -1160,6 +1232,46 @@ const Cracktro = ({
               ))}
             </div>
           </div>
+
+          {/* Row: window size + reset family */}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mr-1">Size</span>
+            <div className="flex items-center gap-1">
+              {(["s", "m", "l"] as WindowSize[]).map((sz) => (
+                <button
+                  key={sz}
+                  type="button"
+                  onClick={() => applyWindowSize(sz)}
+                  className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                    windowSize === sz
+                      ? "border-primary bg-primary/20 text-foreground"
+                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-pressed={windowSize === sz}
+                  title="Resize floating windows and info box"
+                >
+                  {sz.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-3 mr-1">Family</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(
+                  "Reset the goose family?\n\nThis will permanently delete all your geese, eggs, goslings and grown-up offspring. The two original geese will return. Continue?",
+                )) {
+                  clearRoster();
+                  window.location.reload();
+                }
+              }}
+              className="min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-destructive/60 bg-background/60 text-destructive hover:bg-destructive/20"
+              title="Permanently remove all family members"
+            >
+              Reset
+            </button>
+          </div>
+
 
           {/* Row 2: visualizer effect picker */}
           {onStyleChange && (
