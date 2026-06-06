@@ -774,7 +774,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
 
       // ===== FLY / APPROACH =====
-      if (!fetchingFood && !eatingMode && !ballPlayActive && (mode === "fly" || mode === "approach") && gooseIsTired(stamina)) {
+      if (!incubating && !fetchingFood && !eatingMode && !ballPlayActive && (mode === "fly" || mode === "approach") && gooseIsTired(stamina)) {
         const nearestPerch = pickPerch({ x, y });
         if (nearestPerch) {
           perchEl = nearestPerch.el;
@@ -786,7 +786,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           targetSpeed = scale(105);
         }
       }
-      if (mode === "fly" && eatingMode && !away) {
+      if (!incubating && mode === "fly" && eatingMode && !away) {
         const mealPerch = pickPerch({ x, y });
         if (mealPerch) {
           perchEl = mealPerch.el;
@@ -797,7 +797,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           targetSpeed = scale(115);
         }
       }
-      if (mode === "fly" && !away && !eatingMode && !fetchingFood && !ballPlayActive && elapsed >= nextPerchAt) {
+      if (!incubating && mode === "fly" && !away && !eatingMode && !fetchingFood && !ballPlayActive && elapsed >= nextPerchAt) {
         const p = pickPerch();
         if (p) {
           perchEl = p.el;
