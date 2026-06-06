@@ -184,10 +184,10 @@ let lastReproductionAt = 0;
 
 const DIALOGUE_COOLDOWN_BY_ERA: Record<GooseSceneEra, number> = {
   intro: DIALOGUE_COOLDOWN_MS,
-  // Gradual cooldown reduction (~11-34%) so later eras feel livelier without spam.
-  warmed: 62_000,
-  party: 54_000,
-  veteran: 46_000,
+  // Gradual cooldown reduction so later eras feel livelier without spam.
+  warmed: 95_000,
+  party: 80_000,
+  veteran: 70_000,
 };
 const LEXICON_DIALOGUE_LINES = [
   "Local lexicon synced.",
