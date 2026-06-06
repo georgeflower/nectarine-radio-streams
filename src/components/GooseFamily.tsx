@@ -225,14 +225,48 @@ const GooseFamily = () => {
   if (!goslingFramesBrown.current) goslingFramesBrown.current = buildGooseFrameDataUrls("gosling-brown");
   if (!adultFramesWhite.current) adultFramesWhite.current = buildGooseFrameDataUrls("white");
 
-  // Hydrate adults from roster on mount.
+  // Hydrate adults from roster on mount. Also rescue stuck legacy goslings:
+  // any roster entry kind=="gosling" past GROW_UP_MS with no live gosling in
+  // goslingsRef gets promoted to kind=="adult" right now. Placeholder adult
+  // names ("Gosling") get a fresh unique name.
   useEffect(() => {
     ensureOriginals();
-    const roster = getRoster();
+    let roster = getRoster();
+    const wallNow = Date.now();
+    const liveGoslingIds = new Set(goslingsRef.current.map((g) => g.rosterId));
+    const taken = new Set(roster.map((e) => e.name));
+    let rosterChanged = false;
+    roster = roster.map((e) => {
+      // Stuck gosling with no live render → promote to adult.
+      if (
+        e.kind === "gosling" &&
+        !liveGoslingIds.has(e.id) &&
+        wallNow - e.bornAt > GROW_UP_MS
+      ) {
+        rosterChanged = true;
+        let name = e.name;
+        if (isPlaceholderName(name)) {
+          name = pickUniqueName(taken);
+        }
+        taken.delete(e.name); taken.add(name);
+        return { ...e, name, kind: "adult", color: pickRandomAdultColor() };
+      }
+      // Adult still wearing the placeholder "Gosling" name → rename.
+      if (e.kind === "adult" && isPlaceholderName(e.name)) {
+        rosterChanged = true;
+        const name = pickUniqueName(taken);
+        taken.delete(e.name); taken.add(name);
+        return { ...e, name };
+      }
+      return e;
+    });
+    if (rosterChanged) setRoster(roster);
+
     const w = rootRef.current?.clientWidth ?? window.innerWidth;
     const h = rootRef.current?.clientHeight ?? window.innerHeight;
     const sceneScale = getSceneScale(w, h);
-    const floorY = h - BASE_SPRITE_H * sceneScale * GOSLING_SCALE_FACTOR * 0.6 - 12;
+    const adultFloorY = h - BASE_SPRITE_H * sceneScale * 0.6 - 12;
+    const ceilingY = h * 0.8;
     adultsRef.current = roster
       .filter((e) => e.kind === "adult")
       .map((e): FamilyAdult => ({
@@ -240,7 +274,7 @@ const GooseFamily = () => {
         rosterId: e.id,
         color: e.color,
         x: rand(80, Math.max(160, w - 80)),
-        y: floorY,
+        y: rand(ceilingY, adultFloorY),
         dir: Math.random() < 0.5 ? -1 : 1,
         phase: Math.random() * Math.PI * 2,
         targetX: rand(80, Math.max(160, w - 80)),
