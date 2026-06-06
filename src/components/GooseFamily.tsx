@@ -804,7 +804,8 @@ const GooseFamily = () => {
                 transform: `translate(${bodyTX}px, ${bodyTY}px) rotate(${bodyTilt}deg)` }} />
             <img src={frames[STAND_HEAD]} alt="" width={adultW} height={adultH}
               style={{ position: "absolute", inset: 0, width: adultW, height: adultH,
-                imageRendering: "pixelated", transformOrigin: "center center",
+                imageRendering: "pixelated",
+                transformOrigin: `${NECK_PIVOT_X_PX * sceneScale}px ${NECK_PIVOT_Y_PX * sceneScale}px`,
                 transform: `translate(${headTX}px, ${headTY}px) rotate(${headTilt}deg)` }} />
             {bubble && (
               <div style={{ position: "absolute", left: 0, top: 0, transform: `scaleX(${a.dir})` }} />
