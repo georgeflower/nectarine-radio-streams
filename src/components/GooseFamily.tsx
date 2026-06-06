@@ -277,23 +277,30 @@ const GooseFamily = () => {
     const ceilingY = h * 0.8;
     adultsRef.current = roster
       .filter((e) => e.kind === "adult")
-      .map((e): FamilyAdult => ({
-        id: `adult-${e.id}`,
-        rosterId: e.id,
-        color: e.color,
-        x: rand(80, Math.max(160, w - 80)),
-        y: rand(ceilingY, adultFloorY),
-        dir: Math.random() < 0.5 ? -1 : 1,
-        phase: Math.random() * Math.PI * 2,
-        targetX: rand(80, Math.max(160, w - 80)),
-        targetY: adultFloorY,
-        bornAt: e.bornAt,
-        bubbleUntil: 0,
-        bubbleText: "",
-        activity: "waddle",
-        activityUntil: Date.now() + 4000 + Math.random() * 8000,
-        playHopPhase: 0,
-      }));
+      .map((e): FamilyAdult => {
+        const x = rand(80, Math.max(160, w - 80));
+        const y = rand(ceilingY, adultFloorY);
+        const startGround = Math.abs(y - adultFloorY) < 12;
+        return {
+          id: `adult-${e.id}`,
+          rosterId: e.id,
+          color: e.color,
+          x,
+          y: startGround ? adultFloorY : y,
+          dir: Math.random() < 0.5 ? -1 : 1,
+          phase: Math.random() * Math.PI * 2,
+          targetX: rand(80, Math.max(160, w - 80)),
+          targetY: startGround ? adultFloorY : rand(h * 0.2, h * 0.5),
+          bornAt: e.bornAt,
+          bubbleUntil: 0,
+          bubbleText: "",
+          activity: "waddle",
+          activityUntil: Date.now() + 4000 + Math.random() * 6000,
+          playHopPhase: 0,
+          mode: startGround ? "ground" : "flying",
+          takeoffAt: Date.now() + sitDuration(),
+        };
+      });
     setTick((t) => t + 1);
   }, []);
 
