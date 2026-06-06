@@ -11,6 +11,7 @@ const makeGoose = (variant: GooseRole): GooseAPI => ({
   setSitting: vi.fn(),
   setFetchingFood: vi.fn(),
   setBallPlayActive: vi.fn(),
+  setIncubating: vi.fn(),
 });
 
 describe("gooseSocial game flows", () => {
