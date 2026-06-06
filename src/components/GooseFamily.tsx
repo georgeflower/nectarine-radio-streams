@@ -539,14 +539,14 @@ const GooseFamily = () => {
           // play. Each one lasts ~6–15s, then a new activity is rolled.
           if (wallNow >= a.activityUntil) {
             const r = Math.random();
-            a.activity = r < 0.4 ? "waddle"
-              : r < 0.65 ? "sit"
-              : r < 0.85 ? "socialise"
-              : "play";
+            a.activity = r < 0.32 ? "waddle"
+              : r < 0.52 ? "sit"
+              : r < 0.72 ? "socialise"
+              : r < 0.88 ? "play"
+              : "fly";
             a.activityUntil = wallNow + 6000 + Math.random() * 9000;
             if (a.activity === "waddle" || a.activity === "socialise") {
               a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-200, 200)));
-              // Sample a Y in the floor-roam band (bottom 20% of screen)
               a.targetY = rand(ceilingY, adultFloorY);
             }
             if (a.activity === "socialise") {
@@ -564,6 +564,12 @@ const GooseFamily = () => {
               a.playHopPhase = 0;
               a.targetY = adultFloorY;
             }
+            if (a.activity === "fly") {
+              // Take off and fly somewhere in the upper region for ~8-12s.
+              a.targetX = Math.max(60, Math.min(w - 60, a.x + rand(-260, 260)));
+              a.targetY = rand(h * 0.2, h * 0.5);
+              a.activityUntil = wallNow + 8000 + Math.random() * 4000;
+            }
           }
           if (a.activity === "sit") {
             a.phase += dt * 0.6;
@@ -571,6 +577,16 @@ const GooseFamily = () => {
             a.playHopPhase += dt;
             a.phase += dt * 1.4;
             if (Math.random() < 0.01) a.dir = (Math.random() < 0.5 ? -1 : 1) as 1 | -1;
+          } else if (a.activity === "fly") {
+            // Fly toward target with quicker movement; no floor clamp.
+            a.dir = a.targetX > a.x ? 1 : -1;
+            const speed = 60;
+            const stepX = a.dir * speed * sceneScale * dt;
+            const dyTotal = a.targetY - a.y;
+            const stepY = Math.sign(dyTotal) * Math.min(Math.abs(dyTotal), speed * sceneScale * dt);
+            a.x = Math.max(20, Math.min(w - 20, a.x + stepX));
+            a.y = Math.max(20, Math.min(adultFloorY, a.y + stepY));
+            a.phase += dt * 1.6;
           } else {
             // waddle + socialise: walk toward targetX/targetY.
             if (Math.abs(a.targetX - a.x) < 18) {
