@@ -638,32 +638,32 @@ async function runFlyAway() {
   const staying = pair[1 - whichIdx];
   try {
     leaving.setFetchingFood(true);
-    leaving.say(pick(FOOD_FETCH_LINES), 2400);
-    await wait(1400);
+    leaving.say(pick(FOOD_FETCH_LINES), 3400);
+    await wait(2200);
     if (!getPair()) return;
     leaving.setAway(true);
-    // Lonely partner chatters while the other goose fetches snacks.
-    const lonelyRounds = 4 + Math.floor(Math.random() * 3);
+    // Lonely partner chatters quietly while waiting — fewer lines, longer gaps.
+    const lonelyRounds = 2 + Math.floor(Math.random() * 2);
     for (let i = 0; i < lonelyRounds; i++) {
-      await wait(3500 + Math.random() * 2500);
+      await wait(6500 + Math.random() * 3500);
       if (!getPair()) break;
-      staying.say(pick(LONELY_LINES), 2400);
+      staying.say(pick(LONELY_LINES), 3400);
     }
-    await wait(1200);
+    await wait(2000);
     leaving.setAway(false);
-    await wait(320);
+    await wait(500);
     leaving.setFoodBag(true);
     leaving.setFetchingFood(false);
-    await wait(2200);
+    await wait(3200);
     if (getPair()) {
-      leaving.say(pick(FOOD_RETURN_LINES), 2200);
-      await wait(2000);
-      if (getPair()) staying.say("Yum, perfect timing! :D", 2200);
+      leaving.say(pick(FOOD_RETURN_LINES), 3200);
+      await wait(3200);
+      if (getPair()) staying.say("Yum, perfect timing! :D", 3200);
     }
 
     if (getPair()) {
       for (const g of geese.values()) g.setSitting(true);
-      await wait(1200); // let them fly to a perch and settle
+      await wait(1600);
       emitFamilyEvent({ type: "snack-start", positions: getGoosePositions() });
       const eatStart = Date.now();
       const MIN_EAT_MS = 35_000;
@@ -671,36 +671,46 @@ async function runFlyAway() {
       while (Date.now() - eatStart < MIN_EAT_MS) {
         const activePair = getPair();
         if (!activePair) break;
-        // Alternate between snack-specific lines and the broader chatter pool
-        // so the snack break feels more like a real conversation.
-        const line = i % 2 === 0
-          ? pick(FOOD_EAT_LINES)
-          : pickUsageTracked("chatter-pool", CHATTER_POOL);
-        activePair[i % 2].say(line, 2200);
+        // Quiet eating: only speak on every other beat, longer gaps.
+        if (i % 2 === 0) {
+          const line = (i / 2) % 2 === 0
+            ? pick(FOOD_EAT_LINES)
+            : pickUsageTracked("chatter-pool", CHATTER_POOL);
+          activePair[(i / 2) % 2].say(line, 3200);
+        }
         i++;
-        await wait(2400);
+        await wait(4500);
       }
       if (getPair()) {
-        await wait(700);
+        await wait(1000);
         const pairAfterSnack = getPair();
-        if (pairAfterSnack) pairAfterSnack[0].say(pick(FOOD_RESUME_LINES), 2200);
+        if (pairAfterSnack) pairAfterSnack[0].say(pick(FOOD_RESUME_LINES), 3200);
       }
       emitFamilyEvent({ type: "snack-end" });
 
-      // === REPRODUCTION: mother flies down, lays eggs, sits to incubate;
-      //     father runs food-fetch loop; then a 90s brood phase. Skipped
-      //     when the last clutch of goslings is still growing up (we want
-      //     a 10–15 min gap after grow-up before laying again). ===
+      // === REPRODUCTION (snack-coupled). ===
       if (Date.now() >= reproductionEarliestAt) {
         await runReproductionPhase();
       }
     }
 
-
-
   } finally {
     clearFlyAwayState();
     mood = "idle";
+  }
+}
+
+// True when no eggs or goslings remain in the family — used to gate the
+// standalone reproduction trigger.
+function familyHasLiveOffspring(): boolean {
+  try {
+    const eggs = localStorage.getItem("cracktro-goose-eggs-v2");
+    const goslings = localStorage.getItem("cracktro-goose-goslings-v1");
+    const hasEggs = !!eggs && eggs !== "[]" && JSON.parse(eggs).length > 0;
+    const hasGoslings = !!goslings && goslings !== "[]" && JSON.parse(goslings).length > 0;
+    return hasEggs || hasGoslings;
+  } catch {
+    return false;
   }
 }
 
