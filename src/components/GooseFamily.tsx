@@ -90,11 +90,16 @@ const GooseFamily = () => {
   useEffect(() => {
     const unsub = subscribeFamilyEvents((event) => {
       if (event.type !== "snack-start") return;
-      const positions = event.positions ?? getGoosePositions();
-      const anchor = positions?.white ?? positions?.brown;
-      if (!anchor) return;
       if (Math.random() > EGG_LAY_CHANCE) return;
-      const count = 1 + Math.floor(Math.random() * 3);
+      const positions = event.positions ?? getGoosePositions();
+      const w = rootRef.current?.clientWidth ?? window.innerWidth;
+      const h = rootRef.current?.clientHeight ?? window.innerHeight;
+      const anchor =
+        positions?.white ?? positions?.brown ?? { x: w / 2, y: h - 80 };
+      const liveEggs = eggsRef.current.length;
+      const room = Math.max(0, MAX_LIVE_EGGS - liveEggs);
+      if (room === 0) return;
+      const count = Math.min(room, 1 + Math.floor(Math.random() * 3));
       const now = Date.now();
       const fresh: Egg[] = [];
       for (let i = 0; i < count; i++) {
