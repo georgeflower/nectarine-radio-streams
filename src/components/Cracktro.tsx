@@ -802,11 +802,17 @@ const Cracktro = ({
           aria-label="Exit Cracktro"
           title="Exit Cracktro"
         >
-          Era: {sceneEraConfig.label}
+          EXIT
         </button>
         {sceneErasOn && (
-          <div className="sr-only" aria-label={`Scene Era: ${sceneEraConfig.label}`}>
-            Scene Era: {sceneEraConfig.label}
+          <div
+            className={`absolute top-2 left-20 z-10 min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground transition-opacity duration-500 flex items-center ${
+              showHintChrome ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
+            aria-label={`Scene Era: ${sceneEraConfig.label}`}
+            title={`Scene Era: ${sceneEraConfig.label}`}
+          >
+            Era: {sceneEraConfig.label}
           </div>
         )}
         {fpsCounterOn && (
