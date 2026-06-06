@@ -5,12 +5,25 @@ import FloatingWindow from "./FloatingWindow";
 import FlyingGoose from "./FlyingGoose";
 import GooseFamily from "./GooseFamily";
 import BoingBall from "./BoingBall";
+import RosterWindow from "./RosterWindow";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl } from "@/lib/nectarine";
 import { StageProvider } from "@/lib/stage";
 import { renderBBCode } from "@/lib/bbcode";
 import { getSceneEraConfig, getSceneEraFromListeningMs } from "@/lib/gooseSceneEra";
-import { setGoosePerformanceState, setGooseSceneEra } from "@/lib/gooseSocial";
+import { sayFromAnyGoose, setGoosePerformanceState, setGooseSceneEra } from "@/lib/gooseSocial";
+import { pickRatingLine } from "@/lib/gooseSongChatter";
+import {
+  formatMmSs,
+  getMourningActive,
+  getPlayerTime,
+  getWindowSize,
+  setWindowSize,
+  subscribeMourning,
+  subscribePlayerTime,
+  type WindowSize,
+} from "@/lib/cracktroUi";
+import { clearRoster } from "@/lib/gooseFamilyRoster";
 import Flag from "./Flag";
 
 type OnlineUser = { name: string; flag: string };
@@ -63,12 +76,13 @@ const LOW_FPS_THRESHOLD = 28;
 const LOW_FPS_SUSTAINED_MS = 12_000;
 const FPS_HUD_UPDATE_INTERVAL_MS = 250;
 
-type PanelId = "oneliner" | "online" | "queue" | "history";
+type PanelId = "oneliner" | "online" | "queue" | "history" | "roster";
 const PANELS: { id: PanelId; label: string }[] = [
   { id: "oneliner", label: "Oneliner" },
   { id: "online", label: "Online" },
   { id: "queue", label: "Up Next" },
   { id: "history", label: "Recent" },
+  { id: "roster", label: "Geese" },
 ];
 const STORAGE_PANELS = "cracktro-panels-on";
 
@@ -156,7 +170,7 @@ const Cracktro = ({
   const [fps, setFps] = useState<number | null>(null);
   const [lowFpsDetected, setLowFpsDetected] = useState(false);
   const [panelsOn, setPanelsOn] = useState<Record<PanelId, boolean>>(() => {
-    const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: true, history: false };
+    const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: true, history: false, roster: false };
     try {
       const raw = localStorage.getItem(STORAGE_PANELS);
       if (raw) {
