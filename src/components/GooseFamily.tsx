@@ -112,11 +112,12 @@ type FamilyAdult = {
   dir: 1 | -1;
   phase: number;
   targetX: number;
+  targetY: number;
   bornAt: number;
   bubbleUntil: number;
   bubbleText: string;
-  diesAt?: number; // wall-clock — if set, this adult is destined to pass
-  isDying?: boolean; // mourning ritual currently running for this adult
+  diesAt?: number;
+  isDying?: boolean;
   activity: AdultActivity;
   activityUntil: number;
   playHopPhase: number;
