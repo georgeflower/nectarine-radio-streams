@@ -540,7 +540,12 @@ async function runFlyAway() {
         if (pairAfterSnack) pairAfterSnack[0].say(pick(FOOD_RESUME_LINES), 2200);
       }
       emitFamilyEvent({ type: "snack-end" });
+
+      // === REPRODUCTION: mother flies down, lays eggs, sits to incubate;
+      //     father runs food-fetch loop; then a 90s brood phase. ===
+      await runReproductionPhase();
     }
+
 
 
   } finally {
