@@ -537,11 +537,19 @@ const GooseFamily = () => {
         setMourningActive(false);
       }
 
-      // === Adults: waddle / mourn ===
+      // === Adults: ground / flying / descending state machine (mirrors FlyingGoose) ===
       const mourningActive = mourningUntilRef.current > 0;
+      const clampX = (v: number) => Math.max(80, Math.min(w - 80, v));
+      const pickFlyTargetX = (fromX: number) => {
+        const minTravel = 160;
+        const sign = Math.random() < 0.5 ? -1 : 1;
+        const span = minTravel + Math.random() * 220;
+        let tx = fromX + sign * span;
+        if (tx < 80 || tx > w - 80) tx = fromX - sign * span;
+        return Math.max(60, Math.min(w - 60, tx));
+      };
       for (const a of adultsRef.current) {
         if (mourningActive) {
-          // Slow walk toward the centroid of dying adults.
           const dying = adultsRef.current.filter((x) => x.isDying);
           const cx = dying.length > 0
             ? dying.reduce((s, x) => s + x.x, 0) / dying.length
@@ -550,59 +558,33 @@ const GooseFamily = () => {
           a.x += Math.sign(dx) * Math.min(Math.abs(dx), 14 * sceneScale * dt);
           a.dir = dx >= 0 ? 1 : -1;
           a.phase += dt * 0.4;
-        } else {
-          // Rotate through varied activities: waddle, rest/sit, socialise,
-          // play. Each one lasts ~6–15s, then a new activity is rolled.
-          if (wallNow >= a.activityUntil && !a.descending) {
-            // If currently flying and the window ends, enter descending
-            // phase instead of teleport-dropping to the floor.
-            if (a.activity === "fly" && Math.abs(a.y - adultFloorY) > 4) {
-              a.descending = true;
-              a.targetY = adultFloorY;
-              // keep going toward a sensible landing x near current position
-              a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-120, 120)));
-            } else {
-              const r = Math.random();
-              a.activity = r < 0.32 ? "waddle"
-                : r < 0.52 ? "sit"
-                : r < 0.72 ? "socialise"
-                : r < 0.88 ? "play"
-                : "fly";
-              a.activityUntil = wallNow + 6000 + Math.random() * 9000;
-              if (a.activity === "waddle" || a.activity === "socialise") {
-                a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-200, 200)));
-                a.targetY = adultFloorY;
+          a.y = adultFloorY;
+          continue;
+        }
+
+        if (a.mode === "ground") {
+          // Sub-activity rotation while grounded.
+          if (wallNow >= a.activityUntil) {
+            const r = Math.random();
+            a.activity = r < 0.42 ? "waddle"
+              : r < 0.66 ? "sit"
+              : r < 0.86 ? "socialise"
+              : "play";
+            a.activityUntil = wallNow + 4500 + Math.random() * 7000;
+            if (a.activity === "waddle") {
+              a.targetX = clampX(a.x + rand(-200, 200));
+            } else if (a.activity === "socialise") {
+              const others = adultsRef.current.filter((x) => x.id !== a.id && x.mode === "ground");
+              if (others.length > 0) {
+                const peer = others[Math.floor(Math.random() * others.length)];
+                a.targetX = clampX(peer.x + rand(-40, 40));
+              } else {
+                a.targetX = clampX(a.x + rand(-180, 180));
               }
-              if (a.activity === "socialise") {
-                const others = adultsRef.current.filter((x) => x.id !== a.id);
-                if (others.length > 0) {
-                  const peer = others[Math.floor(Math.random() * others.length)];
-                  a.targetX = Math.max(80, Math.min(w - 80, peer.x + rand(-30, 30)));
-                  a.targetY = adultFloorY;
-                }
-              }
-              if (a.activity === "sit") {
-                a.targetY = adultFloorY;
-              }
-              if (a.activity === "play") {
-                a.playHopPhase = 0;
-                a.targetY = adultFloorY;
-              }
-              if (a.activity === "fly") {
-                // Take off — ensure target X is meaningfully far away so
-                // the goose actually traverses instead of flipping in place.
-                const minTravel = 160;
-                const sign = Math.random() < 0.5 ? -1 : 1;
-                const span = minTravel + Math.random() * 220;
-                let tx = a.x + sign * span;
-                if (tx < 80 || tx > w - 80) tx = a.x - sign * span;
-                a.targetX = Math.max(60, Math.min(w - 60, tx));
-                a.targetY = rand(h * 0.2, h * 0.5);
-                a.activityUntil = wallNow + 9000 + Math.random() * 4000;
-                a.dir = a.targetX > a.x ? 1 : -1;
-                a.descending = false;
-              }
+            } else if (a.activity === "play") {
+              a.playHopPhase = 0;
             }
+            a.targetY = adultFloorY;
           }
           if (a.activity === "sit") {
             a.phase += dt * 0.6;
@@ -610,59 +592,147 @@ const GooseFamily = () => {
             a.playHopPhase += dt;
             a.phase += dt * 1.4;
             if (Math.random() < 0.01) a.dir = (Math.random() < 0.5 ? -1 : 1) as 1 | -1;
-          } else if (a.activity === "fly") {
-            // Fly toward target. Only flip facing direction when the
-            // horizontal delta is meaningful, to avoid mid-air flicker.
-            const dxToTarget = a.targetX - a.x;
-            if (Math.abs(dxToTarget) > 30) {
-              a.dir = dxToTarget > 0 ? 1 : -1;
-            }
-            const speed = 60;
-            const stepX = a.dir * speed * sceneScale * dt;
-            const dyTotal = a.targetY - a.y;
-            const stepY = Math.sign(dyTotal) * Math.min(Math.abs(dyTotal), speed * sceneScale * dt);
-            a.x = Math.max(20, Math.min(w - 20, a.x + stepX));
-            a.y = Math.max(20, Math.min(adultFloorY, a.y + stepY));
-            a.phase += dt * 1.6;
-            // Reached fly target before window ends — pick a new airborne target
-            // in the upper band so the goose keeps cruising instead of stalling.
-            if (!a.descending && Math.abs(dxToTarget) < 24 && Math.abs(dyTotal) < 24) {
-              const sign = Math.random() < 0.5 ? -1 : 1;
-              const span = 160 + Math.random() * 220;
-              let tx = a.x + sign * span;
-              if (tx < 80 || tx > w - 80) tx = a.x - sign * span;
-              a.targetX = Math.max(60, Math.min(w - 60, tx));
-              a.targetY = rand(h * 0.2, h * 0.5);
-            }
-            // Landed from descent — clear fly state so next tick rolls a ground activity.
-            if (a.descending && Math.abs(a.y - adultFloorY) < 2) {
-              a.descending = false;
-              a.activity = "waddle";
-              a.activityUntil = wallNow; // trigger fresh roll next frame
-              a.y = adultFloorY;
-            }
           } else {
-            // waddle + socialise: walk along the floor band only.
             if (Math.abs(a.targetX - a.x) < 18) {
-              a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-180, 180)));
-              a.targetY = adultFloorY;
+              a.targetX = clampX(a.x + rand(-180, 180));
             }
             a.dir = a.targetX > a.x ? 1 : -1;
             const speed = a.activity === "socialise" ? 34 : 28;
             const stepX = a.dir * speed * sceneScale * dt;
-            const dyTotal = a.targetY - a.y;
-            const stepY = Math.sign(dyTotal) * Math.min(Math.abs(dyTotal), speed * 0.7 * sceneScale * dt);
             a.x = Math.max(20, Math.min(w - 20, a.x + stepX));
-            a.y = Math.max(adultFloorY - 4, Math.min(adultFloorY, a.y + stepY));
+            a.y = adultFloorY;
             a.phase += dt;
           }
+          // Re-takeoff timing (mirrors FlyingGoose sit-then-fly cycle).
+          if (wallNow >= a.takeoffAt) {
+            a.mode = "flying";
+            a.targetX = pickFlyTargetX(a.x);
+            a.targetY = rand(h * 0.2, h * 0.5);
+            a.dir = a.targetX > a.x ? 1 : -1;
+          }
+        } else if (a.mode === "flying") {
+          const dxToTarget = a.targetX - a.x;
+          if (Math.abs(dxToTarget) > 30) a.dir = dxToTarget > 0 ? 1 : -1;
+          const speed = 60;
+          const stepX = a.dir * speed * sceneScale * dt;
+          const dyTotal = a.targetY - a.y;
+          const stepY = Math.sign(dyTotal) * Math.min(Math.abs(dyTotal), speed * sceneScale * dt);
+          a.x = Math.max(20, Math.min(w - 20, a.x + stepX));
+          a.y = Math.max(20, Math.min(adultFloorY, a.y + stepY));
+          a.phase += dt * 1.6;
+          if (Math.abs(dxToTarget) < 24 && Math.abs(dyTotal) < 24) {
+            // Either continue cruising or begin descent.
+            if (Math.random() < 0.55) {
+              a.targetX = pickFlyTargetX(a.x);
+              a.targetY = rand(h * 0.2, h * 0.5);
+            } else {
+              a.mode = "descending";
+              a.targetX = clampX(a.x + rand(-150, 150));
+              a.targetY = adultFloorY;
+            }
+          }
+        } else if (a.mode === "descending") {
+          const dxToTarget = a.targetX - a.x;
+          if (Math.abs(dxToTarget) > 30) a.dir = dxToTarget > 0 ? 1 : -1;
+          const speed = 60;
+          const stepX = a.dir * speed * sceneScale * dt;
+          const dyTotal = a.targetY - a.y;
+          const stepY = Math.sign(dyTotal) * Math.min(Math.abs(dyTotal), speed * 0.8 * sceneScale * dt);
+          a.x = Math.max(20, Math.min(w - 20, a.x + stepX));
+          a.y = Math.min(adultFloorY, a.y + stepY);
+          a.phase += dt * 1.4;
+          if (Math.abs(a.y - adultFloorY) < 2) {
+            a.y = adultFloorY;
+            a.mode = "ground";
+            a.activity = "waddle";
+            a.activityUntil = wallNow + 4500 + Math.random() * 7000;
+            a.takeoffAt = wallNow + sitDuration();
+            a.targetX = clampX(a.x + rand(-180, 180));
+          }
         }
-        // Apply playful hop offset on y (only for sit/play which anchor to floor).
-        if (a.activity === "sit" || a.activity === "play" || mourningActive) {
-          const hopY = a.activity === "play" && !mourningActive
+        // Apply playful hop offset on y (only for sit/play in ground mode).
+        if (a.mode === "ground" && (a.activity === "sit" || a.activity === "play")) {
+          const hopY = a.activity === "play"
             ? -Math.abs(Math.sin(a.playHopPhase * 6)) * 10 * sceneScale
             : 0;
           a.y = adultFloorY + hopY;
+        }
+      }
+
+      // === Collision avoidance: grounded adults + goslings + originals ===
+      if (!mourningActive) {
+        const psp = PERSONAL_SPACE_PX * sceneScale;
+        const groundAdults = adultsRef.current.filter((a) => a.mode === "ground");
+        const originalsPos = getGoosePositions();
+        const obstacles: Array<{ x: number; y: number }> = [];
+        if (originalsPos?.white) obstacles.push(originalsPos.white);
+        if (originalsPos?.brown) obstacles.push(originalsPos.brown);
+        // Adult-adult separation
+        for (let i = 0; i < groundAdults.length; i++) {
+          for (let j = i + 1; j < groundAdults.length; j++) {
+            const a = groundAdults[i];
+            const b = groundAdults[j];
+            const dx = a.x - b.x;
+            if (Math.abs(dx) < psp && Math.abs(a.y - b.y) < psp) {
+              const overlap = psp - Math.abs(dx);
+              const sign = dx >= 0 ? 1 : -1;
+              a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap * 0.5));
+              b.x = Math.max(20, Math.min(w - 20, b.x - sign * overlap * 0.5));
+              if (!a.avoidUntil || wallNow > a.avoidUntil) {
+                a.targetX = clampX(a.x + sign * (60 + Math.random() * 80));
+                a.avoidUntil = wallNow + 400;
+              }
+              if (!b.avoidUntil || wallNow > b.avoidUntil) {
+                b.targetX = clampX(b.x - sign * (60 + Math.random() * 80));
+                b.avoidUntil = wallNow + 400;
+              }
+            }
+          }
+        }
+        // Adults vs originals (only push the adult)
+        for (const a of groundAdults) {
+          for (const o of obstacles) {
+            const dx = a.x - o.x;
+            if (Math.abs(dx) < psp && Math.abs(a.y - o.y) < psp) {
+              const overlap = psp - Math.abs(dx);
+              const sign = dx >= 0 ? 1 : -1;
+              a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap));
+              if (!a.avoidUntil || wallNow > a.avoidUntil) {
+                a.targetX = clampX(a.x + sign * (60 + Math.random() * 80));
+                a.avoidUntil = wallNow + 400;
+              }
+            }
+          }
+        }
+        // Adults vs goslings (push adult slightly, goslings the rest)
+        for (const a of groundAdults) {
+          for (const g of goslingsRef.current) {
+            const dx = a.x - g.x;
+            if (Math.abs(dx) < psp && Math.abs(a.y - g.y) < psp) {
+              const overlap = psp - Math.abs(dx);
+              const sign = dx >= 0 ? 1 : -1;
+              a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap * 0.4));
+              g.x = Math.max(20, Math.min(w - 20, g.x - sign * overlap * 0.6));
+              g.targetX = Math.max(40, Math.min(w - 40, g.x - sign * (40 + Math.random() * 60)));
+            }
+          }
+        }
+        // Gosling-gosling separation
+        const goslings = goslingsRef.current;
+        for (let i = 0; i < goslings.length; i++) {
+          for (let j = i + 1; j < goslings.length; j++) {
+            const g1 = goslings[i];
+            const g2 = goslings[j];
+            const dx = g1.x - g2.x;
+            if (Math.abs(dx) < psp * 0.8 && Math.abs(g1.y - g2.y) < psp * 0.8) {
+              const overlap = psp * 0.8 - Math.abs(dx);
+              const sign = dx >= 0 ? 1 : -1;
+              g1.x = Math.max(20, Math.min(w - 20, g1.x + sign * overlap * 0.5));
+              g2.x = Math.max(20, Math.min(w - 20, g2.x - sign * overlap * 0.5));
+              g1.targetX = Math.max(40, Math.min(w - 40, g1.x + sign * (40 + Math.random() * 60)));
+              g2.targetX = Math.max(40, Math.min(w - 40, g2.x - sign * (40 + Math.random() * 60)));
+            }
+          }
         }
       }
 
