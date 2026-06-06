@@ -1,68 +1,55 @@
-# Plan
+## Goal
 
-## 1. Volume bar in front of info windows (main page)
-- `AudioPlayer.tsx` line ~531: the volume popup uses `z-20` but sits inside a panel that creates a stacking context, so the BoingBall / floating widgets render on top.
-- Fix by rendering the popup at a much higher layer:
-  - Bump the popup wrapper to `z-[100]`.
-  - Wrap the AudioPlayer container in a relative element with `isolation: isolate` only when popup is closed, or simply add `style={{ position: "relative", zIndex: 60 }}` to the outer `.panel` div of AudioPlayer so its descendants outrank the boing ball (`zIndex 6`) and any FloatingWindow/panels on the page.
+Drop the dual-scenario split (FlyingGoose vs. GooseLifeSimulation). Keep the **non-sim** (`FlyingGoose`) as the only goose runtime — it already owns speech, ball-play, food fetch, oneliner reactions and tired rest. Port the missing visual + life pieces from the sim: the polished **waddle / sit / rest** ground animations, **gosling** sprites, and an **egg → hatch** flow that actually produces goslings.
 
-## 2. Boing ball in front of info windows in cracktro
-- `BoingBall.tsx` line 316: `zIndex: 6`.
-- `FloatingWindow.tsx` line 87: `zIndex: 12` — that's why oneliner/online/queue/history windows cover the ball.
-- Raise the boing ball's `zIndex` to `20` (above FloatingWindow `12` and settings bar `11`, below the fullscreen overlay chrome which is fine since chrome is interactive). Keep it below the cracktro settings expanded panel? Settings is `zIndex 11`, so 20 is fine.
+## Scope
 
-## 3. More bird chatter between play-with-ball and feeding
-- `gooseSocial.ts`:
-  - During `runFlyAway` "eating" loop (lines 460-477): currently 1 line every ~2.4s for 20s. Extend with a much larger pool sourced from the existing dialogue corpus.
-  - Add a new shared `CHATTER_POOL` (~500 short lines) — assemble by combining existing `FOOD_EAT_LINES`, `LONELY_LINES`, `FOOD_RESUME_LINES`, scene/era dialogues from `gooseDialogues.ts`, and reaction responses. Deduplicate, cap at 500.
-  - Use `pickUsageTracked("chatter-pool", CHATTER_POOL)` to avoid repeats.
-  - Insert short interstitial chatter:
-    - Between ball-play end and next activity: append a 2-3 line exchange in `runBallPlay` finally block (before clearing).
-    - Between feeding return and resume: extend the eat loop to also include lonely partner reactions.
-  - Make the eat loop alternate both geese with chatter pool lines and double its duration ceiling.
+### 1. Remove the sim toggle
 
-## 4. Longer interval between feedings
-- `gooseSocial.ts` line 492: `lastFlyAwayAt > 240_000` (4 min) and 25% chance per step.
-- Change to `> 540_000` (9 min) and lower probability to `0.15`.
-- Also raise `MIN_EAT_MS` from 20s to 35s so the snack itself feels more leisurely (this complements #3).
+- `src/components/Cracktro.tsx`
+  - Delete the `gooseLifeSimOn` state, both storage keys (`STORAGE_GOOSE_LIFE_SIM`, `STORAGE_GOOSE_LIFE_SIM_MIGRATED`) and the migration effect.
+  - Remove the `<GooseLifeSimulation>` branch in the render; always render the two `<FlyingGoose>` instances gated by `gooseOn` / `brownGooseOn`.
+  - Remove the "Life Sim" control button and the `disabled`/opacity logic it added to the white/brown goose buttons.
+- `src/components/GooseLifeSimulation.tsx`: delete the file.
+- `src/test/cracktroDefaults.test.tsx`: drop assertions about the sim toggle / default-on behavior, keep tests for the remaining goose toggles.
+- Leave `src/lib/gooseLife/*` in place for now (engine, types, sprite helpers) since FlyingGoose will reuse `gooseSprite` frames and small helpers for the new waddle/gosling work.
 
-## 5. Cloud-shared learned lingo (low cost)
-Goal: aggregate the lexicon/phrases from `gooseLearnedLexicon.ts` + `gooseLearnedPhrases.ts` across users using Lovable Cloud, staying inside the free tier.
+### 2. Port waddle / sit / rest animation polish into `FlyingGoose`
 
-### Schema (one small table)
-```sql
-create table public.goose_lexicon (
-  token text primary key,
-  category text not null,
-  seen int not null default 1,
-  last_seen_at timestamptz not null default now(),
-  style_flags text[] default '{}'
-);
-```
-- Public read (`grant select to anon`), insert/update via an edge function only (so we can rate-limit + sanitize server-side).
-- Add a tiny `goose_phrases` table with the same pattern for whole-phrase learning (optional second step).
+`FlyingGoose.tsx` already has "sitting for meal" and "resting from tiredness" states but they don't use the sim's body-sway / head-bob / sleeping head tilt. Lift the constants and the per-frame math from `GooseLifeSimulation.tsx` (the `WADDLE_*`, `PECK_*`, `SLEEP_HEAD_*`, `PLAY_BOUNCE_*` blocks plus the `walkStrideX/Y`, `walkHeadNudgeX/Y`, `headTransform` computation) into a small shared helper module:
 
-### Edge function `goose-lexicon-sync`
-- POST: accepts up to N (e.g. 20) sanitized tokens per call, runs the same `SENSITIVE_RE` / length guards server-side, upserts with `seen = seen + 1`, updates `last_seen_at`.
-- GET: returns top ~500 tokens by recency+frequency.
+- New `src/lib/gooseLife/groundAnimation.ts` exporting `computeGroundTransform({ phase, mode, spriteScale })` returning `{ bodyTranslate, headTransform, bounce }`.
+- Use it in `FlyingGoose` whenever the goose is grounded (`sittingForMeal`, `restingFromTiredness`, or the new gosling waddle) so the sprite gets the same sway/bob/peck/sleep head tilt the sim showed.
+- Refactor `GooseLifeSimulation`'s inline math into the same helper before deleting the file, to make sure visual parity is preserved (sanity check while editing; the file is then removed in step 1).
 
-### Client integration
-- In `gooseLearnedLexicon.ts`:
-  - After `learnLexiconFromOneliner`, queue new tokens in memory.
-  - Debounced flush (every ~60s, or when queue ≥ 10) calls the edge function POST.
-  - On app boot, fetch GET once and merge results into the local lexicon (local entries win for recency, cloud contributes breadth).
-- Same pattern for phrases if we add that table.
+### 3. Add goslings to `FlyingGoose`
 
-### Cost control (stay free)
-- Debounce + batch (≤ ~1 POST/min/user).
-- Cap payload at 20 tokens × ~30 chars = tiny rows.
-- Single GET per session (cached in `localStorage` with 1h TTL).
-- Sanitize server-side to reject URLs, emails, secrets, long numerics, anything > 32 chars.
-- Hard table size cap via a daily cron-style cleanup (delete rows where `last_seen_at < now() - interval '60 days'` and `seen < 2`) — implemented as a SQL function called from the same edge function on a probabilistic basis (1% of writes trigger cleanup) so we don't need pg_cron.
+- Extend `GooseRole` (in `gooseSocial.ts`) and `FlyingGoose`'s `variant` prop to include `"gosling-white" | "gosling-brown"` — the sprite layer already knows these variants (`buildGooseFrameDataUrls("gosling-white"|"gosling-brown")`).
+- Add an internal `goslings` array inside `FlyingGoose` (the parent goose owns them). Each gosling has `{ id, variant, x, y, vx, vy, followIndex }` and follows the parent's position with the same `FOLLOW_SPACING` logic from `gooseEngine.ts` (`followGoslingBehavior`). Render them in the same root container, scaled down via `GOSLING_SCALE_FACTOR` (lift the constant from the sim).
+- Goslings don't get bubbles, ball-play, food bags, or oneliner reactions — they only waddle/follow and occasionally do the idle peck animation from the ground-animation helper.
 
-No external API, no storage buckets, no realtime channels — just one table + one edge function. Well within the included Lovable Cloud quota.
+### 4. Egg laying + hatching that actually works
 
-## Technical notes
-- Files touched: `src/components/AudioPlayer.tsx`, `src/components/BoingBall.tsx`, `src/lib/gooseSocial.ts`, `src/lib/gooseLearnedLexicon.ts`, new `supabase/functions/goose-lexicon-sync/index.ts`, new migration for `goose_lexicon` table with GRANTs and RLS.
-- No changes to `Cracktro.tsx` settings UI.
-- Existing tests still pass; add a small unit test for the chatter pool size (≥ 500) and for the debounced flush queue.
+Eggs currently exist only inside the sim engine and use 4 in-engine "hours" — which in the sim's accelerated clock never reach the cracktro lifetime. Replace with a lightweight, wall-clock flow inside `FlyingGoose`:
+
+- When the white + brown geese are both present and "sitting" together (after a snack break) there is a small chance per snack break to enter a "nesting" beat: white goose says a nesting line and lays `1–3` eggs.
+- Store eggs in component state: `{ id, x, y, laidAt, hatchAt }` where `hatchAt = laidAt + rand(45_000, 90_000)` ms (45–90 s real time — tuned so users actually see hatching during a typical session). Persist to `localStorage` keyed by date so eggs survive minor reloads.
+- Render eggs as small sprites near the parent's resting position (simple oval CSS shape or an existing sprite frame — TBD during implementation, prefer reusing the sim's egg visual if present; otherwise a styled `div` with the goose palette).
+- On every animation frame, check `Date.now() >= hatchAt`; if so, remove the egg and spawn a gosling in the `goslings` array (alternating `gosling-white` / `gosling-brown`). Trigger a short "Peep! 🐣" speech bubble from the parent.
+
+### 5. Tests
+
+- Update `src/test/cracktroDefaults.test.tsx` for the removed toggle.
+- Add a unit test in `src/test/` that drives `FlyingGoose`'s egg logic with a mocked clock to confirm `hatchAt` produces a gosling and the egg is cleared.
+
+## Out of scope
+
+- The full sim social model (relationships, mourning, funerals, reproduction cooldowns). Only egg→hatch and goslings move over.
+- Persistence of goslings across sessions (they live for the session only).
+- Any backend changes.
+
+## Files touched
+
+- edit: `src/components/Cracktro.tsx`, `src/components/FlyingGoose.tsx`, `src/lib/gooseSocial.ts`, `src/test/cracktroDefaults.test.tsx`
+- new: `src/lib/gooseLife/groundAnimation.ts`, `src/test/flyingGooseEggs.test.tsx`
+- delete: `src/components/GooseLifeSimulation.tsx`
