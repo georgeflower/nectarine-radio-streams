@@ -372,38 +372,15 @@ const Cracktro = ({
       /* ignore */
     }
   }, [boingOn]);
-  const [gooseLifeSimOn, setGooseLifeSimOn] = useState<boolean>(() => {
-    try {
-      // One-time migration (v2): PR #32 made Goose Life Simulation the unified default.
-      // Returning users who had the old "off" value persisted are migrated to the new
-      // default on their first load. After the migration marker is written the stored
-      // value is respected normally, so manual user changes continue to persist.
-      const migrated = localStorage.getItem(STORAGE_GOOSE_LIFE_SIM_MIGRATED);
-      if (!migrated) {
-        return true;
-      }
-      const v = localStorage.getItem(STORAGE_GOOSE_LIFE_SIM);
-      return v === null ? true : v === "1";
-    } catch {
-      return true;
-    }
-  });
+  // Clean up any leftover sim-mode storage keys from previous versions.
   useEffect(() => {
     try {
-      if (!localStorage.getItem(STORAGE_GOOSE_LIFE_SIM_MIGRATED)) {
-        localStorage.setItem(STORAGE_GOOSE_LIFE_SIM_MIGRATED, "1");
-      }
+      localStorage.removeItem("cracktro-goose-life-sim");
+      localStorage.removeItem("cracktro-goose-life-sim-migrated-v2");
     } catch {
       /* ignore */
     }
   }, []);
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_GOOSE_LIFE_SIM, gooseLifeSimOn ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [gooseLifeSimOn]);
   const [sceneErasOn, setSceneErasOn] = useState<boolean>(() => {
     try {
       return localStorage.getItem(STORAGE_SCENE_ERAS) === "1";
