@@ -133,6 +133,7 @@ export type FamilyEvent =
   | { type: "incubation-start"; x: number; y: number }
   | { type: "incubation-end" }
   | { type: "feed-delivery"; targetX: number }
+  | { type: "all-eggs-hatched" }
   | { type: "brood-end" };
 type FamilyListener = (event: FamilyEvent) => void;
 const familyListeners = new Set<FamilyListener>();
