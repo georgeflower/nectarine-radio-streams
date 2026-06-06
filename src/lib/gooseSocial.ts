@@ -132,7 +132,7 @@ export function subscribeFamilyEvents(listener: FamilyListener) {
   familyListeners.add(listener);
   return () => familyListeners.delete(listener);
 }
-function emitFamilyEvent(event: FamilyEvent) {
+export function emitFamilyEvent(event: FamilyEvent) {
   for (const l of familyListeners) {
     try { l(event); } catch { /* ignore listener errors */ }
   }

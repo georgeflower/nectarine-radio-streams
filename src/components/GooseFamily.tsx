@@ -187,7 +187,7 @@ const GooseFamily = () => {
     const floorY = h - BASE_SPRITE_H * sceneScale * GOSLING_SCALE_FACTOR * 0.6 - 12;
     adultsRef.current = roster
       .filter((e) => e.kind === "adult")
-      .map((e, i): FamilyAdult => ({
+      .map((e): FamilyAdult => ({
         id: `adult-${e.id}`,
         rosterId: e.id,
         color: e.color,
@@ -197,6 +197,8 @@ const GooseFamily = () => {
         phase: Math.random() * Math.PI * 2,
         targetX: rand(80, Math.max(160, w - 80)),
         bornAt: e.bornAt,
+        bubbleUntil: 0,
+        bubbleText: "",
       }));
     setTick((t) => t + 1);
   }, []);
