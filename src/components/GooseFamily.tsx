@@ -485,9 +485,9 @@ const GooseFamily = () => {
           border: "2px solid #1a1a1a",
           borderRadius: 6,
           boxShadow: "2px 2px 0 rgba(0,0,0,0.4)",
-          whiteSpace: "nowrap",
+          whiteSpace: "normal",
+          wordBreak: "break-word",
           overflow: "hidden",
-          textOverflow: "ellipsis",
         }}
       >
         {text}
