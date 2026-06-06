@@ -577,6 +577,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       nextLookAt = elapsed + rand(700, 1600);
       x = cx;
       y = topY + sink - spriteH() / 2;
+      if (perchEl) claimPerch(perchClaimId, perchEl, cx);
     };
 
 
