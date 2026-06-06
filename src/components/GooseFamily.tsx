@@ -454,9 +454,10 @@ const GooseFamily = () => {
   // Renders a clamped bubble (kept within [4, w-4] horizontally; flips below
   // the sprite when the sprite is too near the top edge).
   const renderBubble = (text: string, spriteCx: number, spriteCy: number, spriteH: number, dir: 1 | -1) => {
-    const ESTIMATED_WIDTH = Math.min(180, Math.max(60, text.length * 7 + 24));
-    const BUBBLE_H = 24;
     const padding = 8;
+    const maxBubbleW = Math.max(60, w - padding * 2);
+    const ESTIMATED_WIDTH = Math.min(maxBubbleW, Math.max(60, text.length * 7 + 24));
+    const BUBBLE_H = 24;
     let left = spriteCx;
     if (left - ESTIMATED_WIDTH / 2 < padding) left = ESTIMATED_WIDTH / 2 + padding;
     if (left + ESTIMATED_WIDTH / 2 > w - padding) left = w - ESTIMATED_WIDTH / 2 - padding;
