@@ -139,9 +139,28 @@ function loadGoslings(): Gosling[] {
   try {
     const raw = localStorage.getItem(STORAGE_GOSLINGS);
     if (!raw) return [];
-    const data = JSON.parse(raw) as Gosling[];
+    const data = JSON.parse(raw) as Partial<Gosling>[];
     if (!Array.isArray(data)) return [];
-    return data;
+    // Backfill rosterId/name/sex for older saves so promote-to-adult still works.
+    return data.map((g): Gosling => {
+      const rosterId = g.rosterId ?? `gosling-legacy-${Math.random().toString(36).slice(2, 8)}`;
+      return {
+        id: g.id ?? `g-legacy-${Math.random().toString(36).slice(2, 6)}`,
+        rosterId,
+        name: g.name ?? "Gosling",
+        sex: g.sex ?? (Math.random() < 0.5 ? "f" : "m"),
+        variant: g.variant ?? "gosling-white",
+        x: g.x ?? 0,
+        y: g.y ?? 0,
+        dir: (g.dir ?? 1) as 1 | -1,
+        phase: g.phase ?? 0,
+        targetX: g.targetX ?? (g.x ?? 0),
+        targetY: g.targetY ?? (g.y ?? 0),
+        bornAt: g.bornAt ?? Date.now(),
+        bubbleUntil: 0,
+        bubbleText: "",
+      };
+    });
   } catch { return []; }
 }
 function saveGoslings(g: Gosling[]) {
