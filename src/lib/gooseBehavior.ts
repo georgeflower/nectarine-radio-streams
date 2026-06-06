@@ -52,21 +52,33 @@ export const pickPerchCandidate = <T>(
   candidates: PerchCandidate<T>[],
   from: { x: number; y: number } | null,
   random: () => number = Math.random,
+  occupied: Array<{ ref: unknown; anchorX: number }> = [],
+  personalSpacePx = 28,
 ): SelectedPerch<T> | null => {
   if (candidates.length === 0) return null;
 
+  const isBlocked = (ref: T, anchorX: number) =>
+    occupied.some((o) => o.ref === (ref as unknown) && Math.abs(o.anchorX - anchorX) < personalSpacePx);
+
   if (!from) {
-    const c = candidates[Math.floor(random() * candidates.length)];
-    const offset = resolveOffset(c, null, random);
-    return { ...c, offset, anchorX: c.left + c.width * offset };
+    // Try a few random picks; fall through to nearest-style search if all blocked.
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const c = candidates[Math.floor(random() * candidates.length)];
+      const offset = resolveOffset(c, null, random);
+      const anchorX = c.left + c.width * offset;
+      if (!isBlocked(c.ref, anchorX)) {
+        return { ...c, offset, anchorX };
+      }
+    }
   }
 
   let best: SelectedPerch<T> | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const c of candidates) {
-    const offset = resolveOffset(c, from.x, random);
+    const offset = resolveOffset(c, from?.x ?? null, random);
     const anchorX = c.left + c.width * offset;
-    const distance = Math.hypot(anchorX - from.x, c.top - from.y);
+    if (isBlocked(c.ref, anchorX)) continue;
+    const distance = from ? Math.hypot(anchorX - from.x, c.top - from.y) : random();
     if (distance < bestDistance) {
       bestDistance = distance;
       best = { ...c, offset, anchorX };
