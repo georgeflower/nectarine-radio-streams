@@ -15,8 +15,8 @@ vi.mock("../components/FlyingGoose", () => ({
   default: () => <div data-testid="flying-goose" />,
 }));
 
-vi.mock("../components/GooseLifeSimulation", () => ({
-  default: () => <div data-testid="goose-life-sim" />,
+vi.mock("../components/GooseFamily", () => ({
+  default: () => <div data-testid="goose-family" />,
 }));
 
 vi.mock("../components/BoingBall", () => ({
