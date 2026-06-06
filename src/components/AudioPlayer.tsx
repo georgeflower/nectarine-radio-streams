@@ -11,6 +11,7 @@ import {
   type NowPlayingTrack,
 } from "@/lib/nowPlaying";
 import { attachBufferedStream, isMseAudioSupported, type BufferedStreamHandle } from "@/lib/bufferedStream";
+import { setPlayerTime } from "@/lib/cracktroUi";
 
 type Props = {
   streams: StreamSource[];
@@ -624,6 +625,14 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady, onSeek }: Props) 
         }}
         onSeeked={() => {
           onSeek?.();
+        }}
+        onTimeUpdate={(e) => {
+          const el = e.currentTarget;
+          setPlayerTime(el.currentTime || 0, Number.isFinite(el.duration) ? el.duration : 0);
+        }}
+        onDurationChange={(e) => {
+          const el = e.currentTarget;
+          setPlayerTime(el.currentTime || 0, Number.isFinite(el.duration) ? el.duration : 0);
         }}
       />
     </div>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useStageSize } from "@/lib/stage";
+import { getWindowScale, subscribeWindowSize } from "@/lib/cracktroUi";
 
 type Props = {
   id: string;
@@ -36,6 +37,10 @@ const FloatingWindow = ({ id, title, defaultX, defaultY, defaultW = 280, default
     }
     return { x: defaultX, y: defaultY, w: defaultW, h: defaultH };
   });
+
+  const [scale, setScale] = useState(getWindowScale());
+  useEffect(() => subscribeWindowSize(() => setScale(getWindowScale())), []);
+
 
   const stage = useStageSize();
 
@@ -82,9 +87,11 @@ const FloatingWindow = ({ id, title, defaultX, defaultY, defaultW = 280, default
       style={{
         left: pos.x,
         top: pos.y,
-        width: pos.w,
+        width: pos.w * scale,
         maxHeight: "60vh",
         zIndex: 12,
+        transformOrigin: "top left",
+        fontSize: `${scale}em`,
       }}
     >
       <div
