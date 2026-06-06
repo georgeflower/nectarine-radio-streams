@@ -56,7 +56,7 @@ const MAX_LIVE_EGGS = 4;
 const MAX_GOSLINGS = 8;
 const MAX_TOTAL_ADULTS = 8; // includes the 2 originals
 const GOSLING_SCALE_FACTOR = 0.58;
-const GROW_UP_MS = 3 * 60_000; // 3 min wall-clock to grow into an adult
+const GROW_UP_MS = 8 * 60_000; // 8 min wall-clock to grow into an adult
 const ADULT_LIFE_BEFORE_DEATH_MS = 5 * 60_000;
 const MOURNING_DURATION_MS = 45_000;
 
