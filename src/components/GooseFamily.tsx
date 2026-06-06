@@ -121,6 +121,7 @@ type FamilyAdult = {
   activity: AdultActivity;
   activityUntil: number;
   playHopPhase: number;
+  descending?: boolean;
 };
 
 function rand(a: number, b: number) { return a + Math.random() * (b - a); }
