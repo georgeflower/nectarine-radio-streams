@@ -23,6 +23,12 @@ import {
   STAND_HEAD,
 } from "@/lib/gooseSprite";
 import { GOOSE_DIALOGUES } from "@/lib/gooseDialogues";
+import {
+  noteRecentOneliner,
+  registerGoose,
+  type GooseAPI,
+  type GooseRole,
+} from "@/lib/gooseSocial";
 
 type Props = {
   oneliners?: OnelinerEntry[];
@@ -77,11 +83,11 @@ const GOSLING_CHATTER = [
 const MAX_SPEECH_LENGTH = 42;
 const DEFAULT_SPRITE_SCALE_FACTOR = 0.78;
 const GOSLING_SCALE_FACTOR = 0.58;
-const AMBIENT_SPEECH_INTERVAL_MS = 2600;
+// Gosling-only ambient speech (adult chatter handled by gooseSocial turn-taking system)
+const GOSLING_AMBIENT_SPEECH_INTERVAL_MS = 9500;
 const MIN_AMBIENT_SPEECH_DURATION_MS = 1800;
 const AMBIENT_SPEECH_DURATION_VARIANCE_MS = 1400;
-const AMBIENT_SPEECH_PROBABILITY = 0.62;
-const MAX_CONCURRENT_SPEECHES = 0;
+const GOSLING_AMBIENT_SPEECH_PROBABILITY = 0.28;
 const ONELINER_SPEECH_DURATION_MS = 2800;
 const PERCH_UPDATE_INTERVAL_MS = 2600;
 const PHASE_OFFSET_MULTIPLIER_MS = 2000;
@@ -111,6 +117,76 @@ const SLEEP_HEAD_ANGLE = 28;
 const MOURN_HEAD_OFFSET_X = -0.5;
 const MOURN_HEAD_OFFSET_Y = 2.4;
 const MOURN_HEAD_ANGLE = 18;
+
+// Waddle character — grounded floor-walker: much slower, wider, more pronounced animation
+const WADDLE_CHAR_CYCLE_FREQ = 0.55;       // Slow deliberate step cycle
+const WADDLE_CHAR_BODY_SWAY = 5.4;         // 3× wider side-to-side sway
+const WADDLE_CHAR_BODY_BOB = 4.2;          // 2.8× more up-down bob
+const WADDLE_CHAR_BODY_TILT = 9.6;         // 3× body tilt per step
+const WADDLE_CHAR_HEAD_SWAY = 6.6;         // 3× head side sway
+const WADDLE_CHAR_HEAD_DIP = 5.2;          // Head dips down as each foot lands
+const WADDLE_CHAR_HEAD_TILT = 27;          // Strong neck angle per step
+
+// Social directives bridge: stores gooseSocial API callbacks' effect on each goose
+type SocialDirective = {
+  away: boolean;
+  chaseTarget: { x: number; y: number } | null;
+  foodBag: boolean;
+  sitting: boolean;
+  fetchingFood: boolean;
+  ballPlayActive: boolean;
+};
+
+const DEFAULT_DIRECTIVE: SocialDirective = {
+  away: false,
+  chaseTarget: null,
+  foodBag: false,
+  sitting: false,
+  fetchingFood: false,
+  ballPlayActive: false,
+};
+
+/** Apply gooseSocial directives to the sim state after each physics step. */
+function applySimDirectives(state: GooseLifeState, directives: Map<string, SocialDirective>): GooseLifeState {
+  if (directives.size === 0) return state;
+  let changed = false;
+  const geese = state.geese.map((goose) => {
+    const d = directives.get(goose.id);
+    if (!d) return goose;
+    let g = goose;
+
+    // sitting directive: force goose into eat/resting state
+    if (d.sitting && g.state !== "eat") {
+      g = { ...g, state: "eat" };
+      changed = true;
+    }
+
+    // ballPlayActive/fetchingFood: keep goose airborne while active unless explicitly sitting.
+    if (!d.sitting && (d.ballPlayActive || d.fetchingFood) && g.state !== "fly") {
+      g = { ...g, state: "fly" };
+      changed = true;
+    }
+
+    // chaseTarget: steer velocity toward the ball
+    if (d.chaseTarget && !d.sitting) {
+      const dx = d.chaseTarget.x - g.position.x;
+      const dy = d.chaseTarget.y - g.position.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 5) {
+        const chaseSpeed = 140 * 4 * g.speedModifier; // 140 × SPEED_MULTIPLIER(4)
+        g = {
+          ...g,
+          velocity: { x: (dx / dist) * chaseSpeed, y: (dy / dist) * chaseSpeed },
+          state: "fly",
+        };
+        changed = true;
+      }
+    }
+
+    return g;
+  });
+  return changed ? { ...state, geese } : state;
+}
 
 function bodyOpacity(goose: Goose, now: number) {
   if (goose.alive) return 1;
@@ -193,10 +269,12 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
   const stateRef = useRef<GooseLifeState | null>(null);
   const latestOnelinerRef = useRef<OnelinerEntry | null>(oneliners[0] ?? null);
   const lastSpokenOnelinerKeyRef = useRef<string | null>(null);
-  const lastAmbientSpeakerRef = useRef<string | null>(null);
-  const pendingAmbientReplyRef = useRef<string | null>(null);
   const speechesRef = useRef<Record<string, GooseSpeech>>({});
   const boundsRef = useRef<StageBounds>({ width: window.innerWidth, height: window.innerHeight, perches: [] });
+  // Mutable ref for social directives — written by gooseSocial callbacks, read each tick.
+  const socialDirectivesRef = useRef<Map<string, SocialDirective>>(new Map());
+  // Stable ref to upsertSpeech so it can be closed over by gooseSocial API objects.
+  const upsertSpeechRef = useRef<(id: string, text: string, durationMs: number) => void>(() => {});
   const [bounds, setBounds] = useState<StageBounds>({ width: window.innerWidth, height: window.innerHeight, perches: [] });
   const [state, setState] = useState<GooseLifeState>(() => loadGooseLifeState() ?? createInitialGooseLifeState(Date.now()));
   const [now, setNow] = useState(Date.now());
@@ -230,6 +308,9 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
     speechesRef.current = next;
     setSpeeches(next);
   };
+
+  // Keep the stable ref in sync so gooseSocial API closures always call the current version.
+  upsertSpeechRef.current = upsertSpeech;
 
   const pruneSpeeches = (timestamp: number) => {
     let changed = false;
@@ -294,11 +375,13 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
           ? maybeApplyLatestOneliner(prev, latest.text, onelinerKey, tickNow)
           : prev;
         const stepped = stepGooseLife(withReaction, tickNow, dt, bounds);
+        // Apply gooseSocial directives (ball chase, sitting, food fetch, etc.) each tick.
+        const withDirectives = applySimDirectives(stepped, socialDirectivesRef.current);
         if (tickNow >= persistAtRef.current) {
-          saveGooseLifeState(stepped);
+          saveGooseLifeState(withDirectives);
           persistAtRef.current = tickNow + 5_000;
         }
-        return stepped;
+        return withDirectives;
       });
       frameRef.current = requestAnimationFrame(tick);
     };
@@ -309,42 +392,77 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
     };
   }, [bounds]);
 
+  // Gosling ambient chatter only — adult speech is handled by gooseSocial turn-taking system.
   useEffect(() => {
     const interval = window.setInterval(() => {
       const tickNow = Date.now();
       pruneSpeeches(tickNow);
       const current = stateRef.current;
       if (!current) return;
-      const speakers = current.geese.filter(
-        (goose) => goose.alive && goose.state !== "sleep" && goose.state !== "mourn",
+      const goslings = current.geese.filter(
+        (goose) => goose.alive && isGosling(goose) && goose.state !== "sleep" && goose.state !== "mourn",
       );
-      if (speakers.length === 0) return;
-      const visibleSpeechCount = Object.keys(speechesRef.current).length;
-      // Keep speech strictly turn-based: one line at a time, then a reply.
-      if (visibleSpeechCount > MAX_CONCURRENT_SPEECHES) return;
-      let goose: Goose | null = null;
-      if (pendingAmbientReplyRef.current) {
-        goose = speakers.find((candidate) => candidate.id === pendingAmbientReplyRef.current) ?? null;
-        pendingAmbientReplyRef.current = null;
-      } else {
-        if (Math.random() > AMBIENT_SPEECH_PROBABILITY) return;
-        const preferred = speakers.filter((candidate) => candidate.id !== lastAmbientSpeakerRef.current);
-        const pickFrom = preferred.length > 0 ? preferred : speakers;
-        goose = pickFrom[Math.floor(Math.random() * pickFrom.length)] ?? null;
-      }
-      if (!goose) return;
-      const possibleRepliers = speakers.filter((candidate) => candidate.id !== goose.id);
-      if (possibleRepliers.length > 0) {
-        pendingAmbientReplyRef.current = possibleRepliers[Math.floor(Math.random() * possibleRepliers.length)].id;
-      }
-      lastAmbientSpeakerRef.current = goose.id;
-      upsertSpeech(
-        goose.id,
-        chooseAmbientSpeech(goose),
+      if (goslings.length === 0) return;
+      if (Math.random() > GOSLING_AMBIENT_SPEECH_PROBABILITY) return;
+      const gosling = goslings[Math.floor(Math.random() * goslings.length)];
+      if (!gosling) return;
+      upsertSpeechRef.current(
+        gosling.id,
+        GOSLING_CHATTER[Math.floor(Math.random() * GOSLING_CHATTER.length)] ?? "peep!",
         MIN_AMBIENT_SPEECH_DURATION_MS + Math.random() * AMBIENT_SPEECH_DURATION_VARIANCE_MS,
       );
-    }, AMBIENT_SPEECH_INTERVAL_MS);
+    }, GOSLING_AMBIENT_SPEECH_INTERVAL_MS);
     return () => window.clearInterval(interval);
+  }, []);
+
+  // Register the founding female (brown) and male (white) geese with gooseSocial.
+  // This wires up the non-sim ball play, food fetching, and turn-taking chatter system.
+  useEffect(() => {
+    const current = stateRef.current ?? state;
+    // The founding pair are the first female and first male in the initial state.
+    const foundingFemale = current.geese.find((g) => g.sex === "female" && !g.isGosling && !g.parentIds && !g.grounded);
+    const foundingMale = current.geese.find((g) => g.sex === "male" && !g.isGosling && !g.parentIds);
+    if (!foundingFemale || !foundingMale) return;
+
+    const buildApi = (gooseId: string, role: GooseRole): GooseAPI => {
+      const getDirective = () => {
+        const d = socialDirectivesRef.current.get(gooseId);
+        if (d) return d;
+        const fresh: SocialDirective = { ...DEFAULT_DIRECTIVE };
+        socialDirectivesRef.current.set(gooseId, fresh);
+        return fresh;
+      };
+      const setDirective = (patch: Partial<SocialDirective>) => {
+        const current = getDirective();
+        socialDirectivesRef.current.set(gooseId, { ...current, ...patch });
+      };
+      return {
+        variant: role,
+        say: (text: string, durationMs = 2400) => {
+          upsertSpeechRef.current(gooseId, text, durationMs);
+        },
+        getPosition: () => {
+          const g = stateRef.current?.geese.find((x) => x.id === gooseId);
+          return g?.position ?? { x: 400, y: 400 };
+        },
+        setAway: (away: boolean) => setDirective({ away }),
+        setChaseTarget: (target: { x: number; y: number } | null) => setDirective({ chaseTarget: target }),
+        setFoodBag: (foodBag: boolean) => setDirective({ foodBag }),
+        setSitting: (sitting: boolean) => setDirective({ sitting }),
+        setFetchingFood: (fetchingFood: boolean) => setDirective({ fetchingFood }),
+        setBallPlayActive: (ballPlayActive: boolean) => setDirective({ ballPlayActive }),
+      };
+    };
+
+    const unregisterFemale = registerGoose(buildApi(foundingFemale.id, "brown"));
+    const unregisterMale = registerGoose(buildApi(foundingMale.id, "white"));
+
+    return () => {
+      unregisterFemale();
+      unregisterMale();
+      socialDirectivesRef.current.clear();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -357,6 +475,8 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
     }
     if (key === lastSpokenOnelinerKeyRef.current) return;
     lastSpokenOnelinerKeyRef.current = key;
+    // Notify gooseSocial so it can react to the oneliner with context-aware dialogue
+    noteRecentOneliner(latest.username ?? "someone", latest.text);
     const current = stateRef.current;
     if (!current) return;
     const speakers = current.geese.filter((goose) => goose.alive && goose.state !== "sleep");
@@ -374,12 +494,15 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
   const totalDays = dayFromAgeHours(LIFESPAN_HOURS);
 
   return (
-    <div ref={rootRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 62 }} data-testid="goose-life-sim">
+    <div ref={rootRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 62 }} data-testid="goose-life-sim" aria-hidden="true">
       <div className="absolute top-14 left-2 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground">
         Goose Life · Day {currentDay}/{totalDays} · Oldest {maxAge.toFixed(1)}h · Flock {living.length}
       </div>
       {state.geese.map((goose) => {
         if (goose.bodyRemoved) return null;
+        // Don't render geese that are "away" (flying off-screen via gooseSocial directive).
+        const directive = socialDirectivesRef.current.get(goose.id);
+        if (directive?.away) return null;
         const gosling = isGosling(goose);
         const spriteSizeScale = gosling ? GOSLING_SCALE_FACTOR : 1;
         const width = spriteWidth * spriteSizeScale;
@@ -395,6 +518,13 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
         const frames = gooseFrames[variant];
         const speech = speeches[goose.id];
         const visualMode = getGooseVisualMode(goose);
+
+        // Waddle character: grounded floor-walker uses a distinct slow waddling animation.
+        const isWaddleChar = !!goose.grounded;
+        const waddleCharPhase = phaseMs / 180;
+        const waddleCharCycle = Math.sin(waddleCharPhase * WADDLE_CHAR_CYCLE_FREQ);
+        const waddleCharStepLanding = Math.abs(waddleCharCycle); // peaks when foot lands
+
         const frameDuration = visualMode === "run" ? RUN_FRAME_DURATION_MS : visualMode === "walk" ? WALK_FRAME_DURATION_MS : FLY_FRAME_DURATION_MS;
         const frameIndex = Math.floor((phaseMs / frameDuration) % FLY_FRAME_COUNT);
         const flyHeadBob = Math.sin(phase * 1.2) * spriteScale;
@@ -406,6 +536,35 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
           -22,
           22,
         );
+
+        // Body animation: Waddle character uses exaggerated slow waddling transforms.
+        let walkStrideX: number;
+        let walkStrideY: number;
+        let walkTilt: number;
+        let walkHeadNudgeX: number;
+        let walkHeadNudgeY: number;
+        let walkHeadTilt: number;
+
+        if (isWaddleChar && visualMode === "walk") {
+          // Distinct waddling gait: big lateral sway, deep bob, strong tilt — like a real duck walk
+          walkStrideX = waddleCharCycle * WADDLE_CHAR_BODY_SWAY * spriteScale;
+          walkStrideY = waddleCharStepLanding * WADDLE_CHAR_BODY_BOB * spriteScale;
+          walkTilt = waddleCharCycle * WADDLE_CHAR_BODY_TILT;
+          // Head dips toward ground each time a foot lands, then comes back up
+          walkHeadNudgeX = Math.sin(waddleCharPhase * WADDLE_CHAR_CYCLE_FREQ * 0.9) * WADDLE_CHAR_HEAD_SWAY * spriteScale;
+          walkHeadNudgeY = waddleCharStepLanding * WADDLE_CHAR_HEAD_DIP * spriteScale;
+          walkHeadTilt = Math.sin(waddleCharPhase * WADDLE_CHAR_CYCLE_FREQ * 1.1) * WADDLE_CHAR_HEAD_TILT;
+        } else {
+          const waddling = visualMode === "walk";
+          const walkCycle = Math.sin(phase * WADDLE_CYCLE_FREQUENCY);
+          walkStrideX = waddling ? walkCycle * WADDLE_BODY_SWAY_AMPLITUDE * spriteScale : 0;
+          walkStrideY = waddling ? Math.abs(walkCycle) * WADDLE_BODY_BOB_AMPLITUDE * spriteScale : 0;
+          walkTilt = waddling ? walkCycle * WADDLE_BODY_TILT_DEGREES : 0;
+          walkHeadNudgeX = waddling ? Math.sin(phase * WADDLE_HEAD_CYCLE_FREQUENCY) * WADDLE_HEAD_SWAY_AMPLITUDE * spriteScale : 0;
+          walkHeadNudgeY = waddling ? Math.abs(Math.sin(phase * WADDLE_HEAD_CYCLE_FREQUENCY)) * WADDLE_HEAD_BOB_AMPLITUDE * spriteScale : 0;
+          walkHeadTilt = waddling ? Math.sin(phase * WADDLE_HEAD_CYCLE_FREQUENCY) * WADDLE_HEAD_TILT_DEGREES : 0;
+        }
+
         const groundedBounce =
           goose.state === "play"
             ? Math.abs(Math.sin(phase * PLAY_BOUNCE_FREQUENCY)) * PLAY_BOUNCE_AMPLITUDE * spriteScale
@@ -416,14 +575,6 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
           goose.state === "waddle" || goose.state === "follow" || goose.state === "play"
             ? Math.sin(phase * (visualMode === "run" ? 1.6 : 0.8)) * WADDLE_SWAY_AMPLITUDE * spriteScale
             : 0;
-        const waddling = visualMode === "walk";
-        const walkCycle = Math.sin(phase * WADDLE_CYCLE_FREQUENCY);
-        const walkStrideX = waddling ? walkCycle * WADDLE_BODY_SWAY_AMPLITUDE * spriteScale : 0;
-        const walkStrideY = waddling ? Math.abs(walkCycle) * WADDLE_BODY_BOB_AMPLITUDE * spriteScale : 0;
-        const walkTilt = waddling ? walkCycle * WADDLE_BODY_TILT_DEGREES : 0;
-        const walkHeadNudgeX = waddling ? Math.sin(phase * WADDLE_HEAD_CYCLE_FREQUENCY) * WADDLE_HEAD_SWAY_AMPLITUDE * spriteScale : 0;
-        const walkHeadNudgeY = waddling ? Math.abs(Math.sin(phase * WADDLE_HEAD_CYCLE_FREQUENCY)) * WADDLE_HEAD_BOB_AMPLITUDE * spriteScale : 0;
-        const walkHeadTilt = waddling ? Math.sin(phase * WADDLE_HEAD_CYCLE_FREQUENCY) * WADDLE_HEAD_TILT_DEGREES : 0;
 
         let headTransform = "translate(0px, 0px) rotate(0deg)";
         if (goose.state === "eat") {
@@ -524,13 +675,23 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
             </div>
             {speech && speech.until > now && (
               <div
-                className="absolute rounded-md border border-foreground/80 bg-white px-2 py-1 text-[10px] font-black uppercase tracking-wide text-black shadow-[2px_2px_0_rgba(0,0,0,0.35)]"
+                className="absolute"
                 style={{
                   left: goose.position.x + 6,
                   top: goose.position.y - height / 2 - 22,
                   opacity,
                   transform: "translateY(-100%)",
-                  maxWidth: 180,
+                  padding: "4px 10px",
+                  background: "#fff",
+                  color: "#1a1a1a",
+                  fontWeight: 900,
+                  fontSize: 14,
+                  letterSpacing: "0.04em",
+                  border: "2px solid #1a1a1a",
+                  borderRadius: 8,
+                  boxShadow: "2px 2px 0 rgba(0,0,0,0.4)",
+                  whiteSpace: "nowrap",
+                  zIndex: 70,
                 }}
               >
                 {speech.text}
@@ -550,6 +711,14 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
                 style={{ left: goose.position.x - width * 0.35, top: goose.position.y + height * 0.2, opacity }}
               >
                 {goose.eggs.length} eggs
+              </div>
+            )}
+            {directive?.foodBag && (
+              <div
+                className="absolute text-[11px]"
+                style={{ left: goose.position.x + width * 0.25, top: goose.position.y - height * 0.2, opacity }}
+              >
+                🛍️
               </div>
             )}
           </Fragment>

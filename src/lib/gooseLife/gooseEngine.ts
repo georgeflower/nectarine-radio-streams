@@ -33,6 +33,8 @@ const WADDLE_VERTICAL_VARIANCE = 26;
 const WADDLE_VERTICAL_SPRING_STRENGTH = 12;
 const GROUND_VERTICAL_SPEED_RATIO = 0.22;
 const CHASE_GROUND_DISTANCE_THRESHOLD = 170;
+// Fraction of the floor band height where grounded geese (e.g. Waddle) target their Y position.
+const GROUNDED_VERTICAL_TARGET_RATIO = 0.3;
 
 const randomBetween = (min: number, max: number) => min + Math.random() * (max - min);
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -114,6 +116,7 @@ function createGoose(now: number, stage: StageBounds, seed: Partial<Goose>): Goo
     isGosling: seed.isGosling ?? false,
     followIndex: seed.followIndex,
     perchTarget: seed.perchTarget,
+    grounded: seed.grounded ?? false,
   };
 }
 
@@ -122,13 +125,36 @@ export function createInitialGooseLifeState(now = Date.now(), stage: StageBounds
   const femaleName = randomName(used);
   used.add(femaleName);
   const maleName = randomName(used);
+  used.add(maleName);
   const female = createGoose(now, stage, { name: femaleName, sex: "female", mood: "happy", state: "waddle" });
   const male = createGoose(now, stage, { name: maleName, sex: "male", mood: "playful", state: "fly" });
   female.relationships[male.id] = 50;
   male.relationships[female.id] = 50;
 
+  // Waddle: a dedicated grounded goose that only walks the floor, never flies.
+  // She moves very slowly and stays in the lower ~20% of the screen at all times.
+  // Spawn Y is within the floor band [floorY, stage.height - 20] — clamped for safety.
+  const waddleX = randomBetween(stage.width * 0.25, stage.width * 0.75);
+  const waddleFloorTop = floorY(stage);
+  const waddleFloorBottom = stage.height - 20;
+  const waddleY = clamp(
+    waddleFloorTop + randomBetween(0, Math.max(0, waddleFloorBottom - waddleFloorTop) * 0.5),
+    waddleFloorTop,
+    waddleFloorBottom,
+  );
+  const waddle = createGoose(now, stage, {
+    name: "Waddle",
+    sex: "female",
+    mood: "neutral",
+    state: "waddle",
+    grounded: true,
+    speedModifier: 0.38, // Very slow — a gentle, natural waddle pace
+    position: { x: waddleX, y: waddleY },
+    velocity: { x: randomBetween(-18, 18) * SPEED_MULTIPLIER, y: 0 },
+  });
+
   return {
-    geese: [female, male],
+    geese: [female, male, waddle],
     accumulatedOpenMs: 0,
     lastTickAt: now,
     lastReproductionAt: now,
@@ -272,9 +298,12 @@ function applyPlayState(goose: Goose, geese: Goose[], dtSeconds: number, stage: 
 function applyRoamState(goose: Goose, dtSeconds: number, stage: StageBounds): Goose {
   const next = { ...goose, position: { ...goose.position }, velocity: { ...goose.velocity } };
   if (!canFly(next) && next.state === "fly") next.state = "waddle";
+  if (next.grounded && next.state === "fly") next.state = "waddle";
 
-  const flyMode = next.state === "fly" && canFly(next);
-  const roamSpeed = (flyMode ? 90 : 20) * SPEED_MULTIPLIER * next.speedModifier;
+  const flyMode = next.state === "fly" && canFly(next) && !next.grounded;
+  // Grounded geese (like Waddle) walk very slowly; other ground geese walk at normal speed.
+  const groundBaseSpeed = next.grounded ? 7 : 20;
+  const roamSpeed = (flyMode ? 90 : groundBaseSpeed) * SPEED_MULTIPLIER * next.speedModifier;
   const speed = Math.hypot(next.velocity.x, next.velocity.y);
   const groundTop = floorY(stage);
   const groundBottom = Math.max(groundTop + 10, stage.height * GROUND_MAX_HEIGHT_RATIO);
@@ -287,6 +316,11 @@ function applyRoamState(goose: Goose, dtSeconds: number, stage: StageBounds): Go
     next.velocity.x += (Math.random() - 0.5) * dtSeconds * roamSpeed * 0.9;
     if (flyMode) {
       next.velocity.y += (Math.random() - 0.5) * dtSeconds * roamSpeed * 0.5;
+    } else if (next.grounded) {
+      // Grounded geese: very little vertical drift — they walk the floor band only
+      const targetY = groundTop + (groundBottom - groundTop) * GROUNDED_VERTICAL_TARGET_RATIO;
+      next.velocity.y += (targetY - next.position.y) * dtSeconds * WADDLE_VERTICAL_SPRING_STRENGTH * 2;
+      next.velocity.y *= 0.85;
     } else {
       const verticalRange = Math.max(0, Math.min(WADDLE_VERTICAL_VARIANCE, groundBottom - groundTop));
       const targetY = groundTop + ((Math.sin(next.position.x / 90) + 1) * 0.5) * verticalRange;
@@ -502,6 +536,8 @@ export function stepGooseLife(
       ).length;
       goose.state = chooseNextBehavior(goose, nearbyCount);
       if (!canFly(goose) && goose.state === "fly") goose.state = "waddle";
+      // Grounded geese never fly — if somehow assigned fly, correct to waddle.
+      if (goose.grounded && goose.state === "fly") goose.state = "waddle";
       if (goose.state === "sleep" || goose.state === "interact" || goose.state === "eat" || goose.state === "mourn") {
         goose.perchTarget = choosePerch(safeStage, goose);
       } else if (goose.state === "waddle" || goose.state === "idle" || goose.state === "follow") {
@@ -512,15 +548,18 @@ export function stepGooseLife(
       goose.nextBehaviorAt = nextBehaviorAt(now);
 
       const angle = randomBetween(0, Math.PI * 2);
-      const speed = (
-        goose.state === "fly" ? 90
-          : goose.state === "sleep" ? 8
-            : goose.state === "play" ? 62
-              : 20
-      ) * SPEED_MULTIPLIER * goose.speedModifier;
+      const baseSpeed = goose.grounded
+        ? 8 // Grounded geese walk very slowly
+        : (
+            goose.state === "fly" ? 90
+              : goose.state === "sleep" ? 8
+                : goose.state === "play" ? 62
+                  : 20
+          );
+      const speed = baseSpeed * SPEED_MULTIPLIER * goose.speedModifier;
       goose.velocity = {
         x: Math.cos(angle) * speed,
-        y: Math.sin(angle) * speed,
+        y: goose.grounded ? 0 : Math.sin(angle) * speed, // Grounded: horizontal movement only
       };
     }
 

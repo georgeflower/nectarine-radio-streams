@@ -1,8 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
-import { HOUR_MS, LIFESPAN_HOURS, maybeApplyLatestOneliner, stepGooseLife, type Goose, type GooseLifeState } from "@/lib/gooseLife";
+import {
+  HOUR_MS,
+  LIFESPAN_HOURS,
+  chooseNextBehavior,
+  maybeApplyLatestOneliner,
+  stepGooseLife,
+  type Goose,
+  type GooseLifeState,
+} from "@/lib/gooseLife";
 
 const STAGE = { width: 1280, height: 720 };
 const MOURNING_DURATION_MS = 10 * 60_000;
+const GROUNDED_BEHAVIOR_TEST_NOW = 3_650_000;
+const GROUNDED_BAND_TEST_NOW = 3_680_000;
+const GROUNDED_STRESS_VELOCITY = { x: 260, y: -320 };
 
 function makeGoose(now: number, seed: Partial<Goose>): Goose {
   return {
@@ -34,6 +45,7 @@ function makeGoose(now: number, seed: Partial<Goose>): Goose {
     isGosling: seed.isGosling ?? false,
     followIndex: seed.followIndex,
     perchTarget: seed.perchTarget,
+    grounded: seed.grounded ?? false,
   };
 }
 
@@ -163,6 +175,56 @@ describe("gooseLife core invariants", () => {
     const updated = next.geese.find((g) => g.id === "waddler");
     expect(updated?.state).toBe("waddle");
     expect((updated?.position.y ?? 0)).toBeGreaterThanOrEqual(STAGE.height * 0.8);
+  });
+
+  it("never selects fly or play for grounded geese", () => {
+    const now = GROUNDED_BEHAVIOR_TEST_NOW;
+    const grounded = makeGoose(now, {
+      id: "waddle",
+      grounded: true,
+      state: "waddle",
+      ageHours: 12,
+    });
+
+    for (let i = 0; i < 200; i += 1) {
+      const next = chooseNextBehavior(grounded, i % 2);
+      expect(next).not.toBe("fly");
+      expect(next).not.toBe("play");
+    }
+  });
+
+  it("keeps grounded geese in floor band across behavior ticks", () => {
+    const randomValues = [0.05, 0.5, 0.95];
+    let randomIndex = 0;
+    const randomSpy = vi.spyOn(Math, "random").mockImplementation(() => {
+      const value = randomValues[randomIndex % randomValues.length];
+      randomIndex += 1;
+      return value;
+    });
+    const now = GROUNDED_BAND_TEST_NOW;
+    let current = makeState(now, [
+      makeGoose(now, {
+        id: "waddle",
+        grounded: true,
+        ageHours: 12,
+        state: "idle",
+        position: { x: 280, y: 250 },
+        velocity: GROUNDED_STRESS_VELOCITY,
+        nextBehaviorAt: now,
+      }),
+    ]);
+
+    for (let i = 1; i <= 80; i += 1) {
+      const tickNow = now + i * 1_000;
+      current = stepGooseLife(current, tickNow, 16, STAGE);
+      const grounded = current.geese[0];
+      expect(grounded.state).not.toBe("fly");
+      expect(grounded.state).not.toBe("play");
+      expect(grounded.position.y).toBeGreaterThanOrEqual(STAGE.height * 0.8);
+      expect(grounded.position.y).toBeLessThanOrEqual(STAGE.height * 0.96);
+    }
+
+    randomSpy.mockRestore();
   });
 
   it("moves sleeping geese toward perch targets", () => {
