@@ -121,6 +121,23 @@ export function reportBallBump(by: GooseRole) {
   lastBumpEvent = { by, at: Date.now() };
 }
 
+// Family event bus — used by GooseFamily to know when the adults are
+// sitting together on a snack break so it can lay/hatch eggs.
+export type FamilyEvent =
+  | { type: "snack-start"; positions: Record<GooseRole, { x: number; y: number }> | null }
+  | { type: "snack-end" };
+type FamilyListener = (event: FamilyEvent) => void;
+const familyListeners = new Set<FamilyListener>();
+export function subscribeFamilyEvents(listener: FamilyListener) {
+  familyListeners.add(listener);
+  return () => familyListeners.delete(listener);
+}
+function emitFamilyEvent(event: FamilyEvent) {
+  for (const l of familyListeners) {
+    try { l(event); } catch { /* ignore listener errors */ }
+  }
+}
+
 type Mood = "idle" | "playing" | "sleeping" | "away";
 let mood: Mood = "idle";
 
@@ -493,6 +510,7 @@ async function runFlyAway() {
     if (getPair()) {
       for (const g of geese.values()) g.setSitting(true);
       await wait(1200); // let them fly to a perch and settle
+      emitFamilyEvent({ type: "snack-start", positions: getGoosePositions() });
       const eatStart = Date.now();
       const MIN_EAT_MS = 35_000;
       let i = 0;
@@ -513,6 +531,7 @@ async function runFlyAway() {
         const pairAfterSnack = getPair();
         if (pairAfterSnack) pairAfterSnack[0].say(pick(FOOD_RESUME_LINES), 2200);
       }
+      emitFamilyEvent({ type: "snack-end" });
     }
 
 
