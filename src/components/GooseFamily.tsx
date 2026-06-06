@@ -84,6 +84,9 @@ const MOURNING_LINES = [
 
 type Gosling = {
   id: string;
+  rosterId: string;
+  name: string;
+  sex: GooseSex;
   variant: "gosling-white" | "gosling-brown";
   x: number;
   y: number;
@@ -95,6 +98,8 @@ type Gosling = {
   bubbleUntil: number;
   bubbleText: string;
 };
+
+type AdultActivity = "waddle" | "sit" | "socialise" | "play";
 
 type FamilyAdult = {
   id: string;
@@ -110,6 +115,9 @@ type FamilyAdult = {
   bubbleText: string;
   diesAt?: number; // wall-clock — if set, this adult is destined to pass
   isDying?: boolean; // mourning ritual currently running for this adult
+  activity: AdultActivity;
+  activityUntil: number;
+  playHopPhase: number;
 };
 
 function rand(a: number, b: number) { return a + Math.random() * (b - a); }
