@@ -345,7 +345,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     // Imperative API exposed to the social coordinator so the partner goose
     // (and the BoingBall) can trigger speech bubbles and fly-away behavior.
     const api: GooseAPI = {
-      variant,
+      variant: variant === "brown" || variant === "gosling-brown" ? "brown" : "white",
       say: (text: string, durationMs = 2400) => {
         bubble.innerHTML = renderGooseHTML(text);
         bubble.style.opacity = "1";
