@@ -171,12 +171,16 @@ const MAX_ONELINER_TRAIL = 14;
 
 // Prefer chat tied to recent oneliners (85s), then fall back to ambient banter.
 const RECENT_ONELINER_WINDOW_MS = 85_000;
-// Minimum gap between contextual goose dialogues (70s).
-const DIALOGUE_COOLDOWN_MS = 70_000;
+// Minimum gap between contextual goose dialogues (110s — slower pace).
+const DIALOGUE_COOLDOWN_MS = 110_000;
 const BALL_PLAY_COOLDOWN_MS = 180_000;
 // Snack-break interval: at least 9 minutes between feedings.
 const FLY_AWAY_COOLDOWN_MS = 540_000;
 const FLY_AWAY_CHANCE = 0.15;
+// Standalone reproduction trigger: how often the family may try to lay a
+// fresh clutch outside of a snack break.
+const REPRODUCTION_COOLDOWN_MS = 12 * 60_000;
+let lastReproductionAt = 0;
 
 const DIALOGUE_COOLDOWN_BY_ERA: Record<GooseSceneEra, number> = {
   intro: DIALOGUE_COOLDOWN_MS,
