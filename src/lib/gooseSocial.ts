@@ -552,7 +552,7 @@ async function runReproductionPhase() {
   await wait(2400);
   const landed = mother.getPosition();
   emitFamilyEvent({ type: "incubation-start", x: landed.x, y: landed.y });
-  mother.say(pick(INCUBATION_LINES), 2600);
+  mother.say(pick(INCUBATION_LINES), 3600);
 
   // Father provisioning state machine.
   type FatherState = "idle" | "away" | "delivering";
@@ -564,69 +564,67 @@ async function runReproductionPhase() {
     if (fatherState === "idle") {
       father.setFetchingFood(true);
       father.setAway(true);
-      father.say(pick(FOOD_FETCH_LINES), 2200);
+      father.say(pick(FOOD_FETCH_LINES), 3200);
       fatherState = "away";
-      fatherUntil = Date.now() + 7000;
+      fatherUntil = Date.now() + 9000;
     } else if (fatherState === "away") {
       father.setAway(false);
       father.setFetchingFood(false);
       father.setFoodBag(true);
-      father.say(pick(FATHER_FEED_LINES), 2200);
+      father.say(pick(FATHER_FEED_LINES), 3200);
       const target = mother.getPosition();
       emitFamilyEvent({ type: "feed-delivery", targetX: target.x });
       fatherState = "delivering";
-      fatherUntil = Date.now() + 6000;
+      fatherUntil = Date.now() + 7500;
     } else {
       father.setFoodBag(false);
       fatherState = "idle";
-      fatherUntil = Date.now() + 2500;
+      fatherUntil = Date.now() + 3500;
     }
   };
 
-  // Listen for all-eggs-hatched so we can leave incubation chatter behind
-  // as soon as the last gosling pops — mother shouldn't keep talking about
-  // eggs that no longer exist.
   let allHatched = false;
   const unsubHatch = subscribeFamilyEvents((ev) => {
     if (ev.type === "all-eggs-hatched") allHatched = true;
   });
 
   // Incubation phase: up to ~60s, but cuts short the moment the last egg
-  // hatches so mother can switch to parenting mode.
+  // hatches so mother can switch to parenting mode. Chatter is rationed
+  // so she doesn't talk every 3 seconds while just sitting.
   const INCUBATION_MS = 60_000;
   const incEnd = Date.now() + INCUBATION_MS;
   let chatterIdx = 0;
   while (Date.now() < incEnd && getPair() && !allHatched) {
     stepFather();
-    if (chatterIdx % 2 === 0) mother.say(pick(INCUBATION_LINES), 2400);
+    if (chatterIdx % 3 === 0) mother.say(pick(INCUBATION_LINES), 3400);
     chatterIdx++;
-    await wait(3000);
+    await wait(4500);
   }
   emitFamilyEvent({ type: "incubation-end" });
 
-  // Once eggs hatch, mother gets up and waddles with the goslings instead of
-  // sitting like she's still warming them.
   if (allHatched) mother.setIncubating(false);
 
-  // Brood phase: ~90s. Mother stays nearby chatting care lines; father keeps
-  // fetching food (now feeding goslings too).
+  // Brood phase: ~90s.
   const BROOD_MS = 90_000;
   const broodEnd = Date.now() + BROOD_MS;
   while (Date.now() < broodEnd && getPair()) {
     stepFather();
-    if (chatterIdx % 2 === 0) mother.say(pick(MOTHER_CARE_LINES), 2400);
+    if (chatterIdx % 3 === 0) mother.say(pick(MOTHER_CARE_LINES), 3400);
     chatterIdx++;
-    await wait(3000);
+    await wait(4500);
   }
 
   unsubHatch();
 
-  // Release mother.
   mother.setIncubating(false);
   father.setFoodBag(false);
   father.setFetchingFood(false);
   father.setAway(false);
   emitFamilyEvent({ type: "brood-end" });
+  lastReproductionAt = Date.now();
+  // Fallback so a fresh clutch is guaranteed eligible even if
+  // `goslings-grown` is somehow missed.
+  reproductionEarliestAt = Date.now() + REPRODUCTION_COOLDOWN_MS;
 }
 
 
