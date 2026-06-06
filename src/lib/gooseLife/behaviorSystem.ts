@@ -12,8 +12,29 @@ const WEIGHTS_BY_MOOD: Record<Goose["mood"], Record<GooseState, number>> = {
 
 export const nextBehaviorAt = (now: number) => now + (20_000 + Math.random() * 20_000);
 
+const GROUNDED_BEHAVIORS: GooseState[] = ["idle", "waddle", "eat", "sleep", "interact"];
+const GROUNDED_WEIGHTS: Record<GooseState, number> = {
+  idle: 2, waddle: 5, fly: 0, eat: 1, sleep: 1, play: 0, interact: 2, mourn: 0, follow: 0,
+};
+
 export function chooseNextBehavior(goose: Goose, nearbyCount: number): GooseState {
   if (!goose.alive) return "mourn";
+
+  // Grounded geese (e.g. "Waddle") never enter fly state — they walk the floor only.
+  if (goose.grounded) {
+    const weights = { ...GROUNDED_WEIGHTS };
+    if (nearbyCount > 0) weights.interact += 2;
+    let total = 0;
+    for (const key of GROUNDED_BEHAVIORS) total += Math.max(0, weights[key]);
+    if (total <= 0) return "waddle";
+    let roll = Math.random() * total;
+    for (const key of GROUNDED_BEHAVIORS) {
+      roll -= Math.max(0, weights[key]);
+      if (roll <= 0) return key;
+    }
+    return "waddle";
+  }
+
   if (goose.parentIds && goose.ageHours < 6) {
     if (goose.ageHours < 1.2) return Math.random() < 0.8 ? "follow" : "waddle";
     if (goose.ageHours < 3.5) {

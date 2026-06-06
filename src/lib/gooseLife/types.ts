@@ -50,6 +50,8 @@ export interface Goose {
     y: number;
     kind: "letter" | "window" | "floor";
   };
+  /** If true, goose never enters "fly" state — stays grounded on the floor at all times. */
+  grounded?: boolean;
 }
 
 export interface GooseLifeState {

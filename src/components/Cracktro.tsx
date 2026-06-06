@@ -376,10 +376,11 @@ const Cracktro = ({
   const [gooseLifeSimOn, setGooseLifeSimOn] = useState<boolean>(() => {
     try {
       const v = localStorage.getItem(STORAGE_GOOSE_LIFE_SIM);
-      // Keep classic goose pair enabled by default for ball-play and food-fetch interactions.
-      return v === null ? false : v === "1";
+      // Goose Life Simulation is now the unified default — it includes ball play, food
+      // fetching, turn-taking chatter, lifecycle, goslings and the Waddle character.
+      return v === null ? true : v === "1";
     } catch {
-      return false;
+      return true;
     }
   });
   useEffect(() => {
