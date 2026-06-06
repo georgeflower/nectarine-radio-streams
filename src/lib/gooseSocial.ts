@@ -678,8 +678,12 @@ async function runFlyAway() {
       emitFamilyEvent({ type: "snack-end" });
 
       // === REPRODUCTION: mother flies down, lays eggs, sits to incubate;
-      //     father runs food-fetch loop; then a 90s brood phase. ===
-      await runReproductionPhase();
+      //     father runs food-fetch loop; then a 90s brood phase. Skipped
+      //     when the last clutch of goslings is still growing up (we want
+      //     a 10–15 min gap after grow-up before laying again). ===
+      if (Date.now() >= reproductionEarliestAt) {
+        await runReproductionPhase();
+      }
     }
 
 
