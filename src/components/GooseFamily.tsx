@@ -203,17 +203,24 @@ const GooseFamily = () => {
     setTick((t) => t + 1);
   }, []);
 
-  // Snack-break events: lay eggs at the floor near the mother, flip
-  // sitting flag so goslings sit + peck while adults eat.
+  // Family events: snack toggles gosling sit/peck flag; incubation-start
+  // is when the mother has descended and dropped 1–3 eggs on the floor.
   useEffect(() => {
     const unsub = subscribeFamilyEvents((event) => {
+      if (event.type === "snack-start") {
+        adultsSittingRef.current = true;
+        setTick((t) => t + 1);
+        return;
+      }
       if (event.type === "snack-end") {
         adultsSittingRef.current = false;
-        // After the snack, mother "drops" eggs on the floor near her.
+        setTick((t) => t + 1);
+        return;
+      }
+      if (event.type === "incubation-start") {
         const w = rootRef.current?.clientWidth ?? window.innerWidth;
         const h = rootRef.current?.clientHeight ?? window.innerHeight;
-        const positions = getGoosePositions();
-        const anchorX = positions?.white?.x ?? w / 2;
+        const anchorX = event.x ?? w / 2;
         const floorY = h - 28;
         const liveEggs = eggsRef.current.length;
         const room = Math.max(0, MAX_LIVE_EGGS - liveEggs);
@@ -235,14 +242,11 @@ const GooseFamily = () => {
           saveEggs(eggsRef.current);
         }
         setTick((t) => t + 1);
-        return;
       }
-      if (event.type !== "snack-start") return;
-      adultsSittingRef.current = true;
-      setTick((t) => t + 1);
     });
     return () => { unsub(); };
   }, []);
+
 
   // Main animation loop.
   useEffect(() => {

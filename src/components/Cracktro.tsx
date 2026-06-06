@@ -836,7 +836,9 @@ const Cracktro = ({
         )}
 
         {/* Info bar: big now-playing strip pinned to the bottom. Independent of scroller. */}
-        {infobarOn && (
+        {infobarOn && (() => {
+          const tMult = windowSize === "s" ? 0.85 : windowSize === "l" ? 1.2 : 1;
+          return (
           <div
             className="absolute left-0 right-0 pointer-events-none"
             style={{
@@ -848,14 +850,13 @@ const Cracktro = ({
               opacity: mourning ? 0.4 : 1,
               filter: mourning ? "grayscale(0.85)" : undefined,
               transition: "opacity 1200ms ease-out, filter 1200ms ease-out",
-              fontSize: `${windowSize === "s" ? 0.85 : windowSize === "l" ? 1.2 : 1}em`,
             }}
           >
             <div className="mx-auto max-w-6xl px-6 text-center">
               <p
                 key={title || "unknown"}
                 className="neon font-extrabold uppercase leading-tight tracking-wider"
-                style={{ fontSize: "clamp(2rem, 5.5vw, 5rem)" }}
+                style={{ fontSize: `clamp(${2 * tMult}rem, ${5.5 * tMult}vw, ${5 * tMult}rem)` }}
               >
                 {(title || "Unknown Tune").split("").map((ch, i) =>
                   ch === " " ? (
@@ -869,14 +870,14 @@ const Cracktro = ({
               </p>
               <p
                 className="neon-accent font-bold uppercase tracking-widest mt-2"
-                style={{ fontSize: "clamp(1.25rem, 3vw, 2.5rem)" }}
+                style={{ fontSize: `clamp(${1.25 * tMult}rem, ${3 * tMult}vw, ${2.5 * tMult}rem)` }}
               >
                 by {artist || "Unknown Artist"}
               </p>
               {(platform || rating !== undefined || duration > 0) && (
                 <p
                   className="text-foreground uppercase tracking-[0.3em] mt-3"
-                  style={{ fontSize: "clamp(0.95rem, 1.8vw, 1.5rem)" }}
+                  style={{ fontSize: `clamp(${0.95 * tMult}rem, ${1.8 * tMult}vw, ${1.5 * tMult}rem)` }}
                 >
                   {platform && <span>{platform}</span>}
                   {platform && rating !== undefined && <span className="mx-3 opacity-50">·</span>}
@@ -898,7 +899,8 @@ const Cracktro = ({
               )}
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* Floating side panels — independently toggleable & draggable. */}
         {panelsOn.oneliner && (

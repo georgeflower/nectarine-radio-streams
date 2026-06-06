@@ -321,6 +321,12 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let tiredRestReleaseAt = 0;
     let panicFlightUntil = 0;
     let lastAppliedPanicUntil = 0;
+    // Incubation: mother flies to (incubatingX, floorY) and stays there in
+    // a static peck/sit pose until released.
+    let incubating = false;
+    let incubatingX = 0;
+    const incubatingFloorY = () => h - spriteH() * 0.6 - 12;
+
 
 
     const wrap = wrapRef.current;
@@ -447,7 +453,30 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           eatingGooseIds.delete(gooseId);
           eatingMode = false;
           restingFromTiredness = false;
+          incubating = false;
           if (mode === "ground" || mode === "land" || mode === "approach") takeoff();
+        }
+      },
+      setIncubating: (active: boolean, atX?: number) => {
+        if (active) {
+          incubating = true;
+          incubatingX = typeof atX === "number" ? atX : x;
+          // Cancel any perch/eating/chase state — fly down to floor.
+          sittingForMeal = false;
+          eatingGooseIds.delete(gooseId);
+          eatingMode = false;
+          chaseTarget = null;
+          restingFromTiredness = false;
+          fetchingFood = false;
+          perchEl = null;
+          mode = "fly";
+          img.style.opacity = "1";
+          imgBody.style.opacity = "0";
+          imgHead.style.opacity = "0";
+          nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
+        } else {
+          incubating = false;
+          if (mode === "ground") takeoff();
         }
       },
     };
@@ -696,7 +725,13 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       }
 
       if (mode === "ground") {
-        if (eatingMode) {
+        if (incubating) {
+          // Static sit at the floor, with peck/breath animation.
+          x = incubatingX;
+          y = incubatingFloorY();
+          heading = 0;
+          targetHeading = 0;
+        } else if (eatingMode) {
           const layout = getEatingLayout();
           x += (layout.x - x) * Math.min(1, dt * 6);
           y += (layout.y - y) * Math.min(1, dt * 6);
@@ -718,9 +753,28 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         return;
       }
 
+      // ===== INCUBATION: fly to floor x and land in ground mode =====
+      if (incubating) {
+        const targetX = incubatingX;
+        const targetY = incubatingFloorY();
+        targetHeading = Math.atan2(targetY - y, targetX - x);
+        targetSpeed = scale(150);
+        if (Math.hypot(targetX - x, targetY - y) < scale(10)) {
+          x = targetX;
+          y = targetY;
+          mode = "ground";
+          imgBody.style.opacity = "1";
+          imgHead.style.opacity = "1";
+          img.style.opacity = "0";
+          raf = requestAnimationFrame(tick);
+          return;
+        }
+      }
+
+
 
       // ===== FLY / APPROACH =====
-      if (!fetchingFood && !eatingMode && !ballPlayActive && (mode === "fly" || mode === "approach") && gooseIsTired(stamina)) {
+      if (!incubating && !fetchingFood && !eatingMode && !ballPlayActive && (mode === "fly" || mode === "approach") && gooseIsTired(stamina)) {
         const nearestPerch = pickPerch({ x, y });
         if (nearestPerch) {
           perchEl = nearestPerch.el;
@@ -732,7 +786,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           targetSpeed = scale(105);
         }
       }
-      if (mode === "fly" && eatingMode && !away) {
+      if (!incubating && mode === "fly" && eatingMode && !away) {
         const mealPerch = pickPerch({ x, y });
         if (mealPerch) {
           perchEl = mealPerch.el;
@@ -743,7 +797,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           targetSpeed = scale(115);
         }
       }
-      if (mode === "fly" && !away && !eatingMode && !fetchingFood && !ballPlayActive && elapsed >= nextPerchAt) {
+      if (!incubating && mode === "fly" && !away && !eatingMode && !fetchingFood && !ballPlayActive && elapsed >= nextPerchAt) {
         const p = pickPerch();
         if (p) {
           perchEl = p.el;

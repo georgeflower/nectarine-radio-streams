@@ -87,11 +87,9 @@ const FloatingWindow = ({ id, title, defaultX, defaultY, defaultW = 280, default
       style={{
         left: pos.x,
         top: pos.y,
-        width: pos.w * scale,
+        width: pos.w,
         maxHeight: "60vh",
         zIndex: 12,
-        transformOrigin: "top left",
-        fontSize: `${scale}em`,
       }}
     >
       <div
@@ -114,7 +112,10 @@ const FloatingWindow = ({ id, title, defaultX, defaultY, defaultW = 280, default
           ✕
         </button>
       </div>
-      <div className="p-2 overflow-y-auto text-xs text-foreground/90">
+      <div
+        className="p-2 overflow-y-auto text-foreground/90"
+        style={{ fontSize: `${0.75 * scale}rem` }}
+      >
         {children}
       </div>
     </div>
