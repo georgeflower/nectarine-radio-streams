@@ -58,6 +58,9 @@ const STORAGE_FPS_COUNTER = "cracktro-fps-counter";
 const STORAGE_SCENE_ERAS = "cracktro-scene-eras";
 const STORAGE_SCENE_ERA_LISTEN_MS = "cracktro-scene-era-listen-ms";
 const STORAGE_GOOSE_LIFE_SIM = "cracktro-goose-life-sim";
+// Written once after the v2 migration runs so returning users are only forced
+// onto the new sim-on default on their first load after the update.
+const STORAGE_GOOSE_LIFE_SIM_MIGRATED = "cracktro-goose-life-sim-migrated-v2";
 const MAX_FRAME_TIME_MS = 100;
 const FPS_EMA_ALPHA = 0.1;
 const LOW_FPS_THRESHOLD = 28;
@@ -375,9 +378,16 @@ const Cracktro = ({
   }, [boingOn]);
   const [gooseLifeSimOn, setGooseLifeSimOn] = useState<boolean>(() => {
     try {
+      // One-time migration (v2): PR #32 made Goose Life Simulation the unified default.
+      // Returning users who had the old "off" value persisted are migrated to the new
+      // default on their first load. After the migration marker is written the stored
+      // value is respected normally, so manual user changes continue to persist.
+      const migrated = localStorage.getItem(STORAGE_GOOSE_LIFE_SIM_MIGRATED);
+      if (!migrated) {
+        localStorage.setItem(STORAGE_GOOSE_LIFE_SIM_MIGRATED, "1");
+        return true;
+      }
       const v = localStorage.getItem(STORAGE_GOOSE_LIFE_SIM);
-      // Goose Life Simulation is now the unified default — it includes ball play, food
-      // fetching, turn-taking chatter, lifecycle, goslings and the Waddle character.
       return v === null ? true : v === "1";
     } catch {
       return true;
