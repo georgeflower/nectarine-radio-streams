@@ -643,6 +643,14 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
               peckStrength *
               sceneScale;
             imgHead.style.transform = `translate(0px, ${chew}px) rotate(${chew * CHEW_ROTATION_FACTOR}deg)`;
+          } else if (restingFromTiredness) {
+            // Sleep head tilt: head tucked down and slowly bobbing — ported
+            // from the sim's SLEEP_HEAD_* animation.
+            const breath = Math.sin(elapsed / 1400) * 1.5;
+            const sway = Math.sin(elapsed / 1800) * 4;
+            const tuckRotate = -22 + sway; // head pulled down toward the body
+            const tuckDrop = 4 + breath;
+            imgHead.style.transform = `translate(0px, ${tuckDrop * sceneScale}px) rotate(${tuckRotate}deg)`;
           } else {
             // Head: rotate + slight translate, pivoting at the neck base.
             imgHead.style.transform = `translate(${lateral}px, ${neckBob}px) rotate(${yaw + wiggle}deg)`;
