@@ -386,6 +386,7 @@ function clearFlyAwayState() {
     g.setFoodBag(false);
     g.setSitting(false);
     g.setFetchingFood(false);
+    g.setIncubating(false);
   }
 }
 
