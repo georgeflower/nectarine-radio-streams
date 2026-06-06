@@ -498,6 +498,8 @@ const GooseFamily = () => {
             activity: "waddle",
             activityUntil: wallNow + 4000 + Math.random() * 8000,
             playHopPhase: 0,
+            mode: "ground",
+            takeoffAt: wallNow + sitDuration(),
           });
         }
         setRoster([...kept, ...promoted]);
