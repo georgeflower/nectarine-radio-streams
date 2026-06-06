@@ -1087,10 +1087,9 @@ const Cracktro = ({
                 gooseOn
                   ? "border-primary bg-primary/20 text-foreground"
                   : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              } ${gooseLifeSimOn ? "opacity-40 cursor-not-allowed" : ""}`}
+              }`}
               aria-pressed={gooseOn}
-              title={gooseLifeSimOn ? "Classic goose disabled while Life Sim is active" : "Toggle flying goose"}
-              disabled={gooseLifeSimOn}
+              title="Toggle flying goose"
             >
               {gooseOn ? "ON" : "OFF"}
             </button>
@@ -1103,26 +1102,11 @@ const Cracktro = ({
                 brownGooseOn
                   ? "border-primary bg-primary/20 text-foreground"
                   : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              } ${gooseLifeSimOn ? "opacity-40 cursor-not-allowed" : ""}`}
+              }`}
               aria-pressed={brownGooseOn}
-              title={gooseLifeSimOn ? "Classic goose disabled while Life Sim is active" : "Toggle brown flying goose"}
-              disabled={gooseLifeSimOn}
+              title="Toggle brown flying goose"
             >
               {brownGooseOn ? "ON" : "OFF"}
-            </button>
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Life Sim</span>
-            <button
-              type="button"
-              onClick={() => setGooseLifeSimOn((v) => !v)}
-              className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                gooseLifeSimOn
-                  ? "border-primary bg-primary/20 text-foreground"
-                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={gooseLifeSimOn}
-              title="Toggle goose life simulation"
-            >
-              {gooseLifeSimOn ? "ON" : "OFF"}
             </button>
 
             <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Boing</span>
