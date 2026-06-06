@@ -698,10 +698,20 @@ async function runFlyAway() {
       emitFamilyEvent({ type: "snack-end" });
 
       // === REPRODUCTION (snack-coupled). ===
-      if (Date.now() >= reproductionEarliestAt) {
+      // Same gate as the standalone trigger so we don't kick off a clutch
+      // immediately after the previous brood ends.
+      const now2 = Date.now();
+      if (
+        reproductionEarliestAt > 0 &&
+        now2 >= reproductionEarliestAt &&
+        now2 - lastReproductionAt >= REPRODUCTION_COOLDOWN_MS &&
+        now2 - lastBroodEndAt >= POST_HATCH_SETTLE_MS &&
+        !familyHasLiveOffspring()
+      ) {
         await runReproductionPhase();
       }
     }
+
 
   } finally {
     clearFlyAwayState();
