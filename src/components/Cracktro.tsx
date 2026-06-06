@@ -57,10 +57,6 @@ const STORAGE_INFOBAR = "cracktro-infobar-on";
 const STORAGE_FPS_COUNTER = "cracktro-fps-counter";
 const STORAGE_SCENE_ERAS = "cracktro-scene-eras";
 const STORAGE_SCENE_ERA_LISTEN_MS = "cracktro-scene-era-listen-ms";
-const STORAGE_GOOSE_LIFE_SIM = "cracktro-goose-life-sim";
-// Written once after the v2 migration runs so returning users are only forced
-// onto the new sim-on default on their first load after the update.
-const STORAGE_GOOSE_LIFE_SIM_MIGRATED = "cracktro-goose-life-sim-migrated-v2";
 const MAX_FRAME_TIME_MS = 100;
 const FPS_EMA_ALPHA = 0.1;
 const LOW_FPS_THRESHOLD = 28;
