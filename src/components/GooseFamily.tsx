@@ -145,12 +145,23 @@ function loadGoslings(): Gosling[] {
     const data = JSON.parse(raw) as Partial<Gosling>[];
     if (!Array.isArray(data)) return [];
     // Backfill rosterId/name/sex for older saves so promote-to-adult still works.
-    return data.map((g): Gosling => {
+    // If the stored name is a legacy placeholder ("Gosling"/empty), assign a
+    // unique name from the pool and sync the matching roster entry.
+    const roster = getRoster();
+    const taken = new Set(roster.map((e) => e.name));
+    const rosterUpdates = new Map<string, string>(); // rosterId -> new name
+    const result = data.map((g): Gosling => {
       const rosterId = g.rosterId ?? `gosling-legacy-${Math.random().toString(36).slice(2, 8)}`;
+      let name = g.name;
+      if (isPlaceholderName(name)) {
+        name = pickUniqueName(taken);
+        taken.add(name);
+        rosterUpdates.set(rosterId, name);
+      }
       return {
         id: g.id ?? `g-legacy-${Math.random().toString(36).slice(2, 6)}`,
         rosterId,
-        name: g.name ?? "Gosling",
+        name: name!,
         sex: g.sex ?? (Math.random() < 0.5 ? "f" : "m"),
         variant: g.variant ?? "gosling-white",
         x: g.x ?? 0,
@@ -164,6 +175,13 @@ function loadGoslings(): Gosling[] {
         bubbleText: "",
       };
     });
+    if (rosterUpdates.size > 0) {
+      const next = roster.map((e) =>
+        rosterUpdates.has(e.id) ? { ...e, name: rosterUpdates.get(e.id)! } : e,
+      );
+      setRoster(next);
+    }
+    return result;
   } catch { return []; }
 }
 function saveGoslings(g: Gosling[]) {
