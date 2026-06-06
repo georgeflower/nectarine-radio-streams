@@ -208,6 +208,9 @@ const GooseFamily = () => {
         bornAt: e.bornAt,
         bubbleUntil: 0,
         bubbleText: "",
+        activity: "waddle",
+        activityUntil: Date.now() + 4000 + Math.random() * 8000,
+        playHopPhase: 0,
       }));
     setTick((t) => t + 1);
   }, []);
