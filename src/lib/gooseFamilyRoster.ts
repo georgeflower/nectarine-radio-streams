@@ -116,6 +116,14 @@ export function pickRandomAdultColor(): GooseColor {
   return ADULT_COLORS[Math.floor(Math.random() * ADULT_COLORS.length)];
 }
 
+// True if `name` is an empty/placeholder fallback ("Gosling", "", whitespace).
+export function isPlaceholderName(name: string | undefined | null): boolean {
+  if (!name) return true;
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return true;
+  return trimmed.toLowerCase() === "gosling";
+}
+
 export function formatAge(bornAt: number, now = Date.now()): string {
   const ms = Math.max(0, now - bornAt);
   const s = Math.floor(ms / 1000);
