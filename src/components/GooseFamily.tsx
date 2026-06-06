@@ -279,6 +279,7 @@ const GooseFamily = () => {
         dir: Math.random() < 0.5 ? -1 : 1,
         phase: Math.random() * Math.PI * 2,
         targetX: rand(80, Math.max(160, w - 80)),
+        targetY: adultFloorY,
         bornAt: e.bornAt,
         bubbleUntil: 0,
         bubbleText: "",
