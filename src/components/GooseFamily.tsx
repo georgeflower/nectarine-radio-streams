@@ -18,11 +18,12 @@ import {
 } from "@/lib/gooseSprite";
 import { getSceneScale } from "@/lib/gooseScene";
 
-const STORAGE_EGGS = "cracktro-goose-eggs-v1";
-const HATCH_MIN_MS = 45_000;
-const HATCH_MAX_MS = 90_000;
-const EGG_LAY_CHANCE = 0.55;
-const MAX_GOSLINGS = 6;
+const STORAGE_EGGS = "cracktro-goose-eggs-v2";
+const HATCH_MIN_MS = 18_000;
+const HATCH_MAX_MS = 32_000;
+const EGG_LAY_CHANCE = 1; // every snack break produces eggs
+const MAX_LIVE_EGGS = 4;
+const MAX_GOSLINGS = 8;
 const GOSLING_SCALE_FACTOR = 0.58;
 
 // Ground waddle constants (ported from GooseLifeSimulation).
@@ -89,11 +90,16 @@ const GooseFamily = () => {
   useEffect(() => {
     const unsub = subscribeFamilyEvents((event) => {
       if (event.type !== "snack-start") return;
-      const positions = event.positions ?? getGoosePositions();
-      const anchor = positions?.white ?? positions?.brown;
-      if (!anchor) return;
       if (Math.random() > EGG_LAY_CHANCE) return;
-      const count = 1 + Math.floor(Math.random() * 3);
+      const positions = event.positions ?? getGoosePositions();
+      const w = rootRef.current?.clientWidth ?? window.innerWidth;
+      const h = rootRef.current?.clientHeight ?? window.innerHeight;
+      const anchor =
+        positions?.white ?? positions?.brown ?? { x: w / 2, y: h - 80 };
+      const liveEggs = eggsRef.current.length;
+      const room = Math.max(0, MAX_LIVE_EGGS - liveEggs);
+      if (room === 0) return;
+      const count = Math.min(room, 1 + Math.floor(Math.random() * 3));
       const now = Date.now();
       const fresh: Egg[] = [];
       for (let i = 0; i < count; i++) {
