@@ -24,6 +24,8 @@ import {
   BASE_SPRITE_H,
   BASE_SPRITE_W,
   buildGooseFrameDataUrls,
+  NECK_PIVOT_X_PX,
+  NECK_PIVOT_Y_PX,
   STAND_BODY,
   STAND_HEAD,
 } from "@/lib/gooseSprite";
