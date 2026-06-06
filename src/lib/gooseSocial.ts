@@ -38,6 +38,10 @@ export type GooseAPI = {
   // Toggle "ball-play is currently active" — while true, the goose must
   // stay airborne and skip routine/tiredness perching.
   setBallPlayActive: (active: boolean) => void;
+  // Reproduction: when active=true, mother flies down to the floor at x
+  // and stays there in a sitting/peck pose (incubation). When false, takes off.
+  setIncubating: (active: boolean, x?: number) => void;
+
 };
 
 const geese = new Map<number, GooseAPI>();
@@ -125,7 +129,11 @@ export function reportBallBump(by: GooseRole) {
 // sitting together on a snack break so it can lay/hatch eggs.
 export type FamilyEvent =
   | { type: "snack-start"; positions: Record<GooseRole, { x: number; y: number }> | null }
-  | { type: "snack-end" };
+  | { type: "snack-end" }
+  | { type: "incubation-start"; x: number; y: number }
+  | { type: "incubation-end" }
+  | { type: "feed-delivery"; targetX: number }
+  | { type: "brood-end" };
 type FamilyListener = (event: FamilyEvent) => void;
 const familyListeners = new Set<FamilyListener>();
 export function subscribeFamilyEvents(listener: FamilyListener) {
