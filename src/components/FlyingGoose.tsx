@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
 import { SMILEYS } from "@/lib/smileys";
 import {
+  claimPerch,
+  getPerchClaims,
   noteRecentOneliner,
   registerGoose,
+  releasePerch,
   reactToOnelinerSmiley,
   type GooseAPI,
 } from "@/lib/gooseSocial";
