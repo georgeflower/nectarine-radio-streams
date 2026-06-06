@@ -369,8 +369,17 @@ function applyEraMood(mood: LexiconMood, era: GooseSceneEra): LexiconMood {
 function getDialogueCooldownMs() {
   return DIALOGUE_COOLDOWN_BY_ERA[sceneEra] ?? DIALOGUE_COOLDOWN_MS;
 }
+let ballAvailable = true;
+export function setBallAvailable(v: boolean) {
+  ballAvailable = v;
+  if (!v) {
+    // If a play is queued/just-armed, cancel directive so geese stop chasing.
+    ballPlayDirective = null;
+  }
+}
+export function getBallAvailable() { return ballAvailable; }
 function canStartBallPlay(now: number) {
-  return ballPos !== null && now - lastBallPlayAt >= BALL_PLAY_COOLDOWN_MS;
+  return ballAvailable && ballPos !== null && now - lastBallPlayAt >= BALL_PLAY_COOLDOWN_MS;
 }
 function wait(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));

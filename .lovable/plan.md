@@ -1,63 +1,68 @@
-# Plan: Fix sizing + reproduction choreography
+## 1. Goslings not turning into geese
 
-Three targeted fixes based on the latest feedback. No other behavior changes.
+`GROW_UP_MS` is currently 3 min, but the user wants 8 min for goslings to become adults.
 
-## 1. Size control affects text only, not window dimensions
+Fix:
+- Change `GROW_UP_MS` from `3 * 60_000` to `8 * 60_000` in `src/components/GooseFamily.tsx`.
+- `gooseFamilyRoster.ts`: add `isPlaceholderName(name)` helper (matches `"Gosling"`, empty, or whitespace-only names).
+- `GooseFamily.tsx` `loadGoslings()`: when backfilling legacy goslings, assign a real unique name via `pickUniqueName(takenSet)` instead of `"Gosling"`, and update the matching roster entry name.
+- Promotion block (~line 393): if the existing roster name is placeholder or missing, assign a unique name so the promoted adult gets a real identity.
+- Mount effect (~line 208): sweep roster — any `kind: "gosling"` whose `wallNow - bornAt > GROW_UP_MS` with no matching live gosling in `goslingsRef` gets promoted to `kind: "adult"` (real name + adult color) and pushed into `adultsRef`. Also rename any `kind: "adult"` entries still called `"Gosling"`.
 
-**Problem:** `FloatingWindow` currently multiplies `pos.w` by `scale` and sets `fontSize: ${scale}em`, which scales both the panel width and the text. Same applies to the info box in `Cracktro.tsx`.
+## 2. Neck wobble pivots from the body
 
-**Change:**
-- In `src/components/FloatingWindow.tsx`: remove `width: pos.w * scale` → keep `width: pos.w`. Keep `fontSize: ${scale}em` so only text scales. Drop `transformOrigin` (no longer needed).
-- In `src/components/Cracktro.tsx` info box: stop scaling the box's width/padding from `windowScale`; only apply `fontSize: ${scale}em` (or equivalent) to the inner text wrapper. Leave the box's fixed/responsive width alone.
-- S/M/L still maps to 0.8 / 1.0 / 1.25 via `WINDOW_SCALE_VALUES`.
+Both gosling head (line 672) and family-adult head (line 729) use `transformOrigin: "center center"`, so the head rotates around its midpoint and appears to detach from the body. `FlyingGoose.tsx` already uses the sprite-grid neck base at `(11.5, 10)` in `PIXEL` units (`NECK_PIVOT_X_PX`, `NECK_PIVOT_Y_PX`).
 
-## 2. Mother actually flies down, lays, and sits on the eggs
+Fix in `GooseFamily.tsx`:
+- Import `NECK_PIVOT_X_PX` and `NECK_PIVOT_Y_PX` from `@/lib/gooseSprite`.
+- Gosling head `img`: `transformOrigin: \`${NECK_PIVOT_X_PX * sceneScale * GOSLING_SCALE_FACTOR}px ${NECK_PIVOT_Y_PX * sceneScale * GOSLING_SCALE_FACTOR}px\``.
+- Family-adult head `img`: `transformOrigin: \`${NECK_PIVOT_X_PX * sceneScale}px ${NECK_PIVOT_Y_PX * sceneScale}px\``.
+- Leave the outer wrapper and body `transformOrigin` unchanged (wrapper still handles `scaleX(dir)` mirroring).
 
-**Problem:** Eggs currently spawn instantly at `snack-end` at `floorY = h - 28` near wherever the mother happens to be perched, with no fly-down and no incubation pose. Hatch starts immediately on the 18–32 s timer, so father has no time to fetch.
+## 3. Promoted adults join the full social life
 
-**Change in `src/lib/gooseSocial.ts` (`runFlyAway`)**:
-After the snack-eating loop and before `emitFamilyEvent({ type: "snack-end" })`:
-1. Emit a new `snack-end` (eating finished) — but DO NOT lay eggs here.
-2. Emit a new event `lay-eggs-request` with the mother's current position. GooseFamily handles this by:
-   - Choosing a floor anchor near horizontal center of where mother is.
-   - Telling mother (via a new `flyToFloor(x, y)` API on `GooseAPI`) to descend and land at that floor point. The white goose's `FlyingGoose` instance already supports `setSitting` — extend it (or use the existing perch logic) to accept a forced ground target.
-3. After mother lands (`flyToFloor` resolves / a `mother-landed` event fires), GooseFamily lays the 1–3 eggs at her exact landed position and sets `motherIncubating = true`.
-4. Mother stays sitting on the eggs with the existing peck/sit animation. Block the social scheduler from re-perching her until incubation ends. New flag in `gooseSocial`: `isIncubatingWhite` blocks ball-play / fly-away / dialogue cycles for white.
-5. Father (brown) immediately enters a food-fetch loop: fly off, return with food bag, deliver near mother + eggs (existing `setFoodBag(true)` then `false`), say a `FEED_DELIVERY` line. Loop every ~25 s until all eggs hatch and goslings are full-grown OR until cap is reached. While running, brown is also blocked from ball-play / regular fly-away.
+`FamilyAdult` instances are rendered by `GooseFamily` but never registered with `gooseSocial`, so they cannot play ball, fly away, or participate in dialogue.
 
-**Hatch window stays 18–32 s** (eggs.ts), but laying only happens *after* mother lands, so father has the full pre-hatch window to start fetching. Also bump hatch low end to give father a guaranteed first delivery: add a guard that the first hatch can only resolve after the first father feed-delivery completes (or after 25 s if delivery fails).
+Fix:
+- Expose public `registerGoose(api: GooseAPI)` / `unregisterGoose(api: GooseAPI)` from `gooseSocial.ts` (currently exists only in the `__testing` block).
+- Build a lightweight adapter for each `FamilyAdult` that implements the full `GooseAPI` interface, mapping social directives to local adult state (new fields: `away`, `chaseTarget`, `ballPlayActive`).
+- Register each promoted adult immediately upon creation.
+- Tick loop in `GooseFamily` honors `away` (hide sprite), `chaseTarget` (move toward ball target), `ballPlayActive` (pause normal activity rotation).
+- Ball-play (`runBallPlay`) picks any two registered geese, not only `white`/`brown`.
+- Dialogue scheduling includes family adults via their registered `say` method.
+- Family adults use `variant: "family"` so dialogue pools work.
 
-**Incubation chatter:** new pool `INCUBATION_LINES` (≥8 lines, "Almost there, little ones…", "Warming the brood :)") spoken by mother on a ~4 s cadence while incubating.
+## 4. All adults roam the floor band
 
-## 3. Mother actually parents the goslings
+All adult geese (originals + family adults) should sometimes walk on the floor between the very bottom and 20% up from the bottom.
 
-**Problem:** After hatch, mother resumes normal social routine immediately.
+Fix:
+- When the activity is `waddle` or `socialise`, set `targetY` in the range `[h * 0.8, floorY]` (bottom 20% of screen).
+- For originals (white/brown), this means overriding their normal perch-target logic when the floor-roam activity is active. `gooseSocial.ts` sets `grounded: true` on the goose during this window.
+- For family adults, the same `targetY` sampling applies natively in `GooseFamily`.
 
-**Change in `GooseFamily.tsx` + `gooseSocial.ts`:**
-- Keep `isIncubatingWhite` set to true for `MOTHER_BROOD_MS = 90_000` after the *last* gosling hatches. During this window:
-  - Mother stays grounded (sitting flag = false but `setFetchingFood(false)` and `setSitting(true)` toggled per a slow waddle pattern). She waddles slowly along the floor and goslings already follow her via existing `parentAnchor` logic.
-  - Mother speaks from a new `MOTHER_CARE_LINES` pool every ~5 s ("Stay close, peeps!", "Aren't you adorable :D", "Eat up, little ones").
-  - Father continues fetch/deliver loop and now also "feeds" goslings (deliver animation toward gosling cluster centroid, line from `FATHER_FEED_LINES`).
-- After `MOTHER_BROOD_MS` elapses *and* no live eggs remain, clear `isIncubatingWhite` and let the normal scheduler resume. Father exits his fetch loop on the same event.
+## 5. Ball parks on a far-away shelf during brood
 
-## Technical notes
+While the mother is incubating eggs or caring for goslings, the ball cannot be played with.
 
-- New `gooseSocial` events: `lay-eggs-request`, `mother-landed`, `feed-delivery`, `brood-end`.
-- New `GooseAPI` method: `flyToFloor(x: number, y: number): Promise<void> | void`. `FlyingGoose` resolves it by overriding its target until `y` reached, then sets sitting.
-- New flags in `gooseSocial`: `isIncubatingWhite`, `isFatherProvisioning`. Scheduler `step()` skips ball-play / fly-away / dialogue for the locked role.
-- Persistence: add `motherIncubatingUntil` and `fatherProvisioningUntil` to a small `cracktro-goose-family-state-v1` localStorage key so a reload mid-brood resumes correctly.
-- Tests:
-  - Extend `flyingGooseEggs.test.tsx`: assert eggs are only laid after `mother-landed` and that hatch waits ≥ first feed-delivery.
-  - New unit test for the `isIncubatingWhite` lock blocking ball-play in `gooseSocial.test.ts`.
-  - Floating-window text-only scaling test (DOM width unchanged when scale changes; computed font-size changes).
+Fix in `BoingBall.tsx`:
+- Listen for family events `incubation-start` and `brood-end`.
+- On `incubation-start`:
+  - Render a small pixel-art shelf near the right top at 20% down (`x = w * 0.78`, `y = h * 0.20`). Animate it sliding in from the right.
+  - Animate the ball from its current position to the shelf anchor while scaling from `1` to `0.15` (1200 ms, ease-in-out). This creates the visual of the ball going farther away and shrinking.
+  - Disable ball physics and block `gooseSocial` ball-play via a new `setBallAvailable(false)` gate.
+- On `brood-end` (all goslings promoted to adults, no eggs left):
+  - Reverse the ball animation: scale `0.15` to `1` and translate back to a stage-center landing point (800 ms ease-out), then resume physics.
+  - Animate the shelf retracting out to the right (500 ms ease-in).
+  - Re-enable `setBallAvailable(true)`.
+- `gooseSocial.ts`: add `setBallAvailable(boolean)` guard and skip `runBallPlay` while false.
 
 ## Files touched
-- `src/components/FloatingWindow.tsx` (sizing)
-- `src/components/Cracktro.tsx` (info box sizing only)
-- `src/components/FlyingGoose.tsx` (new `flyToFloor`, incubation/provisioning gates)
-- `src/components/GooseFamily.tsx` (lay-after-land, brood window, mother care lines)
-- `src/lib/gooseSocial.ts` (new events, locks, father provisioning loop, incubation lines)
-- `src/lib/gooseLife/eggHatch.ts` (gate first hatch on first feed-delivery)
-- `src/test/flyingGooseEggs.test.tsx` + new tests
+- `src/components/GooseFamily.tsx` — `GROW_UP_MS`, placeholder-name backfill, stuck-gosling rescue, neck pivot `transformOrigin`, register family adults with social, floor-roam band.
+- `src/lib/gooseFamilyRoster.ts` — `isPlaceholderName` helper.
+- `src/lib/gooseSocial.ts` — public `registerGoose`/`unregisterGoose`/`setBallAvailable`, pick any two registered geese for ball-play, emit `brood-end`.
+- `src/components/BoingBall.tsx` — shelf overlay, park/return animations, physics gate.
+- `src/components/FlyingGoose.tsx` — `grounded` support for floor-roam, neck pivot reuse.
+- `src/test/gooseSocial.test.ts` — small test for `setBallAvailable` blocking ball-play.
 
-No design-token, no backend, no schema changes.
+No design-token, schema, or backend changes.
