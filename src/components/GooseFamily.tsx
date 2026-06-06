@@ -756,15 +756,19 @@ const GooseFamily = () => {
               filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.28))",
             }}
           >
-            <img src={frames[STAND_BODY]} alt="" width={goslingW} height={goslingH}
-              style={{ position: "absolute", inset: 0, width: goslingW, height: goslingH,
-                imageRendering: "pixelated",
-                transform: `translate(${bodyTX}px, ${bodyTY}px) rotate(${bodyTilt}deg)` }} />
-            <img src={frames[STAND_HEAD]} alt="" width={goslingW} height={goslingH}
-              style={{ position: "absolute", inset: 0, width: goslingW, height: goslingH,
-                imageRendering: "pixelated",
-                transformOrigin: `${NECK_PIVOT_X_PX * sceneScale * GOSLING_SCALE_FACTOR}px ${NECK_PIVOT_Y_PX * sceneScale * GOSLING_SCALE_FACTOR}px`,
-                transform: `translate(${bodyTX + headTX}px, ${bodyTY + headTY}px) rotate(${headTilt}deg)` }} />
+            <div style={{ position: "absolute", inset: 0, width: goslingW, height: goslingH,
+              transform: `translate(${bodyTX}px, ${bodyTY}px) rotate(${bodyTilt}deg)`,
+              transformOrigin: "center center" }}>
+              <img src={frames[STAND_BODY]} alt="" width={goslingW} height={goslingH}
+                style={{ position: "absolute", inset: 0, width: goslingW, height: goslingH,
+                  imageRendering: "pixelated" }} />
+              <img src={frames[STAND_HEAD]} alt="" width={goslingW} height={goslingH}
+                style={{ position: "absolute", inset: 0, width: goslingW, height: goslingH,
+                  imageRendering: "pixelated",
+                  transformOrigin: `${NECK_PIVOT_X_PX * sceneScale * GOSLING_SCALE_FACTOR}px ${NECK_PIVOT_Y_PX * sceneScale * GOSLING_SCALE_FACTOR}px`,
+                  transform: `translate(${headTX}px, ${headTY}px) rotate(${headTilt}deg)` }} />
+            </div>
+
             {bubble && (
               <div style={{
                 position: "absolute",
