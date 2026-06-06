@@ -101,7 +101,8 @@ type Gosling = {
   bubbleText: string;
 };
 
-type AdultActivity = "waddle" | "sit" | "socialise" | "play" | "fly";
+type AdultActivity = "waddle" | "sit" | "socialise" | "play";
+type AdultMode = "ground" | "flying" | "descending";
 
 type FamilyAdult = {
   id: string;
@@ -121,8 +122,13 @@ type FamilyAdult = {
   activity: AdultActivity;
   activityUntil: number;
   playHopPhase: number;
-  descending?: boolean;
+  mode: AdultMode;
+  takeoffAt: number;
+  avoidUntil?: number;
 };
+
+const PERSONAL_SPACE_PX = 28;
+const sitDuration = () => 9000 + Math.random() * 16000; // ms on the floor before next takeoff
 
 function rand(a: number, b: number) { return a + Math.random() * (b - a); }
 
