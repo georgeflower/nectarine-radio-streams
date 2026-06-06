@@ -80,7 +80,7 @@ const BoingBall = () => {
     let parkT = 0; // 0..1 progress
     const PARK_DURATION = 1.2; // seconds
     const RETURN_DURATION = 0.8;
-    const SHELF_SCALE = 0.15;
+    const SHELF_SCALE = 0.25;
     let parkStartX = 0, parkStartY = 0;
     const shelfAnchorX = () => stageWidth * 0.82;
     const shelfAnchorY = () => stageHeight * 0.20;
