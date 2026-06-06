@@ -771,14 +771,9 @@ const Cracktro = ({
       <StageProvider element={stageEl}>
         <Visualizer analyser={analyser} style={effectiveStyle} />
         <BeatOverlay analyser={analyser} enabled />
-        {gooseLifeSimOn ? (
-          <GooseLifeSimulation oneliners={oneliners} />
-        ) : (
-          <>
-            {gooseOn && <FlyingGoose oneliners={oneliners} />}
-            {brownGooseOn && <FlyingGoose oneliners={oneliners} variant="brown" />}
-          </>
-        )}
+        {gooseOn && <FlyingGoose oneliners={oneliners} />}
+        {brownGooseOn && <FlyingGoose oneliners={oneliners} variant="brown" />}
+        {(gooseOn || brownGooseOn) && <GooseFamily />}
         {boingOn && <BoingBall />}
 
         <button
