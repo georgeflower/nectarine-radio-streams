@@ -445,9 +445,9 @@ async function runBallPlay() {
       const chaser = activePair[chaserIdx];
       const receiver = activePair[1 - chaserIdx];
 
-      chaser.say(pick(CHASE_LINES), 900);
-      await wait(500);
-      chaser.say(pick(PLAY_LINES), 900);
+      chaser.say(pick(CHASE_LINES), 1900);
+      await wait(700);
+      chaser.say(pick(PLAY_LINES), 1900);
       const maxBumpDuration = BUMP_TIMEOUT_BASE_MS + Math.random() * BUMP_TIMEOUT_RANDOM_MS;
       const bumpStart = Date.now();
       const bumpMarker = lastBumpEvent?.at ?? 0;
@@ -464,14 +464,14 @@ async function runBallPlay() {
           bumpToward: latestReceiver.getPosition(),
         };
         if (bumpedSince(latestChaser.variant, bumpMarker)) {
-          latestReceiver.say(pick(RECEIVE_LINES), 900);
+          latestReceiver.say(pick(RECEIVE_LINES), 1900);
           chaserIdx = 1 - chaserIdx;
           break;
         }
         await wait(BUMP_CHECK_INTERVAL_MS);
       }
       clearBallPlayState();
-      await wait(550 + Math.random() * 220);
+      await wait(1200 + Math.random() * 400);
     }
   } finally {
     clearBallPlayState();
@@ -485,23 +485,23 @@ async function runBallPlay() {
   }
   // Wind down with extra chatter pulled from the 500-line pool.
   mood = "sleeping";
-  pairAfterPlay[0].say("Phew! :)", 1800);
-  await wait(1600);
-  if (getPair()) pairAfterPlay[1].say("Tired now... :sleepy:", 1800);
-  await wait(1800);
+  pairAfterPlay[0].say("Phew! :)", 2800);
+  await wait(3100);
+  if (getPair()) pairAfterPlay[1].say("Tired now... :sleepy:", 2800);
+  await wait(3200);
   const chatterRounds = 4 + Math.floor(Math.random() * 4);
   for (let i = 0; i < chatterRounds; i++) {
     const activePair = getPair();
     if (!activePair) break;
-    activePair[i % 2].say(pickUsageTracked("chatter-pool", CHATTER_POOL), 2200);
-    await wait(2400);
+    activePair[i % 2].say(pickUsageTracked("chatter-pool", CHATTER_POOL), 3200);
+    await wait(3900);
   }
   // Sleep for a little while — alternating Zzz
   const zzzRounds = 5 + Math.floor(Math.random() * 4);
   for (let i = 0; i < zzzRounds; i++) {
     if (!getPair()) break;
-    pair[i % 2].say(pick(SLEEPY_LINES), 2200);
-    await wait(2300);
+    pair[i % 2].say(pick(SLEEPY_LINES), 3200);
+    await wait(3600);
   }
   mood = "idle";
 }
