@@ -109,7 +109,7 @@ const GooseFamily = () => {
       saveEggs(eggsRef.current);
       setTick((t) => t + 1);
     });
-    return unsub;
+    return () => { unsub(); };
   }, []);
 
   // Animation loop: hatch eggs, waddle goslings, repaint.
