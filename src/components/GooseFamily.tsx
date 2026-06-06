@@ -281,11 +281,24 @@ const GooseFamily = () => {
       const slotsLeft = Math.max(0, MAX_GOSLINGS - goslingsRef.current.length);
       const { stillEggs, hatched } = hatchDueEggs(eggsRef.current, wallNow, slotsLeft);
       if (hatched.length > 0) {
+        const rosterNow = getRoster();
+        const taken = new Set(rosterNow.map((e) => e.name));
+        const newGoslingRoster: RosterEntry[] = [];
         for (const egg of hatched) {
           const variant: "gosling-white" | "gosling-brown" =
             Math.random() < 0.5 ? "gosling-white" : "gosling-brown";
+          const name = pickUniqueName(taken); taken.add(name);
+          const sex = pickRandomSex();
+          const rosterId = `gosling-${wallNow}-${Math.random().toString(36).slice(2, 6)}`;
+          const color: GooseColor = variant === "gosling-white" ? "white" : "brown";
+          newGoslingRoster.push({
+            id: rosterId, name, sex, color, bornAt: wallNow, kind: "gosling",
+          });
           goslingsRef.current.push({
             id: `g-${wallNow}-${Math.random().toString(36).slice(2, 6)}`,
+            rosterId,
+            name,
+            sex,
             variant,
             x: egg.x,
             y: goslingFloorY,
@@ -295,8 +308,11 @@ const GooseFamily = () => {
             targetY: goslingFloorY,
             bornAt: wallNow,
             bubbleUntil: wallNow + 2200,
-            bubbleText: "Peep! 🐣",
+            bubbleText: `Peep! I'm ${name} 🐣`,
           });
+        }
+        if (newGoslingRoster.length > 0) {
+          setRoster([...rosterNow, ...newGoslingRoster]);
         }
         eggsRef.current = stillEggs;
         saveEggs(stillEggs);
