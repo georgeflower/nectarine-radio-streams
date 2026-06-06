@@ -493,6 +493,7 @@ async function runFlyAway() {
     if (getPair()) {
       for (const g of geese.values()) g.setSitting(true);
       await wait(1200); // let them fly to a perch and settle
+      emitFamilyEvent({ type: "snack-start", positions: getGoosePositions() });
       const eatStart = Date.now();
       const MIN_EAT_MS = 35_000;
       let i = 0;
@@ -513,6 +514,7 @@ async function runFlyAway() {
         const pairAfterSnack = getPair();
         if (pairAfterSnack) pairAfterSnack[0].say(pick(FOOD_RESUME_LINES), 2200);
       }
+      emitFamilyEvent({ type: "snack-end" });
     }
 
 
