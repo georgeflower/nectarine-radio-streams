@@ -1,34 +1,38 @@
-## 1. Reproduction scheduler tuning (`src/lib/gooseSocial.ts`)
+## Root cause
 
-Goal: second clutch should only fire after adults are truly back in idle "post-hatch" life, not immediately as the brood ends.
+Two separate bugs cause the head/neck to detach from the body during waddling:
 
-- Raise `REPRODUCTION_COOLDOWN_MS` from `12 * 60_000` → `18 * 60_000`.
-- Increase the `goslings-grown` deferred window from `(10–15) min` → `(15–22) min` (sets `reproductionEarliestAt`).
-- After `runReproductionPhase()` completes (line ~627), also push `reproductionEarliestAt = Date.now() + REPRODUCTION_COOLDOWN_MS` so the standalone trigger and the snack-coupled trigger share one clock.
-- Add a hard "post-hatch settle" gate in the standalone reproduction branch in `step()` (line ~725): require all of
-  - `reproductionEarliestAt > 0 && now >= reproductionEarliestAt`
-  - `now - lastReproductionAt >= REPRODUCTION_COOLDOWN_MS`
-  - `!familyHasLiveOffspring()`
-  - `now - lastBroodEndAt >= POST_HATCH_SETTLE_MS` (new, 4 min)
-  - `mood === "idle"` (already gated) AND no active snack break / fly-away
-- Track `lastBroodEndAt` by listening for the existing `brood-end` event near line 138/160.
-- Remove the snack-coupled reproduction call at line 692 (or guard it behind the same settle gate) so a clutch can no longer start mid-snack right after the previous brood ends.
+**1. GooseFamily adults & goslings** — The body image rotates around `center center` (the `bodyTilt` swing), but the head image only inherits the body's *translation* (`bodyTX + headTX`, `bodyTY + headTY`), not its rotation. So when the body tilts, the neck-pivot point on the body sweeps along an arc while the head stays in a horizontally-translated frame, opening a gap and tilting the neck the wrong way.
 
-## 2. FlyingGoose ground waddle (`src/components/FlyingGoose.tsx`)
+**2. FlyingGoose ground-waddle branch** — The head is mirrored independently via `scaleX(${lookScale})` while the body keeps its original orientation. Because the head sprite's `transformOrigin` is at the neck pivot (not the wrap center), `scaleX(-1)` shifts the head sideways relative to the body, producing the floating-head look in the video.
 
-Goal: white & brown originals occasionally land on the floor and waddle inside the bottom 20% band instead of always perching on letters/windows.
+## Fix
 
-- Add a new behavior state alongside the existing perch cadence:
-  - `nextGroundWaddleAt = rand(35_000, 80_000)` (initial), refreshed each cycle.
-  - `groundWaddleUntil = 0`, `groundWaddleTargetX`.
-- When `mode === "fly"` and idle conditions hold (`!away && !eatingMode && !fetchingFood && !ballPlayActive && !incubating && !restingFromTiredness`) and `elapsed >= nextGroundWaddleAt`, ~50% of the time choose ground-waddle instead of `pickPerch()`:
-  - Set `targetY = rand(h * 0.80, h - spriteH() * 0.6 - 12)` (inside the existing floor band used by the family adults).
-  - Pick `groundWaddleTargetX = rand(w * 0.1, w * 0.9)`; fly down to that point, then transition `mode = "ground"` with a new flag `waddlingOnGround = true` (mirrors the family adults' floor waddle).
-  - While `waddlingOnGround`, sample a fresh `groundWaddleTargetX` every 2.5–5 s and walk toward it (slow horizontal lerp, body rock & head bob already in the `ground` branch). Duration `rand(12_000, 25_000)`.
-  - When the timer expires, call `takeoff()` and set `nextGroundWaddleAt = elapsed + rand(45_000, 110_000)` and `nextPerchAt = elapsed + rand(6_000, 14_000)` so the goose alternates between waddling, perching, and free flight.
-- Also lower the perch bias: when `elapsed >= nextPerchAt`, only attempt `pickPerch()` ~60% of the time; otherwise defer by `rand(5_000, 12_000)` so they don't immediately re-perch after every flight.
-- All new behavior is suppressed by the existing override flags (`away`, `chaseTarget`, `fetchingFood`, `ballPlayActive`, `incubating`, `restingFromTiredness`) — same gating used for perching.
+### `src/components/GooseFamily.tsx` (adult render ~line 806–830 and gosling render ~line 750–770)
+
+Nest the head inside a body-tilt wrapper so the head shares the body's rotation frame:
+
+```text
+<div wrap: translate3d(x,y) scaleX(dir)>
+  <div bodyFrame: translate(bodyTX,bodyTY) rotate(bodyTilt), origin center center>
+    <img body />
+    <img head: translate(headTX, headTY) rotate(headTilt),
+              origin = neck pivot (in body-frame coords) />
+  </div>
+</div>
+```
+
+This keeps the neck pivot welded to the body as the body sways, and the head's own bob/tilt stays a small offset on top of that. Apply to both the adult and gosling render blocks.
+
+### `src/components/FlyingGoose.tsx` ground/waddle render (~line 794–797)
+
+- Remove the `scaleX(${lookScale})` on `imgHead` while ground-waddling.
+- Apply `lookScale` (clamped, smoothly tweened — already maintained) to the **wrap** transform instead, so the whole goose mirrors as a unit: `wrap.style.transform = translate3d(tx, ty+rock) scaleX(lookScale)`.
+- Keep the head transform limited to the chew bob (`translate(0, chew) rotate(chew * CHEW_ROTATION_FACTOR)`), matching the existing perched ground rendering.
+- Reset `wrap.style.transform` (drop the `scaleX`) on `takeoff()` and in the other non-ground branches that already set `wrap.style.transform` without it, so flying frames don't keep an old mirror applied.
 
 ## Out of scope
 
-No design-token changes, no schema changes, no edits to `GooseFamily.tsx`, `BoingBall.tsx`, or `gooseBeat.ts`.
+- No constant retuning (sway/bob amplitudes stay the same).
+- No design-token, schema, or scheduler changes.
+- `BoingBall.tsx`, `gooseSocial.ts`, `gooseBeat.ts` untouched.
