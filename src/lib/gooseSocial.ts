@@ -745,8 +745,10 @@ async function step() {
       reproductionEarliestAt > 0 &&
       now >= reproductionEarliestAt &&
       now - lastReproductionAt >= REPRODUCTION_COOLDOWN_MS &&
+      now - lastBroodEndAt >= POST_HATCH_SETTLE_MS &&
       !familyHasLiveOffspring()
     ) {
+
       lastReproductionAt = now;
       await runReproductionPhase();
     } else if (now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS && Math.random() < FLY_AWAY_CHANCE) {
