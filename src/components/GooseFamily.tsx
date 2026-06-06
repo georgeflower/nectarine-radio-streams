@@ -39,6 +39,7 @@ import {
   COLOR_FILTER,
   formatAge,
   getRoster,
+  isPlaceholderName,
   pickRandomAdultColor,
   pickRandomSex,
   pickUniqueName,
