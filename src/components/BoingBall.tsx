@@ -358,8 +358,13 @@ const BoingBall = () => {
         spin += 2.4 * dt;
         if (parkT >= 1) parkMode = "parked";
       } else if (parkMode === "parked") {
+        const quarter = getQuarterPeriodMs();
+        // Half-sine "hop" on each quarter-note (4/4 time). Small amplitude so
+        // it reads as gentle bouncing on the shelf.
+        const phase = (now % quarter) / quarter;
+        const hop = Math.sin(phase * Math.PI);
         x = shelfAnchorX();
-        y = shelfAnchorY();
+        y = shelfAnchorY() - hop * 9 * sceneScale;
         renderScale = SHELF_SCALE;
         spin += 0.6 * dt;
       } else if (parkMode === "returning") {
