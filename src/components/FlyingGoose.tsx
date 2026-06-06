@@ -790,12 +790,14 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         const rock = waddlingOnGround
           ? Math.sin(elapsed / 220) * 1.6 * sceneScale
           : 0;
-        wrap.style.transform = `translate3d(${tx}px, ${ty + rock}px, 0)`;
         if (waddlingOnGround) {
-          imgHead.style.transform = `translate(0px, ${chew * 0.4}px) scaleX(${lookScale}) rotate(${chew * CHEW_ROTATION_FACTOR * 0.3}deg)`;
+          // Mirror the whole sprite via the wrap so head & body stay welded.
+          wrap.style.transform = `translate3d(${tx}px, ${ty + rock}px, 0) scaleX(${lookScale})`;
         } else {
-          imgHead.style.transform = `translate(0px, ${chew}px) rotate(${chew * CHEW_ROTATION_FACTOR}deg)`;
+          wrap.style.transform = `translate3d(${tx}px, ${ty + rock}px, 0)`;
         }
+        imgHead.style.transform = `translate(0px, ${chew}px) rotate(${chew * CHEW_ROTATION_FACTOR}deg)`;
+
         positionBubble(x, y);
         positionFoodBag();
         raf = requestAnimationFrame(tick);
