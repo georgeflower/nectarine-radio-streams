@@ -725,7 +725,13 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       }
 
       if (mode === "ground") {
-        if (eatingMode) {
+        if (incubating) {
+          // Static sit at the floor, with peck/breath animation.
+          x = incubatingX;
+          y = incubatingFloorY();
+          heading = 0;
+          targetHeading = 0;
+        } else if (eatingMode) {
           const layout = getEatingLayout();
           x += (layout.x - x) * Math.min(1, dt * 6);
           y += (layout.y - y) * Math.min(1, dt * 6);
@@ -746,6 +752,25 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         raf = requestAnimationFrame(tick);
         return;
       }
+
+      // ===== INCUBATION: fly to floor x and land in ground mode =====
+      if (incubating) {
+        const targetX = incubatingX;
+        const targetY = incubatingFloorY();
+        targetHeading = Math.atan2(targetY - y, targetX - x);
+        targetSpeed = scale(150);
+        if (Math.hypot(targetX - x, targetY - y) < scale(10)) {
+          x = targetX;
+          y = targetY;
+          mode = "ground";
+          imgBody.style.opacity = "1";
+          imgHead.style.opacity = "1";
+          img.style.opacity = "0";
+          raf = requestAnimationFrame(tick);
+          return;
+        }
+      }
+
 
 
       // ===== FLY / APPROACH =====
