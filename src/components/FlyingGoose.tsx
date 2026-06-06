@@ -803,9 +803,9 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       // ===== GROUND-WADDLE APPROACH: fly down to floor band, then walk =====
       if (
         waddlingOnGround &&
-        mode !== "ground" &&
         !incubating && !away && !eatingMode && !fetchingFood && !ballPlayActive && !restingFromTiredness
       ) {
+
         const targetX = groundWaddleTargetX;
         const targetY = groundWaddleY;
         targetHeading = Math.atan2(targetY - y, targetX - x);
