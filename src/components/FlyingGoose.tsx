@@ -205,7 +205,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     bubble.style.transform = "scale(1)";
     reactionUntilRef.current = performance.now() + 2600;
     // Let the partner goose chime in with a cute response.
-    reactToOnelinerSmiley(variant);
+    reactToOnelinerSmiley(variant === "brown" || variant === "gosling-brown" ? "brown" : "white");
   }, [oneliners, variant]);
 
   useEffect(() => {
