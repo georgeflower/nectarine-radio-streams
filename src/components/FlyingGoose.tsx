@@ -869,19 +869,43 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           targetSpeed = scale(115);
         }
       }
-      if (!incubating && mode === "fly" && !away && !eatingMode && !fetchingFood && !ballPlayActive && elapsed >= nextPerchAt) {
-        const p = pickPerch();
-        if (p) {
-          perchEl = p.el;
-          perchChar = p.char;
-          perchKind = p.kind;
-          perchOffset = p.offset;
-          mode = "approach";
-          targetSpeed = scale(110); // normal cruise — do NOT sprint to the perch
+      // Ground-waddle trigger: occasionally choose to land on the floor and
+      // waddle around instead of perching. Same gating as the perch logic.
+      if (
+        !incubating && mode === "fly" && !away && !eatingMode && !fetchingFood &&
+        !ballPlayActive && !restingFromTiredness && !waddlingOnGround &&
+        elapsed >= nextGroundWaddleAt && Math.random() < 0.5
+      ) {
+        waddlingOnGround = true;
+        groundWaddleTargetX = rand(w * 0.1, w * 0.9);
+        groundWaddleY = floorBandY();
+        groundWaddleUntil = elapsed + rand(12_000, 25_000);
+        nextGroundWaddleStepAt = elapsed + rand(2500, 5000);
+        // Defer next perch attempt while we're heading to the floor.
+        nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
+      } else if (
+        !incubating && mode === "fly" && !away && !eatingMode && !fetchingFood &&
+        !ballPlayActive && elapsed >= nextPerchAt
+      ) {
+        // Lowered perch bias: only ~60% of attempts actually grab a perch,
+        // so the goose spends more time freely flying.
+        if (Math.random() < 0.6) {
+          const p = pickPerch();
+          if (p) {
+            perchEl = p.el;
+            perchChar = p.char;
+            perchKind = p.kind;
+            perchOffset = p.offset;
+            mode = "approach";
+            targetSpeed = scale(110); // normal cruise — do NOT sprint to the perch
+          } else {
+            nextPerchAt = elapsed + rand(4000, 9000);
+          }
         } else {
-          nextPerchAt = elapsed + rand(4000, 9000);
+          nextPerchAt = elapsed + rand(5000, 12000);
         }
       }
+
       if (mode === "approach") {
         if (!perchAlive() || (away && !restingFromTiredness && !eatingMode) || fetchingFood) {
           const replacement =
