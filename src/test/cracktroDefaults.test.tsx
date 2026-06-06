@@ -71,13 +71,38 @@ describe("Cracktro defaults and fullscreen behavior", () => {
     expect(screen.getByTestId("floating-queue")).toBeInTheDocument();
   });
 
-  it("falls back to two classic geese when life simulation is turned off", async () => {
+  it("falls back to two classic geese when life simulation is turned off after migration", async () => {
+    // Simulate a user who already migrated and then manually turned sim off.
+    localStorage.setItem("cracktro-goose-life-sim-migrated-v2", "1");
     localStorage.setItem("cracktro-goose-life-sim", "0");
     render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
 
     await screen.findByText(/Skaven/i);
     expect(screen.queryByTestId("goose-life-sim")).not.toBeInTheDocument();
     expect(screen.getAllByTestId("flying-goose")).toHaveLength(2);
+  });
+
+  it("overrides stale sim-off setting for a returning user who has not yet migrated", async () => {
+    // Returning user had "0" saved before PR #32 changed the default.
+    // No migration marker present — migration should force sim mode ON.
+    localStorage.setItem("cracktro-goose-life-sim", "0");
+    render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
+
+    await screen.findByText(/Skaven/i);
+    expect(screen.getByTestId("goose-life-sim")).toBeInTheDocument();
+    expect(screen.queryAllByTestId("flying-goose")).toHaveLength(0);
+    // Migration marker must be written so the override only happens once.
+    await waitFor(() => expect(localStorage.getItem("cracktro-goose-life-sim-migrated-v2")).toBe("1"));
+  });
+
+  it("respects sim-on setting after migration marker is already present", async () => {
+    localStorage.setItem("cracktro-goose-life-sim-migrated-v2", "1");
+    localStorage.setItem("cracktro-goose-life-sim", "1");
+    render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
+
+    await screen.findByText(/Skaven/i);
+    expect(screen.getByTestId("goose-life-sim")).toBeInTheDocument();
+    expect(screen.queryAllByTestId("flying-goose")).toHaveLength(0);
   });
 
   it("exits fullscreen back to in-browser view without opening a floating window", async () => {
