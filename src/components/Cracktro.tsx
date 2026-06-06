@@ -233,6 +233,36 @@ const Cracktro = ({
   const rating = typeof info?.rating === "number" ? info.rating : undefined;
   const votes = info?.votes;
 
+  // Window/info-box size selector (S/M/L), persisted via cracktroUi.
+  const [windowSize, setWindowSizeState] = useState<WindowSize>(getWindowSize());
+  const applyWindowSize = useCallback((s: WindowSize) => {
+    setWindowSize(s);
+    setWindowSizeState(s);
+  }, []);
+
+  // Mourning ritual: scrollers + info box fade & desaturate.
+  const [mourning, setMourning] = useState(getMourningActive());
+  useEffect(() => subscribeMourning(() => setMourning(getMourningActive())), []);
+
+  // Live elapsed/total from the audio player.
+  const [, setTimeTick] = useState(0);
+  useEffect(() => subscribePlayerTime(() => setTimeTick((t) => (t + 1) % 1_000_000)), []);
+  const { currentTime, duration } = getPlayerTime();
+
+  // Song-rating chatter — fire once per (track, ratingTier) combo.
+  const lastChatterKeyRef = useRef<string>("");
+  useEffect(() => {
+    if (rating === undefined || (!title && !artist)) return;
+    const key = `${title}|${artist}|${Math.floor(rating)}`;
+    if (key === lastChatterKeyRef.current) return;
+    lastChatterKeyRef.current = key;
+    const line = pickRatingLine(rating, artist);
+    if (!line) return;
+    const t = window.setTimeout(() => sayFromAnyGoose(line, 3000), 1800);
+    return () => window.clearTimeout(t);
+  }, [title, artist, rating]);
+
+
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const enterFullscreen = useCallback(() => {
