@@ -121,6 +121,23 @@ export function reportBallBump(by: GooseRole) {
   lastBumpEvent = { by, at: Date.now() };
 }
 
+// Family event bus — used by GooseFamily to know when the adults are
+// sitting together on a snack break so it can lay/hatch eggs.
+export type FamilyEvent =
+  | { type: "snack-start"; positions: Record<GooseRole, { x: number; y: number }> | null }
+  | { type: "snack-end" };
+type FamilyListener = (event: FamilyEvent) => void;
+const familyListeners = new Set<FamilyListener>();
+export function subscribeFamilyEvents(listener: FamilyListener) {
+  familyListeners.add(listener);
+  return () => familyListeners.delete(listener);
+}
+function emitFamilyEvent(event: FamilyEvent) {
+  for (const l of familyListeners) {
+    try { l(event); } catch { /* ignore listener errors */ }
+  }
+}
+
 type Mood = "idle" | "playing" | "sleeping" | "away";
 let mood: Mood = "idle";
 
