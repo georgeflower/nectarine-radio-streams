@@ -154,6 +154,14 @@ let mood: Mood = "idle";
 let lastDialogueAt = 0;
 let lastBallPlayAt = 0;
 let lastFlyAwayAt = 0;
+// Earliest wall-clock at which the mother is allowed to lay eggs again. Bumped
+// 10–15 minutes into the future every time a batch of goslings grows up.
+let reproductionEarliestAt = 0;
+familyListeners.add((ev) => {
+  if (ev.type === "goslings-grown") {
+    reproductionEarliestAt = Date.now() + (10 + Math.random() * 5) * 60_000;
+  }
+});
 let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
 let recentOneliner: { username: string; text: string; at: number } | null = null;
