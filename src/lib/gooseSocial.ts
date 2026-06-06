@@ -483,7 +483,116 @@ async function runBallPlay() {
 }
 
 
+const INCUBATION_LINES = [
+  "Almost there, little ones...",
+  "Warming the brood :)",
+  "Stay cozy, eggs!",
+  "I can feel them wiggling!",
+  "Any minute now...",
+  "So excited to meet you peeps!",
+  "Hush now, mama's here.",
+  "Shhh, sleeping eggs.",
+];
+const MOTHER_CARE_LINES = [
+  "Stay close, peeps!",
+  "Aren't you adorable :D",
+  "Eat up, little ones",
+  "Follow mama!",
+  "Mind the ball, babies!",
+  "Look at you grow!",
+  "Such fluffballs <3",
+  "Don't wander too far!",
+];
+const FATHER_FEED_LINES = [
+  "Snack delivery for mama!",
+  "Got the goods! 🍞",
+  "Breakfast in bed, dear",
+  "Fresh baguette inbound!",
+  "Goslings get extra crumbs!",
+  "Family-pack delivered :)",
+];
+
+async function runReproductionPhase() {
+  const pair = getPair();
+  if (!pair) return;
+  const mother = pair.find((g) => g.variant === "white") ?? pair[0];
+  const father = pair.find((g) => g.variant === "brown") ?? pair[1];
+  if (!mother || !father) return;
+
+  // Mother gets up off any perch and flies to floor to incubate.
+  mother.setSitting(false);
+  father.setSitting(false);
+  await wait(400);
+  const motherPos = mother.getPosition();
+  mother.setIncubating(true, motherPos.x);
+  // Give her a moment to descend before laying eggs.
+  await wait(2400);
+  const landed = mother.getPosition();
+  emitFamilyEvent({ type: "incubation-start", x: landed.x, y: landed.y });
+  mother.say(pick(INCUBATION_LINES), 2600);
+
+  // Father provisioning state machine.
+  type FatherState = "idle" | "away" | "delivering";
+  let fatherState: FatherState = "idle";
+  let fatherUntil = Date.now();
+  const stepFather = () => {
+    if (Date.now() < fatherUntil) return;
+    if (!getPair()) return;
+    if (fatherState === "idle") {
+      father.setFetchingFood(true);
+      father.setAway(true);
+      father.say(pick(FOOD_FETCH_LINES), 2200);
+      fatherState = "away";
+      fatherUntil = Date.now() + 7000;
+    } else if (fatherState === "away") {
+      father.setAway(false);
+      father.setFetchingFood(false);
+      father.setFoodBag(true);
+      father.say(pick(FATHER_FEED_LINES), 2200);
+      const target = mother.getPosition();
+      emitFamilyEvent({ type: "feed-delivery", targetX: target.x });
+      fatherState = "delivering";
+      fatherUntil = Date.now() + 6000;
+    } else {
+      father.setFoodBag(false);
+      fatherState = "idle";
+      fatherUntil = Date.now() + 2500;
+    }
+  };
+
+  // Incubation phase: ~60s. Eggs hatch in 18–32s; father gets multiple cycles.
+  const INCUBATION_MS = 60_000;
+  const incEnd = Date.now() + INCUBATION_MS;
+  let chatterIdx = 0;
+  while (Date.now() < incEnd && getPair()) {
+    stepFather();
+    if (chatterIdx % 2 === 0) mother.say(pick(INCUBATION_LINES), 2400);
+    chatterIdx++;
+    await wait(3000);
+  }
+  emitFamilyEvent({ type: "incubation-end" });
+
+  // Brood phase: ~90s. Mother stays grounded chatting care lines; father
+  // keeps fetching food (now feeding goslings too).
+  const BROOD_MS = 90_000;
+  const broodEnd = Date.now() + BROOD_MS;
+  while (Date.now() < broodEnd && getPair()) {
+    stepFather();
+    if (chatterIdx % 2 === 0) mother.say(pick(MOTHER_CARE_LINES), 2400);
+    chatterIdx++;
+    await wait(3000);
+  }
+
+  // Release mother.
+  mother.setIncubating(false);
+  father.setFoodBag(false);
+  father.setFetchingFood(false);
+  father.setAway(false);
+  emitFamilyEvent({ type: "brood-end" });
+}
+
 async function runFlyAway() {
+
   const pair = getPair();
   if (!pair) return;
   mood = "away";
