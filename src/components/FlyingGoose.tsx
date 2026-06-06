@@ -321,6 +321,12 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let tiredRestReleaseAt = 0;
     let panicFlightUntil = 0;
     let lastAppliedPanicUntil = 0;
+    // Incubation: mother flies to (incubatingX, floorY) and stays there in
+    // a static peck/sit pose until released.
+    let incubating = false;
+    let incubatingX = 0;
+    const incubatingFloorY = () => h - spriteH() * 0.6 - 12;
+
 
 
     const wrap = wrapRef.current;
@@ -447,7 +453,30 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           eatingGooseIds.delete(gooseId);
           eatingMode = false;
           restingFromTiredness = false;
+          incubating = false;
           if (mode === "ground" || mode === "land" || mode === "approach") takeoff();
+        }
+      },
+      setIncubating: (active: boolean, atX?: number) => {
+        if (active) {
+          incubating = true;
+          incubatingX = typeof atX === "number" ? atX : x;
+          // Cancel any perch/eating/chase state — fly down to floor.
+          sittingForMeal = false;
+          eatingGooseIds.delete(gooseId);
+          eatingMode = false;
+          chaseTarget = null;
+          restingFromTiredness = false;
+          fetchingFood = false;
+          perchEl = null;
+          mode = "fly";
+          img.style.opacity = "1";
+          imgBody.style.opacity = "0";
+          imgHead.style.opacity = "0";
+          nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
+        } else {
+          incubating = false;
+          if (mode === "ground") takeoff();
         }
       },
     };
