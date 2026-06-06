@@ -445,12 +445,18 @@ const GooseFamily = () => {
         const rosterBefore = getRoster();
         const promotedIds = new Set(grownOut.map((g) => g.rosterId));
         const kept = rosterBefore.filter((e) => !promotedIds.has(e.id));
+        const promotionTaken = new Set(kept.map((e) => e.name));
         const promoted: RosterEntry[] = grownOut.map((g) => {
           const existing = rosterBefore.find((e) => e.id === g.rosterId);
           const color = pickRandomAdultColor();
+          let name = existing?.name ?? g.name;
+          if (isPlaceholderName(name)) {
+            name = pickUniqueName(promotionTaken);
+          }
+          promotionTaken.add(name);
           return {
             id: g.rosterId,
-            name: existing?.name ?? g.name,
+            name,
             sex: existing?.sex ?? g.sex,
             color,
             bornAt: existing?.bornAt ?? g.bornAt,
