@@ -264,14 +264,26 @@ const GooseFamily = () => {
           ? goslingFramesWhite.current!
           : goslingFramesBrown.current!;
         const phase = g.phase;
-        const stepCycle = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2);
-        const stepLanding = Math.abs(stepCycle);
-        const bodyTX = stepCycle * WADDLE_CHAR_BODY_SWAY * sceneScale * GOSLING_SCALE_FACTOR;
-        const bodyTY = stepLanding * WADDLE_CHAR_BODY_BOB * sceneScale * GOSLING_SCALE_FACTOR;
-        const bodyTilt = stepCycle * WADDLE_CHAR_BODY_TILT;
-        const headTX = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 0.9) * WADDLE_CHAR_HEAD_SWAY * sceneScale * GOSLING_SCALE_FACTOR;
-        const headTY = stepLanding * WADDLE_CHAR_HEAD_DIP * sceneScale * GOSLING_SCALE_FACTOR;
-        const headTilt = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 1.1) * WADDLE_CHAR_HEAD_TILT;
+        const sitting = adultsSittingRef.current;
+        let bodyTX = 0, bodyTY = 0, bodyTilt = 0;
+        let headTX = 0, headTY = 0, headTilt = 0;
+        if (sitting) {
+          // Sit + peck: body still, head dips down and forward in rhythm —
+          // mirrors the adult sit/peck animation from the sim.
+          const peck = Math.sin(phase * (1000 / PECK_CYCLE_MS) * Math.PI * 2);
+          const peckDown = Math.max(0, peck);
+          headTY = peckDown * PECK_HEAD_DROP * sceneScale * GOSLING_SCALE_FACTOR;
+          headTilt = peckDown * PECK_HEAD_ROTATE;
+        } else {
+          const stepCycle = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2);
+          const stepLanding = Math.abs(stepCycle);
+          bodyTX = stepCycle * WADDLE_CHAR_BODY_SWAY * sceneScale * GOSLING_SCALE_FACTOR;
+          bodyTY = stepLanding * WADDLE_CHAR_BODY_BOB * sceneScale * GOSLING_SCALE_FACTOR;
+          bodyTilt = stepCycle * WADDLE_CHAR_BODY_TILT;
+          headTX = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 0.9) * WADDLE_CHAR_HEAD_SWAY * sceneScale * GOSLING_SCALE_FACTOR;
+          headTY = stepLanding * WADDLE_CHAR_HEAD_DIP * sceneScale * GOSLING_SCALE_FACTOR;
+          headTilt = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 1.1) * WADDLE_CHAR_HEAD_TILT;
+        }
         const tx = g.x - goslingW / 2;
         const ty = g.y - goslingH / 2;
         const bubble = g.bubbleUntil > now;
