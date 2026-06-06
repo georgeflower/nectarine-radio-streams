@@ -327,6 +327,21 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let incubatingX = 0;
     const incubatingFloorY = () => h - spriteH() * 0.6 - 12;
 
+    // Ground-waddle: occasionally land on the floor band (bottom 20%) and
+    // walk around like the family adults, instead of always perching.
+    let waddlingOnGround = false;
+    let groundWaddleUntil = 0;
+    let groundWaddleTargetX = 0;
+    let groundWaddleY = 0;
+    let nextGroundWaddleStepAt = 0;
+    let nextGroundWaddleAt = rand(35_000, 80_000);
+    const floorBandY = () => {
+      const minY = h * 0.80;
+      const maxY = h - spriteH() * 0.6 - 12;
+      return rand(Math.min(minY, maxY), Math.max(minY, maxY));
+    };
+
+
 
 
     const wrap = wrapRef.current;
