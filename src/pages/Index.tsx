@@ -23,6 +23,7 @@ import {
 import AudioPlayer from "@/components/AudioPlayer";
 import Visualizer, { useAudioLevel, useBpm, type VisualizerStyle } from "@/components/Visualizer";
 import BeatOverlay from "@/components/BeatOverlay";
+import { setBpm } from "@/lib/gooseBeat";
 import Cracktro from "@/components/Cracktro";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
