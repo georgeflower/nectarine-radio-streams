@@ -289,7 +289,11 @@ const GooseFamily = () => {
         eggsRef.current = stillEggs;
         saveEggs(stillEggs);
         saveGoslings(goslingsRef.current);
+        if (stillEggs.length === 0) {
+          emitFamilyEvent({ type: "all-eggs-hatched" });
+        }
       }
+
 
       // === Goslings: grow up after GROW_UP_MS, otherwise waddle ===
       const positions = getGoosePositions();
