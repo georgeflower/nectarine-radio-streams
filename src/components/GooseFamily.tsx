@@ -18,11 +18,12 @@ import {
 } from "@/lib/gooseSprite";
 import { getSceneScale } from "@/lib/gooseScene";
 
-const STORAGE_EGGS = "cracktro-goose-eggs-v1";
-const HATCH_MIN_MS = 45_000;
-const HATCH_MAX_MS = 90_000;
-const EGG_LAY_CHANCE = 0.55;
-const MAX_GOSLINGS = 6;
+const STORAGE_EGGS = "cracktro-goose-eggs-v2";
+const HATCH_MIN_MS = 18_000;
+const HATCH_MAX_MS = 32_000;
+const EGG_LAY_CHANCE = 1; // every snack break produces eggs
+const MAX_LIVE_EGGS = 4;
+const MAX_GOSLINGS = 8;
 const GOSLING_SCALE_FACTOR = 0.58;
 
 // Ground waddle constants (ported from GooseLifeSimulation).
