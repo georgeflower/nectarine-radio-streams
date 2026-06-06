@@ -1233,6 +1233,46 @@ const Cracktro = ({
             </div>
           </div>
 
+          {/* Row: window size + reset family */}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mr-1">Size</span>
+            <div className="flex items-center gap-1">
+              {(["s", "m", "l"] as WindowSize[]).map((sz) => (
+                <button
+                  key={sz}
+                  type="button"
+                  onClick={() => applyWindowSize(sz)}
+                  className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                    windowSize === sz
+                      ? "border-primary bg-primary/20 text-foreground"
+                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-pressed={windowSize === sz}
+                  title="Resize floating windows and info box"
+                >
+                  {sz.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-3 mr-1">Family</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(
+                  "Reset the goose family?\n\nThis will permanently delete all your geese, eggs, goslings and grown-up offspring. The two original geese will return. Continue?",
+                )) {
+                  clearRoster();
+                  window.location.reload();
+                }
+              }}
+              className="min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-destructive/60 bg-background/60 text-destructive hover:bg-destructive/20"
+              title="Permanently remove all family members"
+            >
+              Reset
+            </button>
+          </div>
+
+
           {/* Row 2: visualizer effect picker */}
           {onStyleChange && (
             <div className="flex flex-wrap items-center justify-center gap-2">
