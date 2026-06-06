@@ -34,7 +34,6 @@ import {
   type Egg,
 } from "@/lib/gooseLife/eggHatch";
 import {
-  ADULT_COLORS,
   COLOR_FILTER,
   formatAge,
   getRoster,
@@ -43,6 +42,7 @@ import {
   pickUniqueName,
   setRoster,
   type GooseColor,
+  type GooseSex,
   type RosterEntry,
 } from "@/lib/gooseFamilyRoster";
 import { setMourningActive } from "@/lib/cracktroUi";
@@ -83,6 +83,9 @@ const MOURNING_LINES = [
 
 type Gosling = {
   id: string;
+  rosterId: string;
+  name: string;
+  sex: GooseSex;
   variant: "gosling-white" | "gosling-brown";
   x: number;
   y: number;
@@ -94,6 +97,8 @@ type Gosling = {
   bubbleUntil: number;
   bubbleText: string;
 };
+
+type AdultActivity = "waddle" | "sit" | "socialise" | "play";
 
 type FamilyAdult = {
   id: string;
@@ -109,6 +114,9 @@ type FamilyAdult = {
   bubbleText: string;
   diesAt?: number; // wall-clock — if set, this adult is destined to pass
   isDying?: boolean; // mourning ritual currently running for this adult
+  activity: AdultActivity;
+  activityUntil: number;
+  playHopPhase: number;
 };
 
 function rand(a: number, b: number) { return a + Math.random() * (b - a); }
@@ -131,16 +139,35 @@ function loadGoslings(): Gosling[] {
   try {
     const raw = localStorage.getItem(STORAGE_GOSLINGS);
     if (!raw) return [];
-    const data = JSON.parse(raw) as Gosling[];
+    const data = JSON.parse(raw) as Partial<Gosling>[];
     if (!Array.isArray(data)) return [];
-    return data;
+    // Backfill rosterId/name/sex for older saves so promote-to-adult still works.
+    return data.map((g): Gosling => {
+      const rosterId = g.rosterId ?? `gosling-legacy-${Math.random().toString(36).slice(2, 8)}`;
+      return {
+        id: g.id ?? `g-legacy-${Math.random().toString(36).slice(2, 6)}`,
+        rosterId,
+        name: g.name ?? "Gosling",
+        sex: g.sex ?? (Math.random() < 0.5 ? "f" : "m"),
+        variant: g.variant ?? "gosling-white",
+        x: g.x ?? 0,
+        y: g.y ?? 0,
+        dir: (g.dir ?? 1) as 1 | -1,
+        phase: g.phase ?? 0,
+        targetX: g.targetX ?? (g.x ?? 0),
+        targetY: g.targetY ?? (g.y ?? 0),
+        bornAt: g.bornAt ?? Date.now(),
+        bubbleUntil: 0,
+        bubbleText: "",
+      };
+    });
   } catch { return []; }
 }
 function saveGoslings(g: Gosling[]) {
   try {
     localStorage.setItem(STORAGE_GOSLINGS, JSON.stringify(
-      g.map(({ id, variant, x, y, dir, phase, targetX, targetY, bornAt }) =>
-        ({ id, variant, x, y, dir, phase, targetX, targetY, bornAt, bubbleUntil: 0, bubbleText: "" })),
+      g.map(({ id, rosterId, name, sex, variant, x, y, dir, phase, targetX, targetY, bornAt }) =>
+        ({ id, rosterId, name, sex, variant, x, y, dir, phase, targetX, targetY, bornAt, bubbleUntil: 0, bubbleText: "" })),
     ));
   } catch { /* ignore */ }
 }
@@ -199,6 +226,9 @@ const GooseFamily = () => {
         bornAt: e.bornAt,
         bubbleUntil: 0,
         bubbleText: "",
+        activity: "waddle",
+        activityUntil: Date.now() + 4000 + Math.random() * 8000,
+        playHopPhase: 0,
       }));
     setTick((t) => t + 1);
   }, []);
@@ -269,11 +299,24 @@ const GooseFamily = () => {
       const slotsLeft = Math.max(0, MAX_GOSLINGS - goslingsRef.current.length);
       const { stillEggs, hatched } = hatchDueEggs(eggsRef.current, wallNow, slotsLeft);
       if (hatched.length > 0) {
+        const rosterNow = getRoster();
+        const taken = new Set(rosterNow.map((e) => e.name));
+        const newGoslingRoster: RosterEntry[] = [];
         for (const egg of hatched) {
           const variant: "gosling-white" | "gosling-brown" =
             Math.random() < 0.5 ? "gosling-white" : "gosling-brown";
+          const name = pickUniqueName(taken); taken.add(name);
+          const sex = pickRandomSex();
+          const rosterId = `gosling-${wallNow}-${Math.random().toString(36).slice(2, 6)}`;
+          const color: GooseColor = variant === "gosling-white" ? "white" : "brown";
+          newGoslingRoster.push({
+            id: rosterId, name, sex, color, bornAt: wallNow, kind: "gosling",
+          });
           goslingsRef.current.push({
             id: `g-${wallNow}-${Math.random().toString(36).slice(2, 6)}`,
+            rosterId,
+            name,
+            sex,
             variant,
             x: egg.x,
             y: goslingFloorY,
@@ -283,8 +326,11 @@ const GooseFamily = () => {
             targetY: goslingFloorY,
             bornAt: wallNow,
             bubbleUntil: wallNow + 2200,
-            bubbleText: "Peep! 🐣",
+            bubbleText: `Peep! I'm ${name} 🐣`,
           });
+        }
+        if (newGoslingRoster.length > 0) {
+          setRoster([...rosterNow, ...newGoslingRoster]);
         }
         eggsRef.current = stillEggs;
         saveEggs(stillEggs);
@@ -339,38 +385,45 @@ const GooseFamily = () => {
         remaining.push(g);
       }
       if (grownOut.length > 0) {
-        // Promote goslings to family adults.
-        const roster = getRoster();
-        const taken = new Set(roster.map((e) => e.name));
-        const newRosterEntries: RosterEntry[] = [];
-        for (const g of grownOut) {
+        // Promote goslings to family adults — preserve their roster identity
+        // (name, sex, original bornAt), just swap kind + pick adult color.
+        const rosterBefore = getRoster();
+        const promotedIds = new Set(grownOut.map((g) => g.rosterId));
+        const kept = rosterBefore.filter((e) => !promotedIds.has(e.id));
+        const promoted: RosterEntry[] = grownOut.map((g) => {
+          const existing = rosterBefore.find((e) => e.id === g.rosterId);
           const color = pickRandomAdultColor();
-          const name = pickUniqueName(taken); taken.add(name);
-          const sex = pickRandomSex();
-          const rosterId = `adult-${wallNow}-${Math.random().toString(36).slice(2, 6)}`;
-          newRosterEntries.push({
-            id: rosterId,
-            name,
-            sex,
+          return {
+            id: g.rosterId,
+            name: existing?.name ?? g.name,
+            sex: existing?.sex ?? g.sex,
             color,
-            bornAt: wallNow,
+            bornAt: existing?.bornAt ?? g.bornAt,
             kind: "adult",
-          });
+          };
+        });
+        for (let i = 0; i < grownOut.length; i++) {
+          const g = grownOut[i];
+          const entry = promoted[i];
           adultsRef.current.push({
-            id: `a-${rosterId}`,
-            rosterId,
-            color,
+            id: `a-${entry.id}`,
+            rosterId: entry.id,
+            color: entry.color,
             x: g.x,
             y: adultFloorY,
             dir: g.dir,
             phase: Math.random() * Math.PI * 2,
             targetX: Math.max(80, Math.min(w - 80, g.x + rand(-100, 100))),
-            bornAt: wallNow,
+            bornAt: entry.bornAt,
             bubbleUntil: wallNow + 2400,
-            bubbleText: `I'm ${name}! 🎉`,
+            bubbleText: `I'm ${entry.name}! 🎉`,
+            activity: "waddle",
+            activityUntil: wallNow + 4000 + Math.random() * 8000,
+            playHopPhase: 0,
           });
         }
-        setRoster([...roster, ...newRosterEntries]);
+        setRoster([...kept, ...promoted]);
+        emitFamilyEvent({ type: "goslings-grown" });
         goslingsRef.current = remaining;
         saveGoslings(remaining);
       } else {
@@ -418,15 +471,52 @@ const GooseFamily = () => {
           a.dir = dx >= 0 ? 1 : -1;
           a.phase += dt * 0.4;
         } else {
-          if (Math.abs(a.targetX - a.x) < 18) {
-            a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-180, 180)));
+          // Rotate through varied activities: waddle, rest/sit, socialise,
+          // play. Each one lasts ~6–15s, then a new activity is rolled.
+          if (wallNow >= a.activityUntil) {
+            const r = Math.random();
+            a.activity = r < 0.4 ? "waddle"
+              : r < 0.65 ? "sit"
+              : r < 0.85 ? "socialise"
+              : "play";
+            a.activityUntil = wallNow + 6000 + Math.random() * 9000;
+            if (a.activity === "waddle" || a.activity === "socialise") {
+              a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-200, 200)));
+            }
+            if (a.activity === "socialise") {
+              const others = adultsRef.current.filter((x) => x.id !== a.id);
+              if (others.length > 0) {
+                const peer = others[Math.floor(Math.random() * others.length)];
+                a.targetX = Math.max(80, Math.min(w - 80, peer.x + rand(-30, 30)));
+              }
+            }
+            if (a.activity === "play") a.playHopPhase = 0;
           }
-          a.dir = a.targetX > a.x ? 1 : -1;
-          a.x += a.dir * 28 * sceneScale * dt;
-          a.x = Math.max(20, Math.min(w - 20, a.x));
-          a.phase += dt;
+          if (a.activity === "sit") {
+            // Stand still; head pecks gently via phase.
+            a.phase += dt * 0.6;
+          } else if (a.activity === "play") {
+            // Tiny bouncy hop on the spot.
+            a.playHopPhase += dt;
+            a.phase += dt * 1.4;
+            if (Math.random() < 0.01) a.dir = (Math.random() < 0.5 ? -1 : 1) as 1 | -1;
+          } else {
+            // waddle + socialise: walk toward targetX.
+            if (Math.abs(a.targetX - a.x) < 18) {
+              a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-180, 180)));
+            }
+            a.dir = a.targetX > a.x ? 1 : -1;
+            const speed = a.activity === "socialise" ? 34 : 28;
+            a.x += a.dir * speed * sceneScale * dt;
+            a.x = Math.max(20, Math.min(w - 20, a.x));
+            a.phase += dt;
+          }
         }
-        a.y = adultFloorY;
+        // Apply playful hop offset on y.
+        const hopY = a.activity === "play" && !mourningActive
+          ? -Math.abs(Math.sin(a.playHopPhase * 6)) * 10 * sceneScale
+          : 0;
+        a.y = adultFloorY + hopY;
       }
 
       // Mourning chatter pulse — pick a random adult and a random line every ~3s.

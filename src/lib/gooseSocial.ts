@@ -134,6 +134,7 @@ export type FamilyEvent =
   | { type: "incubation-end" }
   | { type: "feed-delivery"; targetX: number }
   | { type: "all-eggs-hatched" }
+  | { type: "goslings-grown" }
   | { type: "brood-end" };
 type FamilyListener = (event: FamilyEvent) => void;
 const familyListeners = new Set<FamilyListener>();
@@ -153,6 +154,14 @@ let mood: Mood = "idle";
 let lastDialogueAt = 0;
 let lastBallPlayAt = 0;
 let lastFlyAwayAt = 0;
+// Earliest wall-clock at which the mother is allowed to lay eggs again. Bumped
+// 10–15 minutes into the future every time a batch of goslings grows up.
+let reproductionEarliestAt = 0;
+familyListeners.add((ev) => {
+  if (ev.type === "goslings-grown") {
+    reproductionEarliestAt = Date.now() + (10 + Math.random() * 5) * 60_000;
+  }
+});
 let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
 let recentOneliner: { username: string; text: string; at: number } | null = null;
@@ -669,8 +678,12 @@ async function runFlyAway() {
       emitFamilyEvent({ type: "snack-end" });
 
       // === REPRODUCTION: mother flies down, lays eggs, sits to incubate;
-      //     father runs food-fetch loop; then a 90s brood phase. ===
-      await runReproductionPhase();
+      //     father runs food-fetch loop; then a 90s brood phase. Skipped
+      //     when the last clutch of goslings is still growing up (we want
+      //     a 10–15 min gap after grow-up before laying again). ===
+      if (Date.now() >= reproductionEarliestAt) {
+        await runReproductionPhase();
+      }
     }
 
 
