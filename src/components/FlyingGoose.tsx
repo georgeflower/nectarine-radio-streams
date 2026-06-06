@@ -1041,6 +1041,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       else window.removeEventListener("resize", onResize);
       eatingGooseIds.delete(gooseId);
       unregisterGoose();
+      releasePerch(perchClaimId);
     };
   }, [variant]);
 
