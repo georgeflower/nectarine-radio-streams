@@ -101,7 +101,7 @@ type Gosling = {
   bubbleText: string;
 };
 
-type AdultActivity = "waddle" | "sit" | "socialise" | "play";
+type AdultActivity = "waddle" | "sit" | "socialise" | "play" | "fly";
 
 type FamilyAdult = {
   id: string;
