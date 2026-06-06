@@ -89,6 +89,9 @@ const GooseFamily = () => {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const eggsRef = useRef<Egg[]>(loadEggs());
   const goslingsRef = useRef<Gosling[]>([]);
+  // Tracks whether the adults are currently on a snack break — used so the
+  // goslings can mirror the adult sit/peck animation rather than waddling.
+  const adultsSittingRef = useRef(false);
   const [, setTick] = useState(0);
 
   // Pre-build sprite frames for both gosling variants.
@@ -97,11 +100,21 @@ const GooseFamily = () => {
   if (!goslingFramesWhite.current) goslingFramesWhite.current = buildGooseFrameDataUrls("gosling-white");
   if (!goslingFramesBrown.current) goslingFramesBrown.current = buildGooseFrameDataUrls("gosling-brown");
 
-  // Subscribe to snack-break events. Lay eggs with some probability.
+  // Subscribe to snack-break events. Lay eggs deterministically and flip the
+  // adultsSitting flag so the goslings sit + peck while parents are eating.
   useEffect(() => {
     const unsub = subscribeFamilyEvents((event) => {
+      if (event.type === "snack-end") {
+        adultsSittingRef.current = false;
+        setTick((t) => t + 1);
+        return;
+      }
       if (event.type !== "snack-start") return;
-      if (Math.random() > EGG_LAY_CHANCE) return;
+      adultsSittingRef.current = true;
+      if (Math.random() > EGG_LAY_CHANCE) {
+        setTick((t) => t + 1);
+        return;
+      }
       const positions = event.positions ?? getGoosePositions();
       const w = rootRef.current?.clientWidth ?? window.innerWidth;
       const h = rootRef.current?.clientHeight ?? window.innerHeight;
@@ -109,18 +122,22 @@ const GooseFamily = () => {
         positions?.white ?? positions?.brown ?? { x: w / 2, y: h - 80 };
       const liveEggs = eggsRef.current.length;
       const room = Math.max(0, MAX_LIVE_EGGS - liveEggs);
-      if (room === 0) return;
+      if (room === 0) {
+        setTick((t) => t + 1);
+        return;
+      }
       const count = Math.min(room, 1 + Math.floor(Math.random() * 3));
       const now = Date.now();
       const fresh: Egg[] = [];
       for (let i = 0; i < count; i++) {
-        fresh.push({
-          id: `egg-${now}-${i}-${Math.random().toString(36).slice(2, 6)}`,
-          x: anchor.x + rand(-22, 22),
-          y: anchor.y + rand(8, 22),
-          laidAt: now,
-          hatchAt: now + rand(HATCH_MIN_MS, HATCH_MAX_MS),
-        });
+        fresh.push(
+          makeEgg({
+            id: `egg-${now}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+            x: anchor.x + rand(-22, 22),
+            y: anchor.y + rand(8, 22),
+            laidAt: now,
+          }),
+        );
       }
       eggsRef.current = [...eggsRef.current, ...fresh];
       saveEggs(eggsRef.current);
@@ -143,14 +160,14 @@ const GooseFamily = () => {
       const sceneScale = getSceneScale(w, h);
       const floorY = h - BASE_SPRITE_H * sceneScale * GOSLING_SCALE_FACTOR * 0.6 - 12;
 
-      // Hatch eggs.
-      const wall = Date.now();
-      const stillEggs: Egg[] = [];
-      let mutated = false;
-      for (const egg of eggsRef.current) {
-        if (wall >= egg.hatchAt && goslingsRef.current.length < MAX_GOSLINGS) {
-          const positions = getGoosePositions();
-          const anchor = positions?.white ?? positions?.brown ?? { x: egg.x, y: floorY };
+      // Hatch any due eggs via the pure helper (capped by remaining slots).
+      const slotsLeft = Math.max(0, MAX_GOSLINGS - goslingsRef.current.length);
+      const { stillEggs, hatched } = hatchDueEggs(eggsRef.current, Date.now(), slotsLeft);
+      if (hatched.length > 0) {
+        const positions = getGoosePositions();
+        const anchorBase = positions?.white ?? positions?.brown ?? { x: w / 2, y: floorY };
+        const wall = Date.now();
+        for (const egg of hatched) {
           const variant: "gosling-white" | "gosling-brown" =
             Math.random() < 0.5 ? "gosling-white" : "gosling-brown";
           goslingsRef.current.push({
@@ -158,26 +175,28 @@ const GooseFamily = () => {
             variant,
             x: egg.x,
             y: floorY,
-            dir: anchor.x < egg.x ? -1 : 1,
+            dir: anchorBase.x < egg.x ? -1 : 1,
             phase: Math.random() * Math.PI * 2,
-            targetX: anchor.x + rand(-30, 30),
+            targetX: anchorBase.x + rand(-30, 30),
             bornAt: wall,
             bubbleUntil: wall + 2200,
           });
-          mutated = true;
-        } else {
-          stillEggs.push(egg);
         }
-      }
-      if (mutated) {
         eggsRef.current = stillEggs;
         saveEggs(stillEggs);
       }
 
-      // Waddle goslings toward a parent (or wander) along the floor.
+      // Waddle goslings toward a parent (or wander) along the floor. While
+      // the adults are on a snack break the goslings sit and peck instead.
       const positions = getGoosePositions();
       const parentAnchor = positions?.white ?? positions?.brown ?? null;
+      const sitting = adultsSittingRef.current;
       for (const g of goslingsRef.current) {
+        if (sitting) {
+          // Stay put; only the phase keeps advancing so the peck cycle ticks.
+          g.phase += dt;
+          continue;
+        }
         // Re-target every ~3-5s or when close.
         if (Math.abs(g.targetX - g.x) < 14) {
           const base = parentAnchor?.x ?? w / 2;
@@ -198,6 +217,7 @@ const GooseFamily = () => {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, []);
+
 
   const root = rootRef.current;
   const w = root?.clientWidth ?? (typeof window !== "undefined" ? window.innerWidth : 1024);
