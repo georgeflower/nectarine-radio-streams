@@ -386,7 +386,7 @@ function maybeDie(goose: Goose, now: number, dtSeconds: number): Goose {
 }
 
 function updateReproduction(state: GooseLifeState, now: number, stage: StageBounds): GooseLifeState {
-  const geese = state.geese.map((goose) => ({ ...goose, relationships: { ...goose.relationships }, eggs: [...(goose.eggs ?? [])] }));
+  const geese: Goose[] = state.geese.map((goose) => ({ ...goose, relationships: { ...goose.relationships }, eggs: [...(goose.eggs ?? [])] }));
   let lastReproductionAt = state.lastReproductionAt;
 
   const livingAdults = geese.filter((g) => g.alive && g.ageHours > 6 && g.mood !== "mourning");
