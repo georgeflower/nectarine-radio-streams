@@ -148,8 +148,8 @@ function loadGoslings(): Gosling[] {
 function saveGoslings(g: Gosling[]) {
   try {
     localStorage.setItem(STORAGE_GOSLINGS, JSON.stringify(
-      g.map(({ id, variant, x, y, dir, phase, targetX, targetY, bornAt }) =>
-        ({ id, variant, x, y, dir, phase, targetX, targetY, bornAt, bubbleUntil: 0, bubbleText: "" })),
+      g.map(({ id, rosterId, name, sex, variant, x, y, dir, phase, targetX, targetY, bornAt }) =>
+        ({ id, rosterId, name, sex, variant, x, y, dir, phase, targetX, targetY, bornAt, bubbleUntil: 0, bubbleText: "" })),
     ));
   } catch { /* ignore */ }
 }
