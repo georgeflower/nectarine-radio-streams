@@ -735,9 +735,11 @@ const GooseFamily = () => {
           bodyTX = stepCycle * WADDLE_CHAR_BODY_SWAY * sceneScale * GOSLING_SCALE_FACTOR;
           bodyTY = stepLanding * WADDLE_CHAR_BODY_BOB * sceneScale * GOSLING_SCALE_FACTOR;
           bodyTilt = stepCycle * WADDLE_CHAR_BODY_TILT;
-          headTX = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 0.9) * WADDLE_CHAR_HEAD_SWAY * sceneScale * GOSLING_SCALE_FACTOR;
-          headTY = stepLanding * WADDLE_CHAR_HEAD_DIP * sceneScale * GOSLING_SCALE_FACTOR;
-          headTilt = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 1.1) * WADDLE_CHAR_HEAD_TILT;
+          // Head stays welded to the neck socket: no independent translate;
+          // only a gentle tilt rotating around the neck pivot.
+          headTX = 0;
+          headTY = 0;
+          headTilt = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 1.1) * WADDLE_CHAR_HEAD_TILT * 0.5;
         }
         const tx = g.x - goslingW / 2;
         const ty = g.y - goslingH / 2;
@@ -800,9 +802,11 @@ const GooseFamily = () => {
         const bodyTX = stepCycle * WADDLE_CHAR_BODY_SWAY * sceneScale * (dying ? 0.4 : 1);
         const bodyTY = stepLanding * WADDLE_CHAR_BODY_BOB * sceneScale * (dying ? 0.4 : 1);
         const bodyTilt = stepCycle * WADDLE_CHAR_BODY_TILT * (dying ? 0.4 : 1);
-        const headTX = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 0.9) * WADDLE_CHAR_HEAD_SWAY * sceneScale;
-        const headTY = stepLanding * WADDLE_CHAR_HEAD_DIP * sceneScale + (dying ? 6 * sceneScale : 0);
-        const headTilt = (Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 1.1) * WADDLE_CHAR_HEAD_TILT * (dying ? 0.3 : 1)) - (dying ? 18 : 0);
+        // Head stays welded to the neck socket: no independent translate;
+        // only a gentle tilt rotating around the neck pivot.
+        const headTX = 0;
+        const headTY = dying ? 6 * sceneScale : 0;
+        const headTilt = (Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 1.1) * WADDLE_CHAR_HEAD_TILT * 0.5 * (dying ? 0.3 : 1)) - (dying ? 18 : 0);
         const tx = a.x - adultW / 2;
         const ty = a.y - adultH / 2;
         const bubble = a.bubbleUntil > now;

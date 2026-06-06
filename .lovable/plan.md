@@ -1,38 +1,26 @@
-## Root cause
+## Plan
 
-Two separate bugs cause the head/neck to detach from the body during waddling:
+1. **Stop separating the neck socket during waddles**
+   - In `GooseFamily.tsx`, reduce/remove the independent head lateral sway and large head tilt during the bottom-waddle animation.
+   - Keep the body bob/tilt, but make the head motion mostly a small vertical dip/peck that stays anchored at the neck pivot.
 
-**1. GooseFamily adults & goslings** — The body image rotates around `center center` (the `bodyTilt` swing), but the head image only inherits the body's *translation* (`bodyTX + headTX`, `bodyTY + headTY`), not its rotation. So when the body tilts, the neck-pivot point on the body sweeps along an arc while the head stays in a horizontally-translated frame, opening a gap and tilting the neck the wrong way.
-
-**2. FlyingGoose ground-waddle branch** — The head is mirrored independently via `scaleX(${lookScale})` while the body keeps its original orientation. Because the head sprite's `transformOrigin` is at the neck pivot (not the wrap center), `scaleX(-1)` shifts the head sideways relative to the body, producing the floating-head look in the video.
-
-## Fix
-
-### `src/components/GooseFamily.tsx` (adult render ~line 806–830 and gosling render ~line 750–770)
-
-Nest the head inside a body-tilt wrapper so the head shares the body's rotation frame:
+2. **Anchor the head to the body with a socket wrapper**
+   - Replace the current “full head image translates around its own pivot” approach with a nested neck-socket wrapper:
 
 ```text
-<div wrap: translate3d(x,y) scaleX(dir)>
-  <div bodyFrame: translate(bodyTX,bodyTY) rotate(bodyTilt), origin center center>
-    <img body />
-    <img head: translate(headTX, headTY) rotate(headTilt),
-              origin = neck pivot (in body-frame coords) />
-  </div>
-</div>
+outer goose position + facing direction
+  body-frame translate/bob/rotate
+    body image
+    neck-socket at fixed neck pivot
+      head image offset back from socket
 ```
 
-This keeps the neck pivot welded to the body as the body sways, and the head's own bob/tilt stays a small offset on top of that. Apply to both the adult and gosling render blocks.
+   - Apply this to both goslings and grown family adults so the neck base inherits the exact same body transform and cannot drift open.
 
-### `src/components/FlyingGoose.tsx` ground/waddle render (~line 794–797)
+3. **Apply the same socket logic to original white/brown ground waddles**
+   - In `FlyingGoose.tsx`, add a socket/frame wrapper around the standing body/head images.
+   - During ground mode, mirror/move the whole goose as one unit, and animate the head only from the fixed socket.
 
-- Remove the `scaleX(${lookScale})` on `imgHead` while ground-waddling.
-- Apply `lookScale` (clamped, smoothly tweened — already maintained) to the **wrap** transform instead, so the whole goose mirrors as a unit: `wrap.style.transform = translate3d(tx, ty+rock) scaleX(lookScale)`.
-- Keep the head transform limited to the chew bob (`translate(0, chew) rotate(chew * CHEW_ROTATION_FACTOR)`), matching the existing perched ground rendering.
-- Reset `wrap.style.transform` (drop the `scaleX`) on `takeoff()` and in the other non-ground branches that already set `wrap.style.transform` without it, so flying frames don't keep an old mirror applied.
-
-## Out of scope
-
-- No constant retuning (sway/bob amplitudes stay the same).
-- No design-token, schema, or scheduler changes.
-- `BoingBall.tsx`, `gooseSocial.ts`, `gooseBeat.ts` untouched.
+4. **Keep scope tight**
+   - No reproduction, chatter, food, ball, or scheduler changes.
+   - Only adjust waddling/ground-standing transforms for the bottom geese.
