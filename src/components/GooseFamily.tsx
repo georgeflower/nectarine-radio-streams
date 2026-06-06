@@ -17,10 +17,15 @@ import {
   STAND_HEAD,
 } from "@/lib/gooseSprite";
 import { getSceneScale } from "@/lib/gooseScene";
+import {
+  hatchDueEggs,
+  HATCH_MAX_MS,
+  HATCH_MIN_MS,
+  makeEgg,
+  type Egg,
+} from "@/lib/gooseLife/eggHatch";
 
 const STORAGE_EGGS = "cracktro-goose-eggs-v2";
-const HATCH_MIN_MS = 18_000;
-const HATCH_MAX_MS = 32_000;
 const EGG_LAY_CHANCE = 1; // every snack break produces eggs
 const MAX_LIVE_EGGS = 4;
 const MAX_GOSLINGS = 8;
@@ -35,7 +40,13 @@ const WADDLE_CHAR_HEAD_SWAY = 6.6;
 const WADDLE_CHAR_HEAD_DIP = 5.2;
 const WADDLE_CHAR_HEAD_TILT = 27;
 
-type Egg = { id: string; x: number; y: number; laidAt: number; hatchAt: number };
+// Peck (sit + eat) constants — ported from GooseLifeSimulation. Used by
+// goslings when their parents are mid snack-break so the little ones mirror
+// the adults' pecking idle.
+const PECK_CYCLE_MS = 520;
+const PECK_HEAD_DROP = 5.5;
+const PECK_HEAD_ROTATE = 22;
+
 type Gosling = {
   id: string;
   variant: "gosling-white" | "gosling-brown";
