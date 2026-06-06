@@ -92,7 +92,7 @@ describe("Cracktro defaults and fullscreen behavior", () => {
     expect(screen.getByTestId("goose-life-sim")).toBeInTheDocument();
     expect(screen.queryAllByTestId("flying-goose")).toHaveLength(0);
     // Migration marker must be written so the override only happens once.
-    expect(localStorage.getItem("cracktro-goose-life-sim-migrated-v2")).toBe("1");
+    await waitFor(() => expect(localStorage.getItem("cracktro-goose-life-sim-migrated-v2")).toBe("1"));
   });
 
   it("respects sim-on setting after migration marker is already present", async () => {

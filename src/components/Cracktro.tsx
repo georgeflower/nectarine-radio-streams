@@ -384,7 +384,6 @@ const Cracktro = ({
       // value is respected normally, so manual user changes continue to persist.
       const migrated = localStorage.getItem(STORAGE_GOOSE_LIFE_SIM_MIGRATED);
       if (!migrated) {
-        localStorage.setItem(STORAGE_GOOSE_LIFE_SIM_MIGRATED, "1");
         return true;
       }
       const v = localStorage.getItem(STORAGE_GOOSE_LIFE_SIM);
@@ -393,6 +392,15 @@ const Cracktro = ({
       return true;
     }
   });
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(STORAGE_GOOSE_LIFE_SIM_MIGRATED)) {
+        localStorage.setItem(STORAGE_GOOSE_LIFE_SIM_MIGRATED, "1");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_GOOSE_LIFE_SIM, gooseLifeSimOn ? "1" : "0");
