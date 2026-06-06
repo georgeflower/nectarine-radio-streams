@@ -367,38 +367,45 @@ const GooseFamily = () => {
         remaining.push(g);
       }
       if (grownOut.length > 0) {
-        // Promote goslings to family adults.
-        const roster = getRoster();
-        const taken = new Set(roster.map((e) => e.name));
-        const newRosterEntries: RosterEntry[] = [];
-        for (const g of grownOut) {
+        // Promote goslings to family adults — preserve their roster identity
+        // (name, sex, original bornAt), just swap kind + pick adult color.
+        const rosterBefore = getRoster();
+        const promotedIds = new Set(grownOut.map((g) => g.rosterId));
+        const kept = rosterBefore.filter((e) => !promotedIds.has(e.id));
+        const promoted: RosterEntry[] = grownOut.map((g) => {
+          const existing = rosterBefore.find((e) => e.id === g.rosterId);
           const color = pickRandomAdultColor();
-          const name = pickUniqueName(taken); taken.add(name);
-          const sex = pickRandomSex();
-          const rosterId = `adult-${wallNow}-${Math.random().toString(36).slice(2, 6)}`;
-          newRosterEntries.push({
-            id: rosterId,
-            name,
-            sex,
+          return {
+            id: g.rosterId,
+            name: existing?.name ?? g.name,
+            sex: existing?.sex ?? g.sex,
             color,
-            bornAt: wallNow,
+            bornAt: existing?.bornAt ?? g.bornAt,
             kind: "adult",
-          });
+          };
+        });
+        for (let i = 0; i < grownOut.length; i++) {
+          const g = grownOut[i];
+          const entry = promoted[i];
           adultsRef.current.push({
-            id: `a-${rosterId}`,
-            rosterId,
-            color,
+            id: `a-${entry.id}`,
+            rosterId: entry.id,
+            color: entry.color,
             x: g.x,
             y: adultFloorY,
             dir: g.dir,
             phase: Math.random() * Math.PI * 2,
             targetX: Math.max(80, Math.min(w - 80, g.x + rand(-100, 100))),
-            bornAt: wallNow,
+            bornAt: entry.bornAt,
             bubbleUntil: wallNow + 2400,
-            bubbleText: `I'm ${name}! 🎉`,
+            bubbleText: `I'm ${entry.name}! 🎉`,
+            activity: "waddle",
+            activityUntil: wallNow + 4000 + Math.random() * 8000,
+            playHopPhase: 0,
           });
         }
-        setRoster([...roster, ...newRosterEntries]);
+        setRoster([...kept, ...promoted]);
+        emitFamilyEvent({ type: "goslings-grown" });
         goslingsRef.current = remaining;
         saveGoslings(remaining);
       } else {
