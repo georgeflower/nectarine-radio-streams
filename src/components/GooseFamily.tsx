@@ -43,6 +43,7 @@ import {
   pickUniqueName,
   setRoster,
   type GooseColor,
+  type GooseSex,
   type RosterEntry,
 } from "@/lib/gooseFamilyRoster";
 import { setMourningActive } from "@/lib/cracktroUi";
