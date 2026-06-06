@@ -453,15 +453,52 @@ const GooseFamily = () => {
           a.dir = dx >= 0 ? 1 : -1;
           a.phase += dt * 0.4;
         } else {
-          if (Math.abs(a.targetX - a.x) < 18) {
-            a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-180, 180)));
+          // Rotate through varied activities: waddle, rest/sit, socialise,
+          // play. Each one lasts ~6–15s, then a new activity is rolled.
+          if (wallNow >= a.activityUntil) {
+            const r = Math.random();
+            a.activity = r < 0.4 ? "waddle"
+              : r < 0.65 ? "sit"
+              : r < 0.85 ? "socialise"
+              : "play";
+            a.activityUntil = wallNow + 6000 + Math.random() * 9000;
+            if (a.activity === "waddle" || a.activity === "socialise") {
+              a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-200, 200)));
+            }
+            if (a.activity === "socialise") {
+              const others = adultsRef.current.filter((x) => x.id !== a.id);
+              if (others.length > 0) {
+                const peer = others[Math.floor(Math.random() * others.length)];
+                a.targetX = Math.max(80, Math.min(w - 80, peer.x + rand(-30, 30)));
+              }
+            }
+            if (a.activity === "play") a.playHopPhase = 0;
           }
-          a.dir = a.targetX > a.x ? 1 : -1;
-          a.x += a.dir * 28 * sceneScale * dt;
-          a.x = Math.max(20, Math.min(w - 20, a.x));
-          a.phase += dt;
+          if (a.activity === "sit") {
+            // Stand still; head pecks gently via phase.
+            a.phase += dt * 0.6;
+          } else if (a.activity === "play") {
+            // Tiny bouncy hop on the spot.
+            a.playHopPhase += dt;
+            a.phase += dt * 1.4;
+            if (Math.random() < 0.01) a.dir = (Math.random() < 0.5 ? -1 : 1) as 1 | -1;
+          } else {
+            // waddle + socialise: walk toward targetX.
+            if (Math.abs(a.targetX - a.x) < 18) {
+              a.targetX = Math.max(80, Math.min(w - 80, a.x + rand(-180, 180)));
+            }
+            a.dir = a.targetX > a.x ? 1 : -1;
+            const speed = a.activity === "socialise" ? 34 : 28;
+            a.x += a.dir * speed * sceneScale * dt;
+            a.x = Math.max(20, Math.min(w - 20, a.x));
+            a.phase += dt;
+          }
         }
-        a.y = adultFloorY;
+        // Apply playful hop offset on y.
+        const hopY = a.activity === "play" && !mourningActive
+          ? -Math.abs(Math.sin(a.playHopPhase * 6)) * 10 * sceneScale
+          : 0;
+        a.y = adultFloorY + hopY;
       }
 
       // Mourning chatter pulse — pick a random adult and a random line every ~3s.
