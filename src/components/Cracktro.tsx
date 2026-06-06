@@ -824,7 +824,14 @@ const Cracktro = ({
             ref={canvasRef}
             aria-hidden="true"
             className="absolute left-0 right-0 pointer-events-none"
-            style={{ top: "50%", transform: "translateY(-50%)", zIndex: 5 }}
+            style={{
+              top: "50%",
+              transform: "translateY(-50%)",
+              zIndex: 5,
+              opacity: mourning ? 0.25 : 1,
+              filter: mourning ? "grayscale(0.85) brightness(0.55)" : undefined,
+              transition: "opacity 1200ms ease-out, filter 1200ms ease-out",
+            }}
           />
         )}
 
@@ -838,6 +845,10 @@ const Cracktro = ({
               background: `linear-gradient(to top, hsla(20,25%,4%,${sceneEraConfig.infoBarOpacity}), hsla(20,25%,4%,0))`,
               paddingTop: "1.5rem",
               paddingBottom: "1.5rem",
+              opacity: mourning ? 0.4 : 1,
+              filter: mourning ? "grayscale(0.85)" : undefined,
+              transition: "opacity 1200ms ease-out, filter 1200ms ease-out",
+              fontSize: `${windowSize === "s" ? 0.85 : windowSize === "l" ? 1.2 : 1}em`,
             }}
           >
             <div className="mx-auto max-w-6xl px-6 text-center">
@@ -862,7 +873,7 @@ const Cracktro = ({
               >
                 by {artist || "Unknown Artist"}
               </p>
-              {(platform || rating !== undefined) && (
+              {(platform || rating !== undefined || duration > 0) && (
                 <p
                   className="text-foreground uppercase tracking-[0.3em] mt-3"
                   style={{ fontSize: "clamp(0.95rem, 1.8vw, 1.5rem)" }}
@@ -873,6 +884,14 @@ const Cracktro = ({
                     <span>
                       ★ {rating.toFixed(2)}
                       {votes ? ` (${votes})` : ""}
+                    </span>
+                  )}
+                  {(platform || rating !== undefined) && duration > 0 && (
+                    <span className="mx-3 opacity-50">·</span>
+                  )}
+                  {duration > 0 && (
+                    <span className="tabular-nums">
+                      {formatMmSs(currentTime)} / {formatMmSs(duration)}
                     </span>
                   )}
                 </p>
