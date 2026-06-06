@@ -327,6 +327,21 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let incubatingX = 0;
     const incubatingFloorY = () => h - spriteH() * 0.6 - 12;
 
+    // Ground-waddle: occasionally land on the floor band (bottom 20%) and
+    // walk around like the family adults, instead of always perching.
+    let waddlingOnGround = false;
+    let groundWaddleUntil = 0;
+    let groundWaddleTargetX = 0;
+    let groundWaddleY = 0;
+    let nextGroundWaddleStepAt = 0;
+    let nextGroundWaddleAt = rand(35_000, 80_000);
+    const floorBandY = () => {
+      const minY = h * 0.80;
+      const maxY = h - spriteH() * 0.6 - 12;
+      return rand(Math.min(minY, maxY), Math.max(minY, maxY));
+    };
+
+
 
 
     const wrap = wrapRef.current;
@@ -575,6 +590,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       restingFromTiredness = false;
       tiredRestReleaseAt = 0;
       perchEl = null;
+      waddlingOnGround = false;
       heading = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
       targetHeading = heading;
       speed = scale(180);
@@ -587,6 +603,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       imgBody.style.opacity = "0";
       imgHead.style.opacity = "0";
     };
+
 
 
 
@@ -739,6 +756,28 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           y += (layout.y - y) * Math.min(1, dt * 6);
           heading = layout.heading;
           targetHeading = heading;
+        } else if (waddlingOnGround) {
+          // Walk slowly toward groundWaddleTargetX inside the floor band.
+          if (elapsed >= nextGroundWaddleStepAt) {
+            groundWaddleTargetX = rand(w * 0.1, w * 0.9);
+            groundWaddleY = floorBandY();
+            nextGroundWaddleStepAt = elapsed + rand(2500, 5000);
+          }
+          const walkSpeed = scale(28); // px/sec — leisurely waddle
+          const dx = groundWaddleTargetX - x;
+          const step = Math.sign(dx) * Math.min(Math.abs(dx), walkSpeed * dt);
+          x += step;
+          y += (groundWaddleY - y) * Math.min(1, dt * 2);
+          if (step !== 0) lookDir = step > 0 ? 1 : -1;
+          lookScale += (lookDir - lookScale) * Math.min(1, dt * 6);
+          if (elapsed >= groundWaddleUntil) {
+            waddlingOnGround = false;
+            nextGroundWaddleAt = elapsed + rand(45_000, 110_000);
+            nextPerchAt = elapsed + rand(6_000, 14_000);
+            takeoff();
+            raf = requestAnimationFrame(tick);
+            return;
+          }
         }
         const tx = x - spriteW() / 2;
         const ty = y - spriteH() / 2;
@@ -747,13 +786,46 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           CHEW_AMPLITUDE *
           peckStrength *
           sceneScale;
-        wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
-        imgHead.style.transform = `translate(0px, ${chew}px) rotate(${chew * CHEW_ROTATION_FACTOR}deg)`;
+        // Add a gentle body rock while waddling so it reads as walking.
+        const rock = waddlingOnGround
+          ? Math.sin(elapsed / 220) * 1.6 * sceneScale
+          : 0;
+        wrap.style.transform = `translate3d(${tx}px, ${ty + rock}px, 0)`;
+        if (waddlingOnGround) {
+          imgHead.style.transform = `translate(0px, ${chew * 0.4}px) scaleX(${lookScale}) rotate(${chew * CHEW_ROTATION_FACTOR * 0.3}deg)`;
+        } else {
+          imgHead.style.transform = `translate(0px, ${chew}px) rotate(${chew * CHEW_ROTATION_FACTOR}deg)`;
+        }
         positionBubble(x, y);
         positionFoodBag();
         raf = requestAnimationFrame(tick);
         return;
       }
+
+      // ===== GROUND-WADDLE APPROACH: fly down to floor band, then walk =====
+      if (
+        waddlingOnGround &&
+        !incubating && !away && !eatingMode && !fetchingFood && !ballPlayActive && !restingFromTiredness
+      ) {
+
+        const targetX = groundWaddleTargetX;
+        const targetY = groundWaddleY;
+        targetHeading = Math.atan2(targetY - y, targetX - x);
+        targetSpeed = scale(140);
+        if (Math.hypot(targetX - x, targetY - y) < scale(12)) {
+          x = targetX;
+          y = targetY;
+          mode = "ground";
+          perchEl = null;
+          imgBody.style.opacity = "1";
+          imgHead.style.opacity = "1";
+          img.style.opacity = "0";
+          nextGroundWaddleStepAt = elapsed + rand(1200, 2500);
+          raf = requestAnimationFrame(tick);
+          return;
+        }
+      }
+
 
       // ===== INCUBATION: fly to floor x and land in ground mode =====
       if (incubating) {
@@ -799,19 +871,43 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           targetSpeed = scale(115);
         }
       }
-      if (!incubating && mode === "fly" && !away && !eatingMode && !fetchingFood && !ballPlayActive && elapsed >= nextPerchAt) {
-        const p = pickPerch();
-        if (p) {
-          perchEl = p.el;
-          perchChar = p.char;
-          perchKind = p.kind;
-          perchOffset = p.offset;
-          mode = "approach";
-          targetSpeed = scale(110); // normal cruise — do NOT sprint to the perch
+      // Ground-waddle trigger: occasionally choose to land on the floor and
+      // waddle around instead of perching. Same gating as the perch logic.
+      if (
+        !incubating && mode === "fly" && !away && !eatingMode && !fetchingFood &&
+        !ballPlayActive && !restingFromTiredness && !waddlingOnGround &&
+        elapsed >= nextGroundWaddleAt && Math.random() < 0.5
+      ) {
+        waddlingOnGround = true;
+        groundWaddleTargetX = rand(w * 0.1, w * 0.9);
+        groundWaddleY = floorBandY();
+        groundWaddleUntil = elapsed + rand(12_000, 25_000);
+        nextGroundWaddleStepAt = elapsed + rand(2500, 5000);
+        // Defer next perch attempt while we're heading to the floor.
+        nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
+      } else if (
+        !incubating && mode === "fly" && !away && !eatingMode && !fetchingFood &&
+        !ballPlayActive && elapsed >= nextPerchAt
+      ) {
+        // Lowered perch bias: only ~60% of attempts actually grab a perch,
+        // so the goose spends more time freely flying.
+        if (Math.random() < 0.6) {
+          const p = pickPerch();
+          if (p) {
+            perchEl = p.el;
+            perchChar = p.char;
+            perchKind = p.kind;
+            perchOffset = p.offset;
+            mode = "approach";
+            targetSpeed = scale(110); // normal cruise — do NOT sprint to the perch
+          } else {
+            nextPerchAt = elapsed + rand(4000, 9000);
+          }
         } else {
-          nextPerchAt = elapsed + rand(4000, 9000);
+          nextPerchAt = elapsed + rand(5000, 12000);
         }
       }
+
       if (mode === "approach") {
         if (!perchAlive() || (away && !restingFromTiredness && !eatingMode) || fetchingFood) {
           const replacement =

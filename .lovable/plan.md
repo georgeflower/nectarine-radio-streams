@@ -1,58 +1,34 @@
-## 1. Originals + grown adults share the floor
+## 1. Reproduction scheduler tuning (`src/lib/gooseSocial.ts`)
 
-In `src/components/FlyingGoose.tsx` (white + brown originals): add a periodic "land & waddle" mood (~every 60–120 s) where the goose flies down to the floor band (bottom 20 % of the stage), waddles for ~10–20 s, then takes off again. Reuse the existing perch/landing machinery, but pick a floor Y in `[h*0.8, floorY]` instead of a letter/window perch.
+Goal: second clutch should only fire after adults are truly back in idle "post-hatch" life, not immediately as the brood ends.
 
-In `src/components/GooseFamily.tsx`: occasionally let promoted family adults take off and fly briefly (new activity `"fly"`, ~8–12 s) before re-landing in the floor band. Adds an `airborneY` target sampled in `[h*0.2, h*0.5]` so they visually leave the floor.
+- Raise `REPRODUCTION_COOLDOWN_MS` from `12 * 60_000` → `18 * 60_000`.
+- Increase the `goslings-grown` deferred window from `(10–15) min` → `(15–22) min` (sets `reproductionEarliestAt`).
+- After `runReproductionPhase()` completes (line ~627), also push `reproductionEarliestAt = Date.now() + REPRODUCTION_COOLDOWN_MS` so the standalone trigger and the snack-coupled trigger share one clock.
+- Add a hard "post-hatch settle" gate in the standalone reproduction branch in `step()` (line ~725): require all of
+  - `reproductionEarliestAt > 0 && now >= reproductionEarliestAt`
+  - `now - lastReproductionAt >= REPRODUCTION_COOLDOWN_MS`
+  - `!familyHasLiveOffspring()`
+  - `now - lastBroodEndAt >= POST_HATCH_SETTLE_MS` (new, 4 min)
+  - `mood === "idle"` (already gated) AND no active snack break / fly-away
+- Track `lastBroodEndAt` by listening for the existing `brood-end` event near line 138/160.
+- Remove the snack-coupled reproduction call at line 692 (or guard it behind the same settle gate) so a clutch can no longer start mid-snack right after the previous brood ends.
 
-## 2. Neck still has gap
+## 2. FlyingGoose ground waddle (`src/components/FlyingGoose.tsx`)
 
-Body and head currently translate independently — when the body translates `(bodyTX, bodyTY)`, the head doesn't move with it, so a visible gap opens.
+Goal: white & brown originals occasionally land on the floor and waddle inside the bottom 20% band instead of always perching on letters/windows.
 
-Fix in `GooseFamily.tsx` (both gosling and adult head `<img>` blocks): make the head transform inherit the body translate so they stay glued:
+- Add a new behavior state alongside the existing perch cadence:
+  - `nextGroundWaddleAt = rand(35_000, 80_000)` (initial), refreshed each cycle.
+  - `groundWaddleUntil = 0`, `groundWaddleTargetX`.
+- When `mode === "fly"` and idle conditions hold (`!away && !eatingMode && !fetchingFood && !ballPlayActive && !incubating && !restingFromTiredness`) and `elapsed >= nextGroundWaddleAt`, ~50% of the time choose ground-waddle instead of `pickPerch()`:
+  - Set `targetY = rand(h * 0.80, h - spriteH() * 0.6 - 12)` (inside the existing floor band used by the family adults).
+  - Pick `groundWaddleTargetX = rand(w * 0.1, w * 0.9)`; fly down to that point, then transition `mode = "ground"` with a new flag `waddlingOnGround = true` (mirrors the family adults' floor waddle).
+  - While `waddlingOnGround`, sample a fresh `groundWaddleTargetX` every 2.5–5 s and walk toward it (slow horizontal lerp, body rock & head bob already in the `ground` branch). Duration `rand(12_000, 25_000)`.
+  - When the timer expires, call `takeoff()` and set `nextGroundWaddleAt = elapsed + rand(45_000, 110_000)` and `nextPerchAt = elapsed + rand(6_000, 14_000)` so the goose alternates between waddling, perching, and free flight.
+- Also lower the perch bias: when `elapsed >= nextPerchAt`, only attempt `pickPerch()` ~60% of the time; otherwise defer by `rand(5_000, 12_000)` so they don't immediately re-perch after every flight.
+- All new behavior is suppressed by the existing override flags (`away`, `chaseTarget`, `fetchingFood`, `ballPlayActive`, `incubating`, `restingFromTiredness`) — same gating used for perching.
 
-```text
-transform: translate(bodyTX + headTX, bodyTY + headTY) rotate(headTilt)
-transformOrigin: NECK_PIVOT_X * scale + bodyTX  (same for Y)
-```
+## Out of scope
 
-Also apply the same fix in `FlyingGoose.tsx` waddle branch where the original geese render head/body separately.
-
-## 3. Slower, calmer chatter
-
-In `src/lib/gooseSocial.ts`:
-- Bump every `say(text, durationMs)` call by ~1000 ms (e.g. 2200 → 3200, 1800 → 2800, 900 → 1900).
-- Increase inter-line waits in `runBallPlay`, `runFlyAway`, `runReproductionPhase`, `runDialogue` by ~1500 ms.
-- Raise `DIALOGUE_COOLDOWN_MS` 70 s → 110 s and proportionally bump `DIALOGUE_COOLDOWN_BY_ERA`.
-- Slow scheduler tick from 2500 ms → 4000 ms.
-- Snack break (sitting + eating loop): increase `await wait(2400)` → `4500` and only emit a snack line every 2nd iteration. Same treatment for the lonely partner while waiting for the food run.
-
-## 4. Second clutch of eggs
-
-In `gooseSocial.ts`:
-- After a successful `runReproductionPhase()`, set a fallback `reproductionEarliestAt = Date.now() + 12 * 60_000` so the next clutch is guaranteed eligible 12 min later even if the `goslings-grown` event was missed.
-- Add a standalone scheduler hook: in `step()`, if `mood === "idle"`, `Date.now() >= reproductionEarliestAt`, and the family currently has 0 live goslings, allow `runReproductionPhase()` to start directly without requiring a snack break. Cooldown the path with `lastReproductionAt`.
-- On boot, initialize `reproductionEarliestAt = 0` so first clutch still happens naturally.
-
-## 5. Ball shelf polish
-
-In `src/components/BoingBall.tsx`:
-- `SHELF_SCALE`: 0.15 → 0.25.
-- Hide the ball position from `setBallPos` (already done) AND clear `ballPlayDirective` so no goose will speak about the ball. In `gooseSocial.ts`, when `ballAvailable === false`, skip ball-related lines entirely in `buildContextualDialogue` (filter `BALL_CHATTER_TAGS` or check pre-emptively before scheduling `runBallPlay`/snack lines mentioning the ball).
-- Filter `MOTHER_CARE_LINES` to remove "Mind the ball, babies!" while parked (or guard with `getBallAvailable()`).
-
-## 6. Ball bounces to beat (4/4) while parked
-
-- Add a tiny module `src/lib/gooseBeat.ts` with `setBpm(n)`, `getBpm()`, and a `subscribeBeat(cb)` pub/sub that fires a tick every quarter-note based on `performance.now()` and the current BPM (no audio coupling needed). Default 120 BPM until a real value is set.
-- In `src/pages/Index.tsx`, where `useBpm` returns the live BPM, call `setBpm(bpmDebug.bpm)` whenever it changes.
-- In `BoingBall.tsx` parked render block: compute `bounceY = -Math.abs(Math.sin(now * Math.PI / quarterMs)) * 6 * sceneScale` so the parked ball does a small 4/4 hop on the shelf in sync with the music. No effect in `live` mode.
-
-## Technical notes (files touched)
-
-- `src/components/GooseFamily.tsx` — adult `fly` activity, head-follows-body transform.
-- `src/components/FlyingGoose.tsx` — periodic floor-land for originals; head-follows-body transform.
-- `src/components/BoingBall.tsx` — shelf scale 0.25, BPM bounce, suppress ball-speak signal.
-- `src/lib/gooseSocial.ts` — chatter pacing, fallback reproduction trigger, ball-line gating.
-- `src/lib/gooseBeat.ts` (new) — BPM pub/sub.
-- `src/pages/Index.tsx` — publish BPM into the new store.
-
-No schema, backend, or design-token changes. Existing tests in `gooseSocial.test.ts` continue to pass; pacing constants are numeric only.
+No design-token changes, no schema changes, no edits to `GooseFamily.tsx`, `BoingBall.tsx`, or `gooseBeat.ts`.

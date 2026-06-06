@@ -155,13 +155,18 @@ let lastDialogueAt = 0;
 let lastBallPlayAt = 0;
 let lastFlyAwayAt = 0;
 // Earliest wall-clock at which the mother is allowed to lay eggs again. Bumped
-// 10–15 minutes into the future every time a batch of goslings grows up.
+// 15–22 minutes into the future every time a batch of goslings grows up.
 let reproductionEarliestAt = 0;
+// Wall-clock when the most recent brood ended (used for the post-hatch settle gate).
+let lastBroodEndAt = 0;
 familyListeners.add((ev) => {
   if (ev.type === "goslings-grown") {
-    reproductionEarliestAt = Date.now() + (10 + Math.random() * 5) * 60_000;
+    reproductionEarliestAt = Date.now() + (15 + Math.random() * 7) * 60_000;
+  } else if (ev.type === "brood-end") {
+    lastBroodEndAt = Date.now();
   }
 });
+
 let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
 let recentOneliner: { username: string; text: string; at: number } | null = null;
@@ -179,8 +184,12 @@ const FLY_AWAY_COOLDOWN_MS = 540_000;
 const FLY_AWAY_CHANCE = 0.15;
 // Standalone reproduction trigger: how often the family may try to lay a
 // fresh clutch outside of a snack break.
-const REPRODUCTION_COOLDOWN_MS = 12 * 60_000;
+const REPRODUCTION_COOLDOWN_MS = 18 * 60_000;
+// After a brood ends, wait this long before a new clutch is allowed so the
+// adults actually return to normal life first.
+const POST_HATCH_SETTLE_MS = 4 * 60_000;
 let lastReproductionAt = 0;
+
 
 const DIALOGUE_COOLDOWN_BY_ERA: Record<GooseSceneEra, number> = {
   intro: DIALOGUE_COOLDOWN_MS,
@@ -689,10 +698,20 @@ async function runFlyAway() {
       emitFamilyEvent({ type: "snack-end" });
 
       // === REPRODUCTION (snack-coupled). ===
-      if (Date.now() >= reproductionEarliestAt) {
+      // Same gate as the standalone trigger so we don't kick off a clutch
+      // immediately after the previous brood ends.
+      const now2 = Date.now();
+      if (
+        reproductionEarliestAt > 0 &&
+        now2 >= reproductionEarliestAt &&
+        now2 - lastReproductionAt >= REPRODUCTION_COOLDOWN_MS &&
+        now2 - lastBroodEndAt >= POST_HATCH_SETTLE_MS &&
+        !familyHasLiveOffspring()
+      ) {
         await runReproductionPhase();
       }
     }
+
 
   } finally {
     clearFlyAwayState();
@@ -726,8 +745,10 @@ async function step() {
       reproductionEarliestAt > 0 &&
       now >= reproductionEarliestAt &&
       now - lastReproductionAt >= REPRODUCTION_COOLDOWN_MS &&
+      now - lastBroodEndAt >= POST_HATCH_SETTLE_MS &&
       !familyHasLiveOffspring()
     ) {
+
       lastReproductionAt = now;
       await runReproductionPhase();
     } else if (now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS && Math.random() < FLY_AWAY_CHANCE) {
