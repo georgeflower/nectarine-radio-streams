@@ -526,7 +526,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         })
         .filter((candidate): candidate is PerchCandidate<HTMLElement> => candidate !== null);
 
-      const selected = pickPerchCandidate(candidates, from);
+      const selected = pickPerchCandidate(candidates, from, Math.random, getPerchClaims(perchClaimId));
       if (!selected) return null;
       return {
         el: selected.ref,
