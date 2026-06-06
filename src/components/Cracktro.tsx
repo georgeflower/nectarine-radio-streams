@@ -1016,6 +1016,15 @@ const Cracktro = ({
           </FloatingWindow>
         )}
 
+        {panelsOn.roster && (
+          <RosterWindow
+            defaultX={Math.max(16, (typeof window !== "undefined" ? window.innerWidth : 1200) - 320)}
+            defaultY={120}
+            onClose={() => togglePanel("roster")}
+          />
+        )}
+
+
         <button
           type="button"
           onClick={() => {
