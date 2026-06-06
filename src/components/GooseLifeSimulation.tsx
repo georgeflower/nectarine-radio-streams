@@ -161,8 +161,8 @@ function applySimDirectives(state: GooseLifeState, directives: Map<string, Socia
       changed = true;
     }
 
-    // ballPlayActive: prevent sleep/idle while ball play is running
-    if (!d.sitting && d.ballPlayActive && (g.state === "sleep" || g.state === "idle")) {
+    // ballPlayActive/fetchingFood: keep goose airborne while active unless explicitly sitting.
+    if (!d.sitting && (d.ballPlayActive || d.fetchingFood) && g.state !== "fly") {
       g = { ...g, state: "fly" };
       changed = true;
     }
@@ -494,7 +494,7 @@ const GooseLifeSimulation = ({ oneliners = [] }: Props) => {
   const totalDays = dayFromAgeHours(LIFESPAN_HOURS);
 
   return (
-    <div ref={rootRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 62 }} data-testid="goose-life-sim">
+    <div ref={rootRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 62 }} data-testid="goose-life-sim" aria-hidden="true">
       <div className="absolute top-14 left-2 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground">
         Goose Life · Day {currentDay}/{totalDays} · Oldest {maxAge.toFixed(1)}h · Flock {living.length}
       </div>

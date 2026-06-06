@@ -318,7 +318,7 @@ function applyRoamState(goose: Goose, dtSeconds: number, stage: StageBounds): Go
       next.velocity.y += (Math.random() - 0.5) * dtSeconds * roamSpeed * 0.5;
     } else if (next.grounded) {
       // Grounded geese: very little vertical drift — they walk the floor band only
-      const targetY = groundTop + (stage.height - groundTop) * GROUNDED_VERTICAL_TARGET_RATIO;
+      const targetY = groundTop + (groundBottom - groundTop) * GROUNDED_VERTICAL_TARGET_RATIO;
       next.velocity.y += (targetY - next.position.y) * dtSeconds * WADDLE_VERTICAL_SPRING_STRENGTH * 2;
       next.velocity.y *= 0.85;
     } else {
