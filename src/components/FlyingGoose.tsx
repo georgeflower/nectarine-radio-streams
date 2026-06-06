@@ -299,7 +299,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     const tiredRecoveryTakeoffDelay = () => rand(2200, 4600); // ms after recovery before taking off
 
     // Perch state
-    const perchClaimId = `flying-goose-${variant}-${nextGooseInstanceId}`;
+    const perchClaimId = `flying-goose-${variant}-${gooseId}`;
     let mode: Mode = "fly";
     let perchEl: HTMLElement | null = null;
     let perchChar = "";
