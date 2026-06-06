@@ -184,8 +184,12 @@ const FLY_AWAY_COOLDOWN_MS = 540_000;
 const FLY_AWAY_CHANCE = 0.15;
 // Standalone reproduction trigger: how often the family may try to lay a
 // fresh clutch outside of a snack break.
-const REPRODUCTION_COOLDOWN_MS = 12 * 60_000;
+const REPRODUCTION_COOLDOWN_MS = 18 * 60_000;
+// After a brood ends, wait this long before a new clutch is allowed so the
+// adults actually return to normal life first.
+const POST_HATCH_SETTLE_MS = 4 * 60_000;
 let lastReproductionAt = 0;
+
 
 const DIALOGUE_COOLDOWN_BY_ERA: Record<GooseSceneEra, number> = {
   intro: DIALOGUE_COOLDOWN_MS,
