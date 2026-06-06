@@ -7,6 +7,7 @@ import {
   setBallPos,
   subscribeFamilyEvents,
 } from "@/lib/gooseSocial";
+import { getQuarterPeriodMs } from "@/lib/gooseBeat";
 
 /**
  * Classic Amiga "Boing" ball — checkered sphere bouncing across the screen.
