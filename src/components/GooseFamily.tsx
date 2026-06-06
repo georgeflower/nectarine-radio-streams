@@ -477,6 +477,7 @@ const GooseFamily = () => {
             dir: g.dir,
             phase: Math.random() * Math.PI * 2,
             targetX: Math.max(80, Math.min(w - 80, g.x + rand(-100, 100))),
+            targetY: adultFloorY,
             bornAt: entry.bornAt,
             bubbleUntil: wallNow + 2400,
             bubbleText: `I'm ${entry.name}! 🎉`,
