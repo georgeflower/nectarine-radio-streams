@@ -133,6 +133,7 @@ export type FamilyEvent =
   | { type: "incubation-start"; x: number; y: number }
   | { type: "incubation-end" }
   | { type: "feed-delivery"; targetX: number }
+  | { type: "all-eggs-hatched" }
   | { type: "brood-end" };
 type FamilyListener = (event: FamilyEvent) => void;
 const familyListeners = new Set<FamilyListener>();
@@ -561,11 +562,20 @@ async function runReproductionPhase() {
     }
   };
 
-  // Incubation phase: ~60s. Eggs hatch in 18–32s; father gets multiple cycles.
+  // Listen for all-eggs-hatched so we can leave incubation chatter behind
+  // as soon as the last gosling pops — mother shouldn't keep talking about
+  // eggs that no longer exist.
+  let allHatched = false;
+  const unsubHatch = subscribeFamilyEvents((ev) => {
+    if (ev.type === "all-eggs-hatched") allHatched = true;
+  });
+
+  // Incubation phase: up to ~60s, but cuts short the moment the last egg
+  // hatches so mother can switch to parenting mode.
   const INCUBATION_MS = 60_000;
   const incEnd = Date.now() + INCUBATION_MS;
   let chatterIdx = 0;
-  while (Date.now() < incEnd && getPair()) {
+  while (Date.now() < incEnd && getPair() && !allHatched) {
     stepFather();
     if (chatterIdx % 2 === 0) mother.say(pick(INCUBATION_LINES), 2400);
     chatterIdx++;
@@ -573,8 +583,12 @@ async function runReproductionPhase() {
   }
   emitFamilyEvent({ type: "incubation-end" });
 
-  // Brood phase: ~90s. Mother stays grounded chatting care lines; father
-  // keeps fetching food (now feeding goslings too).
+  // Once eggs hatch, mother gets up and waddles with the goslings instead of
+  // sitting like she's still warming them.
+  if (allHatched) mother.setIncubating(false);
+
+  // Brood phase: ~90s. Mother stays nearby chatting care lines; father keeps
+  // fetching food (now feeding goslings too).
   const BROOD_MS = 90_000;
   const broodEnd = Date.now() + BROOD_MS;
   while (Date.now() < broodEnd && getPair()) {
@@ -584,6 +598,8 @@ async function runReproductionPhase() {
     await wait(3000);
   }
 
+  unsubHatch();
+
   // Release mother.
   mother.setIncubating(false);
   father.setFoodBag(false);
@@ -591,6 +607,7 @@ async function runReproductionPhase() {
   father.setAway(false);
   emitFamilyEvent({ type: "brood-end" });
 }
+
 
 async function runFlyAway() {
 
