@@ -595,6 +595,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       restingFromTiredness = false;
       tiredRestReleaseAt = 0;
       perchEl = null;
+      releasePerch(perchClaimId);
       waddlingOnGround = false;
       heading = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
       targetHeading = heading;
