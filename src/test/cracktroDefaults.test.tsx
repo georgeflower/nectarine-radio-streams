@@ -61,48 +61,24 @@ describe("Cracktro defaults and fullscreen behavior", () => {
     });
   });
 
-  it("shows goose life simulation by default with boing ball, info text, and queue", async () => {
+  it("shows two flying geese by default with boing ball, info text, and queue", async () => {
     render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
 
     expect(await screen.findByText(/Skaven/i)).toBeInTheDocument();
-    expect(screen.getByTestId("goose-life-sim")).toBeInTheDocument();
-    expect(screen.queryAllByTestId("flying-goose")).toHaveLength(0);
+    expect(screen.queryByTestId("goose-life-sim")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("flying-goose")).toHaveLength(2);
     expect(screen.getByTestId("boing-ball")).toBeInTheDocument();
     expect(screen.getByTestId("floating-queue")).toBeInTheDocument();
   });
 
-  it("falls back to two classic geese when life simulation is turned off after migration", async () => {
-    // Simulate a user who already migrated and then manually turned sim off.
-    localStorage.setItem("cracktro-goose-life-sim-migrated-v2", "1");
-    localStorage.setItem("cracktro-goose-life-sim", "0");
+  it("hides geese when both toggles are off", async () => {
+    localStorage.setItem("cracktro-goose", "0");
+    localStorage.setItem("cracktro-goose-brown", "0");
     render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
 
     await screen.findByText(/Skaven/i);
-    expect(screen.queryByTestId("goose-life-sim")).not.toBeInTheDocument();
-    expect(screen.getAllByTestId("flying-goose")).toHaveLength(2);
-  });
-
-  it("overrides stale sim-off setting for a returning user who has not yet migrated", async () => {
-    // Returning user had "0" saved before PR #32 changed the default.
-    // No migration marker present — migration should force sim mode ON.
-    localStorage.setItem("cracktro-goose-life-sim", "0");
-    render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
-
-    await screen.findByText(/Skaven/i);
-    expect(screen.getByTestId("goose-life-sim")).toBeInTheDocument();
     expect(screen.queryAllByTestId("flying-goose")).toHaveLength(0);
-    // Migration marker must be written so the override only happens once.
-    await waitFor(() => expect(localStorage.getItem("cracktro-goose-life-sim-migrated-v2")).toBe("1"));
-  });
-
-  it("respects sim-on setting after migration marker is already present", async () => {
-    localStorage.setItem("cracktro-goose-life-sim-migrated-v2", "1");
-    localStorage.setItem("cracktro-goose-life-sim", "1");
-    render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
-
-    await screen.findByText(/Skaven/i);
-    expect(screen.getByTestId("goose-life-sim")).toBeInTheDocument();
-    expect(screen.queryAllByTestId("flying-goose")).toHaveLength(0);
+    expect(screen.queryByTestId("goose-family")).not.toBeInTheDocument();
   });
 
   it("exits fullscreen back to in-browser view without opening a floating window", async () => {
