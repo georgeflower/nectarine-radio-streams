@@ -418,8 +418,8 @@ async function runDialogue(lines: string[]) {
   if (!pair) return;
   for (let i = 0; i < lines.length; i++) {
     const g = pair[i % 2];
-    g.say(lines[i], 2400);
-    await wait(2600);
+    g.say(lines[i], 3400);
+    await wait(4200);
     if (!getPair()) return;
   }
 }
