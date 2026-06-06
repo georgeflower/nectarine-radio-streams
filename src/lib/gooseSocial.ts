@@ -121,6 +121,25 @@ export function getGoosePositions() {
   } as Record<GooseRole, { x: number; y: number }>;
 }
 
+// Perch occupancy registry — two FlyingGoose instances share the same letters/
+// windows; ensure they never land on the same perch.
+type PerchClaim = { id: string; ref: unknown; anchorX: number };
+const perchClaims = new Map<string, PerchClaim>();
+export function claimPerch(id: string, ref: unknown, anchorX: number) {
+  perchClaims.set(id, { id, ref, anchorX });
+}
+export function releasePerch(id: string) {
+  perchClaims.delete(id);
+}
+export function getPerchClaims(excludeId?: string): Array<{ ref: unknown; anchorX: number }> {
+  const out: Array<{ ref: unknown; anchorX: number }> = [];
+  for (const c of perchClaims.values()) {
+    if (excludeId && c.id === excludeId) continue;
+    out.push({ ref: c.ref, anchorX: c.anchorX });
+  }
+  return out;
+}
+
 export function reportBallBump(by: GooseRole) {
   lastBumpEvent = { by, at: Date.now() };
 }

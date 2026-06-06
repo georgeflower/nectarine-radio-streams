@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
 import { SMILEYS } from "@/lib/smileys";
 import {
+  claimPerch,
+  getPerchClaims,
   noteRecentOneliner,
   registerGoose,
+  releasePerch,
   reactToOnelinerSmiley,
   type GooseAPI,
 } from "@/lib/gooseSocial";
@@ -296,6 +299,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     const tiredRecoveryTakeoffDelay = () => rand(2200, 4600); // ms after recovery before taking off
 
     // Perch state
+    const perchClaimId = `flying-goose-${variant}-${gooseId}`;
     let mode: Mode = "fly";
     let perchEl: HTMLElement | null = null;
     let perchChar = "";
@@ -522,7 +526,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         })
         .filter((candidate): candidate is PerchCandidate<HTMLElement> => candidate !== null);
 
-      const selected = pickPerchCandidate(candidates, from);
+      const selected = pickPerchCandidate(candidates, from, Math.random, getPerchClaims(perchClaimId));
       if (!selected) return null;
       return {
         el: selected.ref,
@@ -573,6 +577,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       nextLookAt = elapsed + rand(700, 1600);
       x = cx;
       y = topY + sink - spriteH() / 2;
+      if (perchEl) claimPerch(perchClaimId, perchEl, cx);
     };
 
 
@@ -590,6 +595,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       restingFromTiredness = false;
       tiredRestReleaseAt = 0;
       perchEl = null;
+      releasePerch(perchClaimId);
       waddlingOnGround = false;
       heading = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
       targetHeading = heading;
@@ -1035,6 +1041,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       else window.removeEventListener("resize", onResize);
       eatingGooseIds.delete(gooseId);
       unregisterGoose();
+      releasePerch(perchClaimId);
     };
   }, [variant]);
 
