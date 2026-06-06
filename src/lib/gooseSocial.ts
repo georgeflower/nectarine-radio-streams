@@ -719,8 +719,15 @@ async function step() {
   const pair = getPair();
   const now = Date.now();
   if (pair && mood === "idle") {
-    // Priority: fly-away > ball-play > regular chat.
-    if (now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS && Math.random() < FLY_AWAY_CHANCE) {
+    // Priority: standalone reproduction > fly-away > ball-play > regular chat.
+    if (
+      now >= reproductionEarliestAt &&
+      now - lastReproductionAt >= REPRODUCTION_COOLDOWN_MS &&
+      !familyHasLiveOffspring()
+    ) {
+      lastReproductionAt = now;
+      await runReproductionPhase();
+    } else if (now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS && Math.random() < FLY_AWAY_CHANCE) {
       lastFlyAwayAt = now;
       await runFlyAway();
     } else if (canStartBallPlay(now)) {
@@ -738,7 +745,7 @@ async function step() {
     }
   }
   if (running) {
-    schedulerTimer = setTimeout(step, 2500);
+    schedulerTimer = setTimeout(step, 4000);
   }
 }
 
