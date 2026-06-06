@@ -720,7 +720,10 @@ async function step() {
   const now = Date.now();
   if (pair && mood === "idle") {
     // Priority: standalone reproduction > fly-away > ball-play > regular chat.
+    // Only fires once reproductionEarliestAt has been explicitly set (i.e.
+    // after a first clutch has grown up or finished brooding).
     if (
+      reproductionEarliestAt > 0 &&
       now >= reproductionEarliestAt &&
       now - lastReproductionAt >= REPRODUCTION_COOLDOWN_MS &&
       !familyHasLiveOffspring()
