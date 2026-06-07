@@ -203,20 +203,26 @@ const BoingBall = () => {
     setTimeout(parkOnShelf, 0);
 
     // Click toggle: clicking the ball flips it between parked and live.
+    // Canvas keeps pointer-events:none so it doesn't block the rest of the
+    // stage; we listen on the stage element and only consume the event when
+    // the click lands within the ball's hit radius.
     const onClick = (ev: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
+      const target = stageEl ?? canvas;
+      const rect = target.getBoundingClientRect();
       const cx = ev.clientX - rect.left;
       const cy = ev.clientY - rect.top;
-      const r = radius() * (parkMode === "parked" ? SHELF_SCALE : 1);
+      const r = radius() * (parkMode === "parked" || parkMode === "parking" ? SHELF_SCALE : 1);
       const hit = Math.hypot(cx - x, cy - y) <= r + 6;
       if (!hit) return;
+      ev.stopPropagation();
       if (parkMode === "parked" || parkMode === "parking") {
         returnFromShelf();
       } else if (parkMode === "live") {
         parkOnShelf();
       }
     };
-    canvas.addEventListener("click", onClick);
+    const clickTarget = stageEl ?? window;
+    clickTarget.addEventListener("click", onClick as EventListener, true);
 
     const gravity = () => BASE_GRAVITY * sceneScale;
     const bounce = 0.94;
