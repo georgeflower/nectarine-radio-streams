@@ -777,91 +777,17 @@ const GooseFamily = () => {
         </div>
       ))}
 
-      {/* Family adults (grown-up offspring) */}
-      {adultsRef.current.map((a) => {
-        const frames = adultFramesWhite.current!;
-        const dying = a.isDying;
-        const phase = a.phase;
-        // While airborne (flying / descending) use the same flap cycle as the
-        // original FlyingGoose (frames 0..3 at ~9 Hz). When grounded use the
-        // body/head split waddle.
-        const flying = !dying && (a.mode === "flying" || a.mode === "descending");
-        const tx = a.x - adultW / 2;
-        const ty = a.y - adultH / 2;
-        const bubble = a.bubbleUntil > now;
-        const filter = `${COLOR_FILTER[a.color]} drop-shadow(0 2px 0 rgba(0,0,0,0.28))${dying ? " opacity(0.5) grayscale(0.6)" : ""}`;
-
-        if (flying) {
-          const FLAP_HZ = 9;
-          const flapFrameIdx = Math.floor(phase * FLAP_HZ) & 3; // 0..3
-          const flapBob = Math.sin(phase * FLAP_HZ * Math.PI * 2) * 2 * sceneScale;
-          return (
-            <div key={a.id}
-              style={{
-                position: "absolute",
-                left: 0, top: 0, width: adultW, height: adultH,
-                transform: `translate3d(${tx}px, ${ty + flapBob}px, 0) scaleX(${a.dir})`,
-                transformOrigin: "center center",
-                filter,
-                transition: "filter 800ms ease-out",
-              }}
-            >
-              <img src={frames[flapFrameIdx]} alt="" width={adultW} height={adultH}
-                style={{ position: "absolute", inset: 0, width: adultW, height: adultH,
-                  imageRendering: "pixelated" }} />
-              {bubble && (
-                <div style={{ position: "absolute", left: 0, top: 0, transform: `scaleX(${a.dir})` }} />
-              )}
-            </div>
-          );
-        }
-
-        const stepCycle = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2);
-        const stepLanding = Math.abs(stepCycle);
-        const bodyTX = stepCycle * WADDLE_CHAR_BODY_SWAY * sceneScale * (dying ? 0.4 : 1);
-        const bodyTY = stepLanding * WADDLE_CHAR_BODY_BOB * sceneScale * (dying ? 0.4 : 1);
-        const bodyTilt = stepCycle * WADDLE_CHAR_BODY_TILT * (dying ? 0.4 : 1);
-        // Head stays welded to the neck socket: no independent translate;
-        // only a gentle tilt rotating around the neck pivot.
-        const headTX = 0;
-        const headTY = dying ? 6 * sceneScale : 0;
-        const headTilt = (Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 1.1) * WADDLE_CHAR_HEAD_TILT * 0.5 * (dying ? 0.3 : 1)) - (dying ? 18 : 0);
-        return (
-          <div key={a.id}
-            style={{
-              position: "absolute",
-              left: 0, top: 0, width: adultW, height: adultH,
-              transform: `translate3d(${tx}px, ${ty}px, 0) scaleX(${a.dir})`,
-              transformOrigin: "center center",
-              filter,
-              transition: "filter 800ms ease-out",
-            }}
-          >
-            <div style={{ position: "absolute", inset: 0, width: adultW, height: adultH,
-              transform: `translate(${bodyTX}px, ${bodyTY}px) rotate(${bodyTilt}deg)`,
-              transformOrigin: "center center" }}>
-              <img src={frames[STAND_BODY]} alt="" width={adultW} height={adultH}
-                style={{ position: "absolute", inset: 0, width: adultW, height: adultH,
-                  imageRendering: "pixelated" }} />
-              <img src={frames[STAND_HEAD]} alt="" width={adultW} height={adultH}
-                style={{ position: "absolute", inset: 0, width: adultW, height: adultH,
-                  imageRendering: "pixelated",
-                  transformOrigin: `${NECK_PIVOT_X_PX * sceneScale}px ${NECK_PIVOT_Y_PX * sceneScale}px`,
-                  transform: `translate(${headTX}px, ${headTY}px) rotate(${headTilt}deg)` }} />
-            </div>
-
-            {bubble && (
-              <div style={{ position: "absolute", left: 0, top: 0, transform: `scaleX(${a.dir})` }} />
-            )}
-          </div>
-        );
-      })}
-
-      {/* Adult bubbles (clamped) */}
-      {adultsRef.current.filter((a) => a.bubbleUntil > now && a.bubbleText).map((a) => (
-        <div key={`ab-${a.id}`}>
-          {renderBubble(a.bubbleText, a.x, a.y, adultH, a.dir)}
-        </div>
+      {/* Family adults (grown-up offspring) — each is a full FlyingGoose
+          instance, so they use the same flight/perch/waddle/stamina state
+          machine as the originals. Color recolor is done with CSS filter. */}
+      {adultsRef.current.map((a) => (
+        <FlyingGoose
+          key={a.id}
+          role="family"
+          variant="white"
+          colorFilter={COLOR_FILTER[a.color]}
+          isDying={!!a.isDying}
+        />
       ))}
     </div>
   );
