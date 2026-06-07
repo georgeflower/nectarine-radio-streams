@@ -251,6 +251,15 @@ const Cracktro = ({
   useEffect(() => subscribePlayerTime(() => setTimeTick((t) => (t + 1) % 1_000_000)), []);
   const { currentTime, duration } = getPlayerTime();
 
+  // Refresh remaining time every second.
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const timeLeft = nowPlaying ? computeTimeLeft(nowPlaying.playstart, nowPlaying.lengthSec) : "-";
+  const songLength = nowPlaying ? formatDuration(nowPlaying.lengthSec) : "";
+
   // Song-rating chatter — fire once per (track, ratingTier) combo.
   const lastChatterKeyRef = useRef<string>("");
   useEffect(() => {
