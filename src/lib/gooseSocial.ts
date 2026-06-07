@@ -951,6 +951,11 @@ export const __testing = {
     lastReproductionAt = 0;
     reproductionEarliestAt = 0;
     lastBumpEvent = null;
+    debugCounters.bumps = 0; debugCounters.deaths = 0; debugCounters.mournings = 0;
+    debugCounters.lastBumpAt = 0; debugCounters.lastDeathAt = 0; debugCounters.lastMourningAt = 0;
+    perchClaims.clear();
+    familySnapshotProvider = null;
+
     recentOneliner = null;
     recentOnelinerTrail = [];
     dialogueUsage.clear();
