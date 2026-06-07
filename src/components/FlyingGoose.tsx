@@ -141,9 +141,26 @@ const INDEFINITE_PERCH_DELAY_MS = 1_000_000_000;
 type Props = {
   oneliners?: OnelinerEntry[];
   variant?: GooseVariant;
+  /** "original" = the two coordinator-driven mother/father geese.
+   *  "family"   = a grown-up offspring adult. Same flight/perch/waddle
+   *  logic, but it is NOT registered with the social coordinator (so it
+   *  never gets pulled into incubation, mothering, ball-play chases,
+   *  food fetching or fly-away). Defaults to "original". */
+  role?: "original" | "family";
+  /** Extra CSS filter applied to the sprite wrap (used by family adults
+   *  to recolor the white palette via hue/saturation shifts). */
+  colorFilter?: string;
+  /** When true, fade & desaturate the sprite to signal end-of-life. */
+  isDying?: boolean;
 };
 
-const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
+const FlyingGoose = ({
+  oneliners = [],
+  variant = "white",
+  role = "original",
+  colorFilter,
+  isDying = false,
+}: Props) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const imgStandBodyRef = useRef<HTMLImageElement | null>(null);
