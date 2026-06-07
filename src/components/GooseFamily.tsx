@@ -112,33 +112,19 @@ type Gosling = {
   sleepUntil?: number;
 };
 
-type AdultActivity = "waddle" | "sit" | "socialise" | "play";
-type AdultMode = "ground" | "flying" | "descending";
-
+// Family adults are now rendered as <FlyingGoose role="family" .../> so they
+// share the exact same flight/perch/waddle/stamina state machine as the two
+// originals. This component only owns the lifecycle (promotion, cap, dying,
+// mourning, persistence) — not the per-frame motion.
 type FamilyAdult = {
   id: string;
   rosterId: string;
   color: GooseColor;
-  x: number;
-  y: number;
-  dir: 1 | -1;
-  phase: number;
-  targetX: number;
-  targetY: number;
   bornAt: number;
-  bubbleUntil: number;
-  bubbleText: string;
   diesAt?: number;
   isDying?: boolean;
-  activity: AdultActivity;
-  activityUntil: number;
-  playHopPhase: number;
-  mode: AdultMode;
-  takeoffAt: number;
-  avoidUntil?: number;
 };
 
-const sitDuration = () => 9000 + Math.random() * 16000; // ms on the floor before next takeoff
 
 
 function rand(a: number, b: number) { return a + Math.random() * (b - a); }
