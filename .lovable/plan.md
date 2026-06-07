@@ -1,93 +1,43 @@
-## Goals
+## Problem 1 — Grown-up adults use the wrong sprite when flying
 
-1. Goslings that grow up should actually take off and fly (currently they keep waddling because the new adult is spawned in `ground` mode with no immediate takeoff).
-2. Eliminate the residual oscillation when two geese bump — make `PERSONAL_SPACE_PX`, the post-bump cool-down, and the separation distance tunable in one place and tune the defaults.
-3. Add a developer debug overlay that exposes per-goose state, perch claims, collision vectors, and all life-cycle timers/counters with their governing rules.
+Grown-up offspring adults in `src/components/GooseFamily.tsx` always render the standing waddle sprite (frames `STAND_BODY`/`STAND_HEAD` = 5/6), even when their internal `mode` is `"flying"` or `"descending"`. The two original geese (rendered by `FlyingGoose.tsx`) correctly swap to the flight sprite cycle (frames 0–3). Result: a grown-up labelled `flying·play` in debug visibly bobs along with the walking animation instead of flapping like an original.
 
-All changes stay in existing files plus one new debug overlay component. No backend, no new dependencies.
+(The `mode: "?"` shown for originals in the debug HUD is just because `getGoosePositions()` only exposes `{x,y}` — cosmetic, not part of this fix.)
 
-## 1. Goslings grow up → enter flight (`GooseFamily.tsx`)
+### Fix
 
-When a gosling crosses `GROW_UP_MS` and is promoted to a `FamilyAdult`, set the initial mode to `flying` rather than `ground`:
+In the "Family adults" render block of `src/components/GooseFamily.tsx`:
 
-- New adult spawn fields: `mode = "flying"`, `y = upper-air band`, `targetX/targetY` picked in the upper band (same logic the original FlyingGoose uses on first appearance), `takeoffAt = undefined` (will be set when it lands).
-- Add a one-shot guard: if a promoted adult is still `mode === "ground"` within 250ms of `bornAt`, force `mode = "flying"` (covers any persisted/restored case).
-- When the new flying adult reaches its airborne target → run the existing `approach` → `descending` → `ground` chain. On `ground` entry, set `takeoffAt = now + sitDuration()` so the standard cycle continues.
+1. Detect flight state: `const flying = a.mode === "flying" || a.mode === "descending";`
+2. When `flying`, render a single flight sprite instead of the body/head split:
+   - Cycle through frames `0..3` derived from `a.phase` at a flap cadence comparable to `FlyingGoose` (~110 ms/frame): `const frameIdx = Math.floor(phase * FLAP_FREQ) & 3;`
+   - Replace the walking sway with a subtle vertical flap bob (`sin(phase * 2π * FLAP_FREQ) * scale`).
+   - Skip `bodyTilt` while flying.
+3. When `!flying`, keep the existing body/head split waddle render exactly as today.
+4. Keep the directional `scaleX(a.dir)` and color filter logic in both branches.
 
-No other lifecycle behavior changes.
+No state-machine or debug overlay changes — purely a render-time branch on `a.mode`.
 
-## 2. Tunable collision avoidance (`GooseFamily.tsx`, `FlyingGoose.tsx`, `gooseSocial.ts`)
+## Problem 2 — Boing ball never returns to play
 
-Centralize the magic numbers in a single exported constants object in `gooseSocial.ts`:
+The Amiga boing ball is supposed to leave the shelf and zoom into play when the geese want to ball-play, then zoom back up to the shelf when the play session ends. Currently it stays parked on the shelf forever after the first brood (debug HUD: `last ball play 24m58s ago`, cooldown `0s` — eligible, but it never re-enters play).
 
-```ts
-export const GOOSE_COLLISION = {
-  personalSpacePx: 34,      // up from 28 — clears beak/tail overlap
-  separationPushPx: 18,     // half-overlap minimum push per frame
-  bumpCooldownMs: 650,      // up from 400 — kills oscillation
-  retargetJitterPx: [80, 160] as const, // new target offset range after bump
-  perchPersonalSpacePx: 36, // perch-anchor exclusion radius
-};
-```
+### Investigation needed (read-only)
 
-All ground/waddle code (`GooseFamily.tsx` adults + goslings, `FlyingGoose.tsx` originals) and `pickPerchCandidate` read from this constant instead of local literals.
+- `src/components/BoingBall.tsx` — current shelf/in-play state machine, what triggers `play` mode, what triggers return to shelf.
+- `src/lib/gooseSocial.ts` — how ball-play is scheduled (`lastBallPlayAt`, `ballPlayCooldownMs`, any `wantsBallPlay`/event emission) and what gates it. Confirm whether the gate is being held permanently by a stale flag (e.g. brood active, goslings present, post-hatch settle, mothering mode).
+- `src/components/GooseFamily.tsx` / `src/components/FlyingGoose.tsx` — any consumer that toggles the ball or that blocks ball-play while a brood/goslings exist.
 
-Tuning rules added on top of the existing pairwise loop:
+### Fix (after investigation, scope to be confirmed)
 
-- After a bump, set `a.avoidUntil = now + bumpCooldownMs` and `a.avoidPartnerId = partner.id`. While `now < avoidUntil`, the avoider may not pick a new target whose sign toward `avoidPartnerId` is toward the partner — re-roll the target sign instead.
-- Replace symmetric push with asymmetric push: only the body with the larger `|targetX - x|` (i.e. the more "committed" mover) gets re-targeted; the other only gets a position nudge. This prevents the both-flip-each-frame oscillation seen in earlier builds.
-- Add a hysteresis band: separation logic only triggers when `dist < personalSpacePx`; clearing only happens once `dist > personalSpacePx + 6`. Inside the band, no second bump fires.
+1. In whichever module owns the "should ball-play start now?" decision, ensure the gate clears once goslings are grown / brood has ended and no eggs are live, so the cooldown alone governs re-entry.
+2. `BoingBall.tsx`: on the ball-play start signal, animate from shelf → into play (zoom-in); on the end signal (or after the play window expires), animate back to the shelf (zoom-out). Both transitions must be re-entrant so the ball can cycle indefinitely.
+3. Emit/consume a clear start/stop event pair (reuse the existing snack/play event bus rather than adding a new global) and stamp `lastBallPlayAt` only at play start (not at every re-render) so the debug timer reflects reality.
+4. Verify in the debug HUD: after a play session, `last ball play` resets to `0s ago` and the next session fires once `cooldown` elapses, regardless of whether goslings or eggs exist.
 
-## 3. Debug overlay (new `src/components/GooseDebugOverlay.tsx`, mounted in `Cracktro.tsx`)
+## Files
 
-A toggleable, fixed-position panel (top-right, monospace, semi-transparent dark surface) shown only when a debug flag is on. Toggle via:
-
-- Keyboard: `Shift+D` while in Cracktro.
-- URL: `?gooseDebug=1`.
-- Persists in `localStorage` under `cracktro-goose-debug`.
-
-The overlay subscribes (via a new `subscribeGooseDebug` event on `gooseSocial.ts` + a polling `requestAnimationFrame` for live position data) and renders three sections:
-
-### 3a. Per-goose table
-Columns: `id`, `kind` (original/family-adult/gosling), `color/variant`, `mode` (ground/flying/descending/approach/land), `x,y`, `dir`, `targetX,Y`, `perchClaim` (key or `—`), `avoidUntil` (ms remaining), `avoidPartner`.
-
-### 3b. Collision vectors
-For every active pair within `personalSpacePx * 1.5`, render a row `A ↔ B  dist=NN  push=±N  cooldown=Nms`. Also overlay thin colored lines between the live sprite positions on screen (absolute-positioned 1px lines, only when debug is on) so overlap is visually obvious.
-
-### 3c. Life-cycle timers & counters
-
-For every event with a timer/counter, show:
-- Current value
-- Rule that governs it (constant name + value), e.g. `GROW_UP_MS = 8 min`
-- Last event timestamp + elapsed since
-- Next scheduled time (if applicable)
-
-Entries to include:
-
-| Group | Counter / Timer | Rule |
-|---|---|---|
-| Eggs | live eggs count, last egg laid at, next hatch in | `MAX_LIVE_EGGS=4`, hatch window 18–32s |
-| Goslings | count, oldest age, time until next grow-up | `GROW_UP_MS=8min`, `MAX_GOSLINGS=8` |
-| Adults | family adult count, total (incl. originals), oldest `diesAt` countdown | `MAX_TOTAL_ADULTS=8`, `ADULT_LIFE_BEFORE_DEATH_MS=5min` |
-| Mourning | rituals run (session counter), currently active y/n, time remaining | `MOURNING_DURATION_MS=45s` |
-| Deaths | total deaths this session, last death at | n/a |
-| Reproduction | last reproduction at, cooldown remaining | `lastReproductionAt` from `gooseLife` |
-| Snack break / fly-away | last run at, next eligible at | from `gooseSocial` cooldowns |
-| Ball play | last run at, cooldown remaining | `getBallPlayCooldownMs` |
-| Perches | claims list `(gooseId → perchKey @ anchorX)` | `perchPersonalSpacePx=36` |
-| Collisions | bumps this session, currently in cool-down list | `bumpCooldownMs=650` |
-
-Counters that have never fired show `0` / `—` rather than being hidden — every counter is always present.
-
-To support this, add small session counters and getters to `gooseSocial.ts`:
-- `recordDeath()`, `recordMourning()`, `recordBump()` plus `getDebugCounters()` returning the structured snapshot above.
-- `GooseFamily.tsx` calls these at the existing points (death scheduling, mourning start, collision resolution).
-
-The overlay is purely additive — when the flag is off, nothing renders and there is zero runtime cost beyond a single `localStorage.getItem` check.
-
-## Technical notes
-
-- Files touched: `src/lib/gooseSocial.ts`, `src/lib/gooseBehavior.ts` (read constant from gooseSocial), `src/components/GooseFamily.tsx`, `src/components/FlyingGoose.tsx`, `src/components/Cracktro.tsx` (mount overlay + key handler), new `src/components/GooseDebugOverlay.tsx`.
-- Tests: extend `gooseSocial.test.ts` with `recordBump`/`getDebugCounters` round-trip; extend `gooseBehavior.test.ts` to assert `pickPerchCandidate` reads `perchPersonalSpacePx` from the new constant.
-- No design-token or styling changes outside the debug overlay (which uses existing tokens).
-- No persistence schema changes; new adult `mode` and `avoidUntil` remain runtime-only.
+- `src/components/GooseFamily.tsx` — branch adult render for flying vs waddling.
+- `src/components/BoingBall.tsx` — shelf ↔ play state machine, re-entrant.
+- `src/lib/gooseSocial.ts` — unblock ball-play scheduling after broods; ensure `lastBallPlayAt` is stamped on start.
+- (Possibly) `src/components/FlyingGoose.tsx` — if it gates ball-play participation while mothering/parenting.
