@@ -488,26 +488,35 @@ const GooseFamily = () => {
         for (let i = 0; i < grownOut.length; i++) {
           const g = grownOut[i];
           const entry = promoted[i];
+          // Promoted gosling enters FLIGHT (not waddle) — mirrors a fresh
+          // FlyingGoose appearance. Spawned up in the air band with a
+          // horizontal fly target; the standard flying -> descending -> ground
+          // chain takes over from there.
+          const startY = rand(h * 0.18, h * 0.42);
+          const flySign = Math.random() < 0.5 ? -1 : 1;
+          const flyTargetX = Math.max(60, Math.min(w - 60,
+            g.x + flySign * (160 + Math.random() * 220)));
           adultsRef.current.push({
             id: `a-${entry.id}`,
             rosterId: entry.id,
             color: entry.color,
             x: g.x,
-            y: adultFloorY,
-            dir: g.dir,
+            y: startY,
+            dir: flyTargetX > g.x ? 1 : -1,
             phase: Math.random() * Math.PI * 2,
-            targetX: Math.max(80, Math.min(w - 80, g.x + rand(-100, 100))),
-            targetY: adultFloorY,
+            targetX: flyTargetX,
+            targetY: rand(h * 0.2, h * 0.5),
             bornAt: entry.bornAt,
             bubbleUntil: wallNow + 2400,
             bubbleText: `I'm ${entry.name}! 🎉`,
             activity: "waddle",
             activityUntil: wallNow + 4000 + Math.random() * 8000,
             playHopPhase: 0,
-            mode: "ground",
-            takeoffAt: wallNow + sitDuration(),
+            mode: "flying",
+            takeoffAt: 0, // set on first landing
           });
         }
+
         setRoster([...kept, ...promoted]);
         emitFamilyEvent({ type: "goslings-grown" });
         goslingsRef.current = remaining;
