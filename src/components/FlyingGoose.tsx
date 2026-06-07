@@ -331,6 +331,12 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
     let incubatingX = 0;
     const incubatingFloorY = () => h - spriteH() * 0.6 - 12;
 
+    // Mothering: after eggs hatch, mother stays grounded waddling around
+    // the floor band, watching/feeding goslings. Never flies until all
+    // goslings have grown up (`setMothering(false)`).
+    let mothering = false;
+    let motherWatch = false;
+
     // Ground-waddle: occasionally land on the floor band (bottom 20%) and
     // walk around like the family adults, instead of always perching.
     let waddlingOnGround = false;
