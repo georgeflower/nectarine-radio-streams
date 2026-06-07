@@ -1,58 +1,93 @@
 ## Goals
 
-1. Grown-up goslings (family adults) behave like the original white/brown FlyingGoose — including flight, ground-band waddle targeting, and re-takeoff timing.
-2. The top-left button is mislabeled: it currently reads "Era: …" but is the Exit button. Restore a clear Exit control while keeping the era readout.
-3. Geese (and goslings) must never occupy the same pixel space — on the ground, or while perched. On collision they should peel off in a different direction.
+1. Goslings that grow up should actually take off and fly (currently they keep waddling because the new adult is spawned in `ground` mode with no immediate takeoff).
+2. Eliminate the residual oscillation when two geese bump — make `PERSONAL_SPACE_PX`, the post-bump cool-down, and the separation distance tunable in one place and tune the defaults.
+3. Add a developer debug overlay that exposes per-goose state, perch claims, collision vectors, and all life-cycle timers/counters with their governing rules.
 
-All changes stay in the existing files. No backend, no new data, no new dependencies.
+All changes stay in existing files plus one new debug overlay component. No backend, no new dependencies.
 
-## 1. Mirror white/brown goose rules for grown adults (`GooseFamily.tsx`)
+## 1. Goslings grow up → enter flight (`GooseFamily.tsx`)
 
-Today the grown adults use a free activity-roll (waddle / sit / socialise / play / fly) and rarely actually fly because the descending phase keeps preempting it. Re-align with the original `FlyingGoose` state machine:
+When a gosling crosses `GROW_UP_MS` and is promoted to a `FamilyAdult`, set the initial mode to `flying` rather than `ground`:
 
-- **Replace the activity roll with a fly-cycle mirror:**
-  - States per adult: `flying`, `approach`, `land`, `ground` (with sub-activities waddle / sit / socialise / play during `ground`). Add `mode` + `groundEntersAt` + `takeoffAt` fields to `FamilyAdult` (runtime only, no persistence change).
-  - On spawn (gosling promoted to adult) the adult enters `flying` first (matches FlyingGoose first appearance), then descends via `approach` → `land` to the ground band, then runs ground activities.
-- **Ground-band targeting:** during `ground`, `targetY` is always clamped to the same `adultFloorY` band the white/brown geese use; vertical motion is from waddle bob only, not from activity reroll.
-- **Re-takeoff timing:** copy the FlyingGoose timing model — pick `takeoffAt = now + sitDuration()` when entering `ground`, where `sitDuration()` matches the original range used in `FlyingGoose.tsx` (~12–25s with the same jitter). When `now >= takeoffAt` call the equivalent of `takeoff()`: set `mode = "flying"`, pick a new `targetX/targetY` in the upper band using the same min-travel + clamp logic FlyingGoose uses.
-- **Direction stability** (already in place) is kept: only flip `dir` when `|dxToTarget| > 30`.
-- **Descending preempt fix:** remove the current short-circuit that converts the fly window's end into a forced descent before the goose has actually traversed. The new flow uses `approach`/`land` only when `takeoffAt` is finite and the goose has reached its airborne target, identical to FlyingGoose.
-- **Result:** grown adults will actually take off again on a schedule, glide across, descend cleanly, walk on the floor band, and repeat — visually indistinguishable from the originals (modulo color).
+- New adult spawn fields: `mode = "flying"`, `y = upper-air band`, `targetX/targetY` picked in the upper band (same logic the original FlyingGoose uses on first appearance), `takeoffAt = undefined` (will be set when it lands).
+- Add a one-shot guard: if a promoted adult is still `mode === "ground"` within 250ms of `bornAt`, force `mode = "flying"` (covers any persisted/restored case).
+- When the new flying adult reaches its airborne target → run the existing `approach` → `descending` → `ground` chain. On `ground` entry, set `takeoffAt = now + sitDuration()` so the standard cycle continues.
 
-No changes to: gosling-stage behavior, reproduction scheduler, mourning ritual, chatter, food/ball, originals (`FlyingGoose`), neck-socket transforms.
+No other lifecycle behavior changes.
 
-## 2. Exit vs Era button (`Cracktro.tsx`, ~line 796)
+## 2. Tunable collision avoidance (`GooseFamily.tsx`, `FlyingGoose.tsx`, `gooseSocial.ts`)
 
-The single top-left button is wired to `onExit` but its label says `Era: {sceneEraConfig.label}`. Split it into the intended two controls:
+Centralize the magic numbers in a single exported constants object in `gooseSocial.ts`:
 
-- **Exit button (top-left):** label/text reads `EXIT`, keeps `aria-label="Exit Cracktro"`, keeps the existing onClick. Same styling/position.
-- **Era readout:** render the `Era: {label}` chip next to it (immediately to the right, same vertical position, same chrome) only when `sceneErasOn`. It's a passive readout, not a button — `<div>` with same border/typography.
-- The hidden `sr-only` era announcement stays as-is.
+```ts
+export const GOOSE_COLLISION = {
+  personalSpacePx: 34,      // up from 28 — clears beak/tail overlap
+  separationPushPx: 18,     // half-overlap minimum push per frame
+  bumpCooldownMs: 650,      // up from 400 — kills oscillation
+  retargetJitterPx: [80, 160] as const, // new target offset range after bump
+  perchPersonalSpacePx: 36, // perch-anchor exclusion radius
+};
+```
 
-No other Cracktro behavior changes.
+All ground/waddle code (`GooseFamily.tsx` adults + goslings, `FlyingGoose.tsx` originals) and `pickPerchCandidate` read from this constant instead of local literals.
 
-## 3. Collision avoidance — geese never overlap (`GooseFamily.tsx`, `FlyingGoose.tsx`)
+Tuning rules added on top of the existing pairwise loop:
 
-Introduce a lightweight shared "no-overlap" rule used in two places: ground waddling and perch selection.
+- After a bump, set `a.avoidUntil = now + bumpCooldownMs` and `a.avoidPartnerId = partner.id`. While `now < avoidUntil`, the avoider may not pick a new target whose sign toward `avoidPartnerId` is toward the partner — re-roll the target sign instead.
+- Replace symmetric push with asymmetric push: only the body with the larger `|targetX - x|` (i.e. the more "committed" mover) gets re-targeted; the other only gets a position nudge. This prevents the both-flip-each-frame oscillation seen in earlier builds.
+- Add a hysteresis band: separation logic only triggers when `dist < personalSpacePx`; clearing only happens once `dist > personalSpacePx + 6`. Inside the band, no second bump fires.
 
-### 3a. Ground / waddle separation
+## 3. Debug overlay (new `src/components/GooseDebugOverlay.tsx`, mounted in `Cracktro.tsx`)
 
-- Define a `PERSONAL_SPACE_PX` (~28px at base scale, scaled by `sceneScale`).
-- Each frame, for every grounded body (family adults, family goslings, and the originals when on the floor), check pairwise distance against `PERSONAL_SPACE_PX`. If two overlap:
-  - Compute the horizontal vector between them; push each by half the overlap so they separate.
-  - Flip the *target* X of the moving one (`a.targetX = a.x + sign(awayDir) * rand(60, 140)`) so the next step continues away rather than back into the partner — this is the "go in another direction on bump" behavior.
-  - Apply a short cool-down (~400ms) before that adult can pick a new target that would re-cross the partner, so they don't oscillate.
-- Implementation lives in `GooseFamily.tsx` (single pass over `adultsRef.current` + `goslingsRef.current`). The originals expose their floor position via the existing `GooseAPI.getPosition`; include them as read-only obstacles so family members steer around them. The originals themselves get the same avoidance check added inside `FlyingGoose.tsx`'s ground tick using positions from `gooseSocial`'s registered API list.
+A toggleable, fixed-position panel (top-right, monospace, semi-transparent dark surface) shown only when a debug flag is on. Toggle via:
 
-### 3b. Perch separation
+- Keyboard: `Shift+D` while in Cracktro.
+- URL: `?gooseDebug=1`.
+- Persists in `localStorage` under `cracktro-goose-debug`.
 
-- When picking a perch (`pickPerchCandidate` in `src/lib/gooseBehavior.ts`), accept an `occupied: Array<{ ref: T; offset: number }>` argument. Reject any candidate `(ref, offset)` whose anchor X is within `PERSONAL_SPACE_PX` of an already-occupied anchor on the same letter/window.
-- Track currently-perched geese in a small shared registry in `gooseSocial.ts` (`registerPerch(id, perchKey, anchorX)` / `releasePerch(id)`); `FlyingGoose` calls these on land/takeoff. `pickPerchCandidate` consults the registry via a new optional parameter so callers don't have to thread state manually.
-- If every perch candidate is occupied, fall back to a ground waddle target instead of stacking on the same letter.
+The overlay subscribes (via a new `subscribeGooseDebug` event on `gooseSocial.ts` + a polling `requestAnimationFrame` for live position data) and renders three sections:
+
+### 3a. Per-goose table
+Columns: `id`, `kind` (original/family-adult/gosling), `color/variant`, `mode` (ground/flying/descending/approach/land), `x,y`, `dir`, `targetX,Y`, `perchClaim` (key or `—`), `avoidUntil` (ms remaining), `avoidPartner`.
+
+### 3b. Collision vectors
+For every active pair within `personalSpacePx * 1.5`, render a row `A ↔ B  dist=NN  push=±N  cooldown=Nms`. Also overlay thin colored lines between the live sprite positions on screen (absolute-positioned 1px lines, only when debug is on) so overlap is visually obvious.
+
+### 3c. Life-cycle timers & counters
+
+For every event with a timer/counter, show:
+- Current value
+- Rule that governs it (constant name + value), e.g. `GROW_UP_MS = 8 min`
+- Last event timestamp + elapsed since
+- Next scheduled time (if applicable)
+
+Entries to include:
+
+| Group | Counter / Timer | Rule |
+|---|---|---|
+| Eggs | live eggs count, last egg laid at, next hatch in | `MAX_LIVE_EGGS=4`, hatch window 18–32s |
+| Goslings | count, oldest age, time until next grow-up | `GROW_UP_MS=8min`, `MAX_GOSLINGS=8` |
+| Adults | family adult count, total (incl. originals), oldest `diesAt` countdown | `MAX_TOTAL_ADULTS=8`, `ADULT_LIFE_BEFORE_DEATH_MS=5min` |
+| Mourning | rituals run (session counter), currently active y/n, time remaining | `MOURNING_DURATION_MS=45s` |
+| Deaths | total deaths this session, last death at | n/a |
+| Reproduction | last reproduction at, cooldown remaining | `lastReproductionAt` from `gooseLife` |
+| Snack break / fly-away | last run at, next eligible at | from `gooseSocial` cooldowns |
+| Ball play | last run at, cooldown remaining | `getBallPlayCooldownMs` |
+| Perches | claims list `(gooseId → perchKey @ anchorX)` | `perchPersonalSpacePx=36` |
+| Collisions | bumps this session, currently in cool-down list | `bumpCooldownMs=650` |
+
+Counters that have never fired show `0` / `—` rather than being hidden — every counter is always present.
+
+To support this, add small session counters and getters to `gooseSocial.ts`:
+- `recordDeath()`, `recordMourning()`, `recordBump()` plus `getDebugCounters()` returning the structured snapshot above.
+- `GooseFamily.tsx` calls these at the existing points (death scheduling, mourning start, collision resolution).
+
+The overlay is purely additive — when the flag is off, nothing renders and there is zero runtime cost beyond a single `localStorage.getItem` check.
 
 ## Technical notes
 
-- Files touched: `src/components/Cracktro.tsx`, `src/components/GooseFamily.tsx`, `src/components/FlyingGoose.tsx`, `src/lib/gooseBehavior.ts`, `src/lib/gooseSocial.ts`.
-- `FamilyAdult` gains optional runtime fields (`mode`, `takeoffAt`, `avoidUntil`); existing persisted shape is unchanged.
-- Tests: existing `gooseSocial.test.ts` and `flyingGooseLayout.test.ts` should still pass; add a small unit test that `pickPerchCandidate` skips occupied anchors within `PERSONAL_SPACE_PX`.
-- No styling/design-token changes.
+- Files touched: `src/lib/gooseSocial.ts`, `src/lib/gooseBehavior.ts` (read constant from gooseSocial), `src/components/GooseFamily.tsx`, `src/components/FlyingGoose.tsx`, `src/components/Cracktro.tsx` (mount overlay + key handler), new `src/components/GooseDebugOverlay.tsx`.
+- Tests: extend `gooseSocial.test.ts` with `recordBump`/`getDebugCounters` round-trip; extend `gooseBehavior.test.ts` to assert `pickPerchCandidate` reads `perchPersonalSpacePx` from the new constant.
+- No design-token or styling changes outside the debug overlay (which uses existing tokens).
+- No persistence schema changes; new adult `mode` and `avoidUntil` remain runtime-only.
