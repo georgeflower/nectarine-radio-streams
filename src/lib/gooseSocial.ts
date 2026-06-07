@@ -279,7 +279,27 @@ familyListeners.add((ev) => {
   } else if (ev.type === "brood-end") {
     lastBroodEndAt = Date.now();
   }
+  // Mothering toggle: switch the mother into ground-bound parenting mode
+  // the moment the last egg hatches, and release her once no goslings
+  // remain (either after the last one grew up, or anytime offspring count
+  // drops to zero).
+  if (ev.type === "all-eggs-hatched") {
+    const mother = getPair()?.find((g) => g.variant === "white");
+    mother?.setMothering?.(true, mother.getPosition().x);
+  } else if (ev.type === "goslings-grown" || ev.type === "brood-end") {
+    if (!familyHasLiveOffspring()) {
+      const mother = getPair()?.find((g) => g.variant === "white");
+      mother?.setMothering?.(false);
+      mother?.setMotherWatch?.(false);
+    }
+  }
 });
+
+/** Called by the family ticker to freeze the mother while goslings sleep. */
+export function setMotherWatchingGoslings(active: boolean) {
+  const mother = getPair()?.find((g) => g.variant === "white");
+  mother?.setMotherWatch?.(active);
+}
 
 let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
