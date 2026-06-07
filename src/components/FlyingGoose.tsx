@@ -1163,7 +1163,12 @@ const FlyingGoose = ({
           height: BASE_SPRITE_H,
           willChange: "transform",
           transformOrigin: "center center",
-          filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.25))",
+          filter: [
+            colorFilter ?? "",
+            isDying ? "opacity(0.5) grayscale(0.6)" : "",
+            "drop-shadow(0 2px 0 rgba(0,0,0,0.25))",
+          ].filter(Boolean).join(" "),
+          transition: "filter 600ms ease-out",
         }}
       >
         <img
