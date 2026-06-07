@@ -68,7 +68,7 @@ const GooseDebugOverlay = () => {
   const rafRef = useRef<number>(0);
   // Draggable panel position (top/left). Persisted across reloads.
   const [pos, setPos] = useState<{ top: number; left: number }>(() => {
-    if (typeof window === "undefined") return { top: 8, left: Math.max(8, window?.innerWidth - 468) };
+    if (typeof window === "undefined") return { top: 8, left: 8 };
     try {
       const raw = localStorage.getItem(POS_STORAGE_KEY);
       if (raw) {
