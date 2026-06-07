@@ -66,6 +66,19 @@ const GooseDebugOverlay = () => {
   const on = useDebugFlag();
   const [, setTick] = useState(0);
   const rafRef = useRef<number>(0);
+  // Draggable panel position (top/left). Persisted across reloads.
+  const [pos, setPos] = useState<{ top: number; left: number }>(() => {
+    if (typeof window === "undefined") return { top: 8, left: Math.max(8, window?.innerWidth - 468) };
+    try {
+      const raw = localStorage.getItem(POS_STORAGE_KEY);
+      if (raw) {
+        const p = JSON.parse(raw) as { top: number; left: number };
+        if (typeof p?.top === "number" && typeof p?.left === "number") return p;
+      }
+    } catch { /* ignore */ }
+    return { top: 8, left: Math.max(8, window.innerWidth - 468) };
+  });
+  const dragState = useRef<{ dx: number; dy: number } | null>(null);
   useEffect(() => {
     if (!on) return;
     let raf = 0;
@@ -79,6 +92,28 @@ const GooseDebugOverlay = () => {
     rafRef.current = raf;
     return () => cancelAnimationFrame(raf);
   }, [on]);
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!dragState.current) return;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const left = Math.max(0, Math.min(w - 60, e.clientX - dragState.current.dx));
+      const top = Math.max(0, Math.min(h - 24, e.clientY - dragState.current.dy));
+      setPos({ top, left });
+    };
+    const onUp = () => {
+      if (!dragState.current) return;
+      dragState.current = null;
+      try { localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(pos)); } catch { /* ignore */ }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [pos]);
 
   if (!on) return null;
   const now = Date.now();
