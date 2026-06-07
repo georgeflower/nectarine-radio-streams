@@ -12,6 +12,7 @@ import {
 } from "@/lib/gooseSocial";
 
 const STORAGE_KEY = "cracktro-goose-debug";
+const POS_STORAGE_KEY = "cracktro-goose-debug-pos";
 
 // Mirror the GooseFamily constants here for display (kept in lock-step manually).
 const RULES = {
