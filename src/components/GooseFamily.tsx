@@ -578,9 +578,12 @@ const GooseFamily = () => {
         }
 
         setRoster([...kept, ...promoted]);
-        emitFamilyEvent({ type: "goslings-grown" });
+        // Save BEFORE emitting so listeners (e.g. BoingBall) that re-read
+        // persisted gosling state see the post-promotion truth and can
+        // un-park the ball when the last gosling has grown up.
         goslingsRef.current = remaining;
         saveGoslings(remaining);
+        emitFamilyEvent({ type: "goslings-grown" });
       } else {
         goslingsRef.current = remaining;
       }
@@ -1029,6 +1032,40 @@ const GooseFamily = () => {
         const frames = adultFramesWhite.current!;
         const dying = a.isDying;
         const phase = a.phase;
+        // While airborne (flying / descending) use the same flap cycle as the
+        // original FlyingGoose (frames 0..3 at ~9 Hz). When grounded use the
+        // body/head split waddle.
+        const flying = !dying && (a.mode === "flying" || a.mode === "descending");
+        const tx = a.x - adultW / 2;
+        const ty = a.y - adultH / 2;
+        const bubble = a.bubbleUntil > now;
+        const filter = `${COLOR_FILTER[a.color]} drop-shadow(0 2px 0 rgba(0,0,0,0.28))${dying ? " opacity(0.5) grayscale(0.6)" : ""}`;
+
+        if (flying) {
+          const FLAP_HZ = 9;
+          const flapFrameIdx = Math.floor(phase * FLAP_HZ) & 3; // 0..3
+          const flapBob = Math.sin(phase * FLAP_HZ * Math.PI * 2) * 2 * sceneScale;
+          return (
+            <div key={a.id}
+              style={{
+                position: "absolute",
+                left: 0, top: 0, width: adultW, height: adultH,
+                transform: `translate3d(${tx}px, ${ty + flapBob}px, 0) scaleX(${a.dir})`,
+                transformOrigin: "center center",
+                filter,
+                transition: "filter 800ms ease-out",
+              }}
+            >
+              <img src={frames[flapFrameIdx]} alt="" width={adultW} height={adultH}
+                style={{ position: "absolute", inset: 0, width: adultW, height: adultH,
+                  imageRendering: "pixelated" }} />
+              {bubble && (
+                <div style={{ position: "absolute", left: 0, top: 0, transform: `scaleX(${a.dir})` }} />
+              )}
+            </div>
+          );
+        }
+
         const stepCycle = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2);
         const stepLanding = Math.abs(stepCycle);
         const bodyTX = stepCycle * WADDLE_CHAR_BODY_SWAY * sceneScale * (dying ? 0.4 : 1);
@@ -1039,10 +1076,6 @@ const GooseFamily = () => {
         const headTX = 0;
         const headTY = dying ? 6 * sceneScale : 0;
         const headTilt = (Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 1.1) * WADDLE_CHAR_HEAD_TILT * 0.5 * (dying ? 0.3 : 1)) - (dying ? 18 : 0);
-        const tx = a.x - adultW / 2;
-        const ty = a.y - adultH / 2;
-        const bubble = a.bubbleUntil > now;
-        const filter = `${COLOR_FILTER[a.color]} drop-shadow(0 2px 0 rgba(0,0,0,0.28))${dying ? " opacity(0.5) grayscale(0.6)" : ""}`;
         return (
           <div key={a.id}
             style={{
