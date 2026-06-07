@@ -142,25 +142,55 @@ const BoingBall = () => {
     };
     showShelf(false);
 
+    const goslingsPresent = () => {
+      try {
+        const raw = localStorage.getItem("cracktro-goose-goslings-v1");
+        return !!raw && raw !== "[]" && (JSON.parse(raw) as unknown[]).length > 0;
+      } catch { return false; }
+    };
+    const parkOnShelf = () => {
+      if (parkMode === "live" || parkMode === "returning") {
+        parkMode = "parking";
+        parkT = 0;
+        parkStartX = x;
+        parkStartY = y;
+        setBallAvailable(false);
+        showShelf(true);
+      }
+    };
+    const returnFromShelf = () => {
+      if (parkMode === "parked" || parkMode === "parking") {
+        parkMode = "returning";
+        parkT = 0;
+        parkStartX = shelfAnchorX();
+        parkStartY = shelfAnchorY();
+      }
+    };
     const unsubFamily = subscribeFamilyEvents((ev) => {
       if (ev.type === "incubation-start") {
-        if (parkMode === "live" || parkMode === "returning") {
-          parkMode = "parking";
-          parkT = 0;
-          parkStartX = x;
-          parkStartY = y;
-          setBallAvailable(false);
-          showShelf(true);
-        }
+        parkOnShelf();
+      } else if (ev.type === "all-eggs-hatched") {
+        // Eggs just hatched — keep the ball parked through the mothering phase.
+        parkOnShelf();
       } else if (ev.type === "brood-end") {
-        if (parkMode === "parked" || parkMode === "parking") {
-          parkMode = "returning";
-          parkT = 0;
-          parkStartX = shelfAnchorX();
-          parkStartY = shelfAnchorY();
-        }
+        // Only release if the goslings haven't even appeared (e.g. failed clutch).
+        if (!goslingsPresent()) returnFromShelf();
+      } else if (ev.type === "goslings-grown") {
+        // Release the ball once the last gosling has grown up.
+        if (!goslingsPresent()) returnFromShelf();
       }
     });
+
+    // Initial mount: if goslings or eggs already exist (page reload mid-cycle),
+    // park the ball immediately so the rule holds across refreshes.
+    try {
+      const eggsRaw = localStorage.getItem("cracktro-goose-eggs-v2");
+      const hasEggs = !!eggsRaw && eggsRaw !== "[]" && (JSON.parse(eggsRaw) as unknown[]).length > 0;
+      if (hasEggs || goslingsPresent()) {
+        // Defer one tick so layout is ready.
+        setTimeout(parkOnShelf, 0);
+      }
+    } catch { /* ignore */ }
 
     const gravity = () => BASE_GRAVITY * sceneScale;
     const bounce = 0.94;

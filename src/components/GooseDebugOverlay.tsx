@@ -12,6 +12,7 @@ import {
 } from "@/lib/gooseSocial";
 
 const STORAGE_KEY = "cracktro-goose-debug";
+const POS_STORAGE_KEY = "cracktro-goose-debug-pos";
 
 // Mirror the GooseFamily constants here for display (kept in lock-step manually).
 const RULES = {
@@ -65,6 +66,19 @@ const GooseDebugOverlay = () => {
   const on = useDebugFlag();
   const [, setTick] = useState(0);
   const rafRef = useRef<number>(0);
+  // Draggable panel position (top/left). Persisted across reloads.
+  const [pos, setPos] = useState<{ top: number; left: number }>(() => {
+    if (typeof window === "undefined") return { top: 8, left: 8 };
+    try {
+      const raw = localStorage.getItem(POS_STORAGE_KEY);
+      if (raw) {
+        const p = JSON.parse(raw) as { top: number; left: number };
+        if (typeof p?.top === "number" && typeof p?.left === "number") return p;
+      }
+    } catch { /* ignore */ }
+    return { top: 8, left: Math.max(8, window.innerWidth - 468) };
+  });
+  const dragState = useRef<{ dx: number; dy: number } | null>(null);
   useEffect(() => {
     if (!on) return;
     let raf = 0;
@@ -78,6 +92,28 @@ const GooseDebugOverlay = () => {
     rafRef.current = raf;
     return () => cancelAnimationFrame(raf);
   }, [on]);
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!dragState.current) return;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const left = Math.max(0, Math.min(w - 60, e.clientX - dragState.current.dx));
+      const top = Math.max(0, Math.min(h - 24, e.clientY - dragState.current.dy));
+      setPos({ top, left });
+    };
+    const onUp = () => {
+      if (!dragState.current) return;
+      dragState.current = null;
+      try { localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(pos)); } catch { /* ignore */ }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [pos]);
 
   if (!on) return null;
   const now = Date.now();
@@ -159,7 +195,7 @@ const GooseDebugOverlay = () => {
     : 0;
 
   const panelStyle: React.CSSProperties = {
-    position: "fixed", top: 8, right: 8, zIndex: 9999,
+    position: "fixed", top: pos.top, left: pos.left, zIndex: 9999,
     maxHeight: "calc(100vh - 16px)", overflowY: "auto",
     width: 460, padding: 10,
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
@@ -169,10 +205,15 @@ const GooseDebugOverlay = () => {
     border: "1px solid rgba(120, 180, 255, 0.4)",
     borderRadius: 6,
     pointerEvents: "auto",
+    userSelect: "none",
   };
   const h: React.CSSProperties = { fontWeight: 700, color: "#7fd2ff", marginTop: 8, marginBottom: 2, textTransform: "uppercase", letterSpacing: 0.6, fontSize: 9 };
   const td: React.CSSProperties = { padding: "1px 4px", whiteSpace: "nowrap" };
   const dim: React.CSSProperties = { color: "#9aa9bd" };
+  const onHeaderPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    dragState.current = { dx: e.clientX - pos.left, dy: e.clientY - pos.top };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
 
   return (
     <>
@@ -193,8 +234,12 @@ const GooseDebugOverlay = () => {
       </svg>
 
       <div style={panelStyle}>
-        <div style={{ fontWeight: 800, color: "#fff", fontSize: 11 }}>
-          GOOSE DEBUG · Shift+D to toggle
+        <div
+          onPointerDown={onHeaderPointerDown}
+          style={{ fontWeight: 800, color: "#fff", fontSize: 11, cursor: "move", padding: "2px 0" }}
+          title="Drag to move"
+        >
+          ⠿ GOOSE DEBUG · Shift+D to toggle · drag here
         </div>
         <div style={dim}>
           rules: personalSpace={psp}px · bumpCooldown={GOOSE_COLLISION.bumpCooldownMs}ms · perchSpace={GOOSE_COLLISION.perchPersonalSpacePx}px
