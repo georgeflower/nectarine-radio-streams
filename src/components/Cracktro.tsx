@@ -923,14 +923,6 @@ const Cracktro = ({
                   {timeLeft !== "-" && (
                     <span className="tabular-nums">{timeLeft}</span>
                   )}
-                  {(platform || rating !== undefined || songLength || timeLeft !== "-") && duration > 0 && (
-                    <span className="mx-3 opacity-50">·</span>
-                  )}
-                  {duration > 0 && (
-                    <span className="tabular-nums">
-                      {formatMmSs(currentTime)} / {formatMmSs(duration)}
-                    </span>
-                  )}
                 </p>
               )}
             </div>
