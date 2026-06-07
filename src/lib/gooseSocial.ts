@@ -684,6 +684,10 @@ async function runReproductionPhase() {
   const mother = pair.find((g) => g.variant === "white") ?? pair[0];
   const father = pair.find((g) => g.variant === "brown") ?? pair[1];
   if (!mother || !father) return;
+  // Stamp the conception time once, here, so both snack-coupled and
+  // standalone reproduction paths set it consistently.
+  lastReproductionAt = Date.now();
+
 
   // Mother gets up off any perch and flies to floor to incubate.
   mother.setSitting(false);
