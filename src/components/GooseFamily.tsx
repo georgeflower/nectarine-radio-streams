@@ -133,8 +133,8 @@ type FamilyAdult = {
   avoidUntil?: number;
 };
 
-const PERSONAL_SPACE_PX = 28;
 const sitDuration = () => 9000 + Math.random() * 16000; // ms on the floor before next takeoff
+
 
 function rand(a: number, b: number) { return a + Math.random() * (b - a); }
 
