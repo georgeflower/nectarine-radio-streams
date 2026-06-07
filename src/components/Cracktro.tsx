@@ -891,7 +891,7 @@ const Cracktro = ({
               >
                 by {artist || "Unknown Artist"}
               </p>
-              {(platform || rating !== undefined || duration > 0) && (
+              {(platform || rating !== undefined || duration > 0 || songLength) && (
                 <p
                   className="text-foreground uppercase tracking-[0.3em] mt-3"
                   style={{ fontSize: `clamp(${0.95 * tMult}rem, ${1.8 * tMult}vw, ${1.5 * tMult}rem)` }}
@@ -904,7 +904,21 @@ const Cracktro = ({
                       {votes ? ` (${votes})` : ""}
                     </span>
                   )}
-                  {(platform || rating !== undefined) && duration > 0 && (
+                  {(platform || rating !== undefined) && songLength && (
+                    <span className="mx-3 opacity-50">·</span>
+                  )}
+                  {songLength && (
+                    <span>
+                      {songLength}
+                    </span>
+                  )}
+                  {songLength && timeLeft !== "-" && (
+                    <span className="mx-3 opacity-50">·</span>
+                  )}
+                  {timeLeft !== "-" && (
+                    <span className="tabular-nums">{timeLeft}</span>
+                  )}
+                  {(platform || rating !== undefined || songLength || timeLeft !== "-") && duration > 0 && (
                     <span className="mx-3 opacity-50">·</span>
                   )}
                   {duration > 0 && (
