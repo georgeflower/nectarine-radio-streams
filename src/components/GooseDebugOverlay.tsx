@@ -234,8 +234,12 @@ const GooseDebugOverlay = () => {
       </svg>
 
       <div style={panelStyle}>
-        <div style={{ fontWeight: 800, color: "#fff", fontSize: 11 }}>
-          GOOSE DEBUG · Shift+D to toggle
+        <div
+          onPointerDown={onHeaderPointerDown}
+          style={{ fontWeight: 800, color: "#fff", fontSize: 11, cursor: "move", padding: "2px 0" }}
+          title="Drag to move"
+        >
+          ⠿ GOOSE DEBUG · Shift+D to toggle · drag here
         </div>
         <div style={dim}>
           rules: personalSpace={psp}px · bumpCooldown={GOOSE_COLLISION.bumpCooldownMs}ms · perchSpace={GOOSE_COLLISION.perchPersonalSpacePx}px
