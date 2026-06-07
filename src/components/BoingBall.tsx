@@ -461,9 +461,12 @@ const BoingBall = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBall(x, y, r * renderScale, squash);
 
-      // Only publish position while live so the geese don't chase the tiny
-      // far-away ball or react to a parked ball.
-      setBallPos(parkMode === "live" ? { x, y } : null);
+      // Publish position while live, or while parked-and-available so the
+      // geese can still target the shelf to initiate ball-play. During
+      // brood-driven parking (parkedAvailable=false) the ball is hidden
+      // from the social coordinator entirely.
+      const publish = parkMode === "live" || ((parkMode === "parked" || parkMode === "parking") && parkedAvailable);
+      setBallPos(publish ? { x, y } : null);
 
       raf = requestAnimationFrame(tick);
     };
