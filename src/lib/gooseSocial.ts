@@ -41,7 +41,12 @@ export type GooseAPI = {
   // Reproduction: when active=true, mother flies down to the floor at x
   // and stays there in a sitting/peck pose (incubation). When false, takes off.
   setIncubating: (active: boolean, x?: number) => void;
-
+  // Mothering: while active=true, the mother stays grounded in the floor
+  // band, waddles slowly, and never flies, fetches food, plays ball, or
+  // joins snack breaks. Cleared once all goslings have grown up.
+  setMothering?: (active: boolean, x?: number) => void;
+  // While mothering, freeze in place to watch over sleeping goslings.
+  setMotherWatch?: (active: boolean) => void;
 };
 
 const geese = new Map<number, GooseAPI>();
