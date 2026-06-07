@@ -901,15 +901,24 @@ function stopSchedulerIfEmpty() {
   }
 }
 
+// Bootstrap delay before the very first clutch is allowed (only when no
+// prior brood exists). Without this, `reproductionEarliestAt` would stay at
+// 0 forever for fresh sessions and the gate in `step()` would never open.
+const FIRST_CLUTCH_DELAY_MS = 90_000;
+
 export function registerGoose(api: GooseAPI): () => void {
   const id = nextId++;
   geese.set(id, api);
+  if (reproductionEarliestAt === 0 && lastReproductionAt === 0) {
+    reproductionEarliestAt = Date.now() + FIRST_CLUTCH_DELAY_MS;
+  }
   ensureScheduler();
   return () => {
     geese.delete(id);
     stopSchedulerIfEmpty();
   };
 }
+
 
 // Called by FlyingGoose whenever it shows a smiley reaction for an
 // incoming oneliner. The partner goose chimes in with a cute response.
