@@ -224,7 +224,9 @@ const BoingBall = () => {
       if (parkMode === "parked" || parkMode === "parking") {
         returnFromShelf();
       } else if (parkMode === "live") {
-        parkOnShelf();
+        // User-initiated park: mark unavailable so the geese can't yank it
+        // back. Stays on the shelf until the user clicks it again.
+        parkOnShelf(false);
       }
     };
     const clickTarget = stageEl ?? window;
