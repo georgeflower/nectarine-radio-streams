@@ -154,13 +154,19 @@ const BoingBall = () => {
         return !!raw && raw !== "[]" && (JSON.parse(raw) as unknown[]).length > 0;
       } catch { return false; }
     };
-    const parkOnShelf = () => {
+    // When true, the ball is parked but still "available" so the geese can
+    // request play and pull it back from the shelf. Brood-driven parking
+    // marks the ball unavailable (geese are busy nesting); user/idle
+    // parking leaves it available.
+    let parkedAvailable = true;
+    const parkOnShelf = (keepAvailable = true) => {
       if (parkMode === "live" || parkMode === "returning") {
         parkMode = "parking";
         parkT = 0;
         parkStartX = x;
         parkStartY = y;
-        setBallAvailable(false);
+        parkedAvailable = keepAvailable;
+        setBallAvailable(keepAvailable);
         showShelf(true);
       }
     };
