@@ -335,6 +335,7 @@ const Index = () => {
           artist={now?.artist ?? ""}
           title={now?.song ?? ""}
           songId={now?.songId}
+          nowPlaying={now}
           onExit={() => setCracktroOpen(false)}
           onStyleChange={(s) => setVizStyle(s)}
           oneliners={oneliners}

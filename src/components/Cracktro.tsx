@@ -7,7 +7,7 @@ import GooseFamily from "./GooseFamily";
 import BoingBall from "./BoingBall";
 import RosterWindow from "./RosterWindow";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
-import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl } from "@/lib/nectarine";
+import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl, formatDuration, computeTimeLeft } from "@/lib/nectarine";
 import { StageProvider } from "@/lib/stage";
 import { renderBBCode } from "@/lib/bbcode";
 import { getSceneEraConfig, getSceneEraFromListeningMs } from "@/lib/gooseSceneEra";
@@ -34,6 +34,7 @@ type Props = {
   artist: string;
   title: string;
   songId?: string;
+  nowPlaying?: QueueEntry | null;
   onExit: () => void;
   onStyleChange?: (s: VisualizerStyle) => void;
   oneliners?: OnelinerEntry[];
