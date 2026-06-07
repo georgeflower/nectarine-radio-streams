@@ -768,11 +768,12 @@ async function runReproductionPhase() {
   father.setFetchingFood(false);
   father.setAway(false);
   emitFamilyEvent({ type: "brood-end" });
-  lastReproductionAt = Date.now();
-  // Fallback so a fresh clutch is guaranteed eligible even if
-  // `goslings-grown` is somehow missed.
-  reproductionEarliestAt = Date.now() + REPRODUCTION_COOLDOWN_MS;
+  // NOTE: do NOT bump lastReproductionAt or reproductionEarliestAt here —
+  // those were stamped when the clutch was laid and are advanced again on
+  // `goslings-grown`. Resetting them here would zero the debug counters
+  // while goslings are still growing.
 }
+
 
 
 async function runFlyAway() {
