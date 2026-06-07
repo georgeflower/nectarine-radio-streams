@@ -540,14 +540,17 @@ const GooseFamily = () => {
         for (const a of dyingNow) a.isDying = true;
         mourningUntilRef.current = wallNow + MOURNING_DURATION_MS;
         setMourningActive(true);
+        recordMourning();
       }
       if (mourningUntilRef.current > 0 && wallNow >= mourningUntilRef.current) {
         // Ritual ends — remove the dying adults from roster + render.
         const dyingIds = new Set(adultsRef.current.filter((a) => a.isDying).map((a) => a.rosterId));
         adultsRef.current = adultsRef.current.filter((a) => !dyingIds.has(a.rosterId));
         if (dyingIds.size > 0) {
+          for (let i = 0; i < dyingIds.size; i++) recordDeath();
           setRoster(getRoster().filter((e) => !dyingIds.has(e.id)));
         }
+
         mourningUntilRef.current = 0;
         setMourningActive(false);
       }
