@@ -41,7 +41,12 @@ export type GooseAPI = {
   // Reproduction: when active=true, mother flies down to the floor at x
   // and stays there in a sitting/peck pose (incubation). When false, takes off.
   setIncubating: (active: boolean, x?: number) => void;
-
+  // Mothering: while active=true, the mother stays grounded in the floor
+  // band, waddles slowly, and never flies, fetches food, plays ball, or
+  // joins snack breaks. Cleared once all goslings have grown up.
+  setMothering?: (active: boolean, x?: number) => void;
+  // While mothering, freeze in place to watch over sleeping goslings.
+  setMotherWatch?: (active: boolean) => void;
 };
 
 const geese = new Map<number, GooseAPI>();
@@ -274,7 +279,27 @@ familyListeners.add((ev) => {
   } else if (ev.type === "brood-end") {
     lastBroodEndAt = Date.now();
   }
+  // Mothering toggle: switch the mother into ground-bound parenting mode
+  // the moment the last egg hatches, and release her once no goslings
+  // remain (either after the last one grew up, or anytime offspring count
+  // drops to zero).
+  if (ev.type === "all-eggs-hatched") {
+    const mother = getPair()?.find((g) => g.variant === "white");
+    mother?.setMothering?.(true, mother.getPosition().x);
+  } else if (ev.type === "goslings-grown" || ev.type === "brood-end") {
+    if (!familyHasLiveOffspring()) {
+      const mother = getPair()?.find((g) => g.variant === "white");
+      mother?.setMothering?.(false);
+      mother?.setMotherWatch?.(false);
+    }
+  }
 });
+
+/** Called by the family ticker to freeze the mother while goslings sleep. */
+export function setMotherWatchingGoslings(active: boolean) {
+  const mother = getPair()?.find((g) => g.variant === "white");
+  mother?.setMotherWatch?.(active);
+}
 
 let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
@@ -860,10 +885,14 @@ async function step() {
 
       lastReproductionAt = now;
       await runReproductionPhase();
-    } else if (now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS && Math.random() < FLY_AWAY_CHANCE) {
+    } else if (
+      !familyHasLiveOffspring() &&
+      now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS &&
+      Math.random() < FLY_AWAY_CHANCE
+    ) {
       lastFlyAwayAt = now;
       await runFlyAway();
-    } else if (canStartBallPlay(now)) {
+    } else if (!familyHasLiveOffspring() && canStartBallPlay(now)) {
       try {
         await runBallPlay();
       } finally {
