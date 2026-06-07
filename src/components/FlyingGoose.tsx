@@ -506,6 +506,19 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
         } else {
           incubating = false;
+          if (mothering) {
+            // Hatching switches mama from incubation to parenting without a
+            // takeoff; she must stay grounded and keep waddling with goslings.
+            waddlingOnGround = true;
+            groundWaddleUntil = Number.POSITIVE_INFINITY;
+            nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
+            if (mode === "ground") {
+              imgBody.style.opacity = "1";
+              imgHead.style.opacity = "1";
+              img.style.opacity = "0";
+            }
+            return;
+          }
           if (mode === "ground") takeoff();
         }
       },

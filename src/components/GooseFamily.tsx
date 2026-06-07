@@ -3,7 +3,7 @@
 //
 // Lifecycle:
 //   • Snack ends → mother (white) lays 1–3 eggs at the floor near her.
-//   • Eggs hatch 18–32 s later into goslings (random gosling-white/brown).
+//   • Eggs hatch 3 minutes later into goslings (random gosling-white/brown).
 //   • Goslings waddle, may roam up to 20 % of screen height above the
 //     floor, follow the mother when she's grounded.
 //   • After ~3 min, goslings grow up into adult family members with a
