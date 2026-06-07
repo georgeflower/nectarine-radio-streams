@@ -148,6 +148,12 @@ const BoingBall = () => {
         return !!raw && raw !== "[]" && (JSON.parse(raw) as unknown[]).length > 0;
       } catch { return false; }
     };
+    const eggsPresent = () => {
+      try {
+        const raw = localStorage.getItem("cracktro-goose-eggs-v2");
+        return !!raw && raw !== "[]" && (JSON.parse(raw) as unknown[]).length > 0;
+      } catch { return false; }
+    };
     const parkOnShelf = () => {
       if (parkMode === "live" || parkMode === "returning") {
         parkMode = "parking";
@@ -166,6 +172,15 @@ const BoingBall = () => {
         parkStartY = shelfAnchorY();
       }
     };
+    // Poll for the brood ending: GooseFamily's "goslings-grown" event can
+    // fire before persisted gosling state is fully cleared, so we also
+    // re-check every 2s — whenever no eggs and no goslings remain the ball
+    // is allowed back into play.
+    const broodPoll = window.setInterval(() => {
+      if ((parkMode === "parked" || parkMode === "parking") && !goslingsPresent() && !eggsPresent()) {
+        returnFromShelf();
+      }
+    }, 2000);
     const unsubFamily = subscribeFamilyEvents((ev) => {
       if (ev.type === "incubation-start") {
         parkOnShelf();
@@ -176,7 +191,8 @@ const BoingBall = () => {
         // Only release if the goslings haven't even appeared (e.g. failed clutch).
         if (!goslingsPresent()) returnFromShelf();
       } else if (ev.type === "goslings-grown") {
-        // Release the ball once the last gosling has grown up.
+        // Release the ball once the last gosling has grown up. The poll above
+        // will also catch this if storage hasn't been flushed yet.
         if (!goslingsPresent()) returnFromShelf();
       }
     });
@@ -430,6 +446,7 @@ const BoingBall = () => {
       cancelAnimationFrame(raf);
       if (ro) ro.disconnect();
       else window.removeEventListener("resize", resize);
+      clearInterval(broodPoll);
       setBallPos(null);
       setBallAvailable(true);
       unsubFamily();
