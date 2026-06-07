@@ -20,6 +20,7 @@ import {
   getGoosePositions,
   subscribeFamilyEvents,
   setFamilySnapshotProvider,
+  setMotherWatchingGoslings,
   recordBump,
   recordDeath,
   recordMourning,
