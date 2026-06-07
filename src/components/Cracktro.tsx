@@ -93,6 +93,7 @@ const Cracktro = ({
   artist,
   title,
   songId,
+  nowPlaying,
   onExit,
   onStyleChange,
   oneliners = [],
