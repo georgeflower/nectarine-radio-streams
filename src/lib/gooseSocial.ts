@@ -684,6 +684,10 @@ async function runReproductionPhase() {
   const mother = pair.find((g) => g.variant === "white") ?? pair[0];
   const father = pair.find((g) => g.variant === "brown") ?? pair[1];
   if (!mother || !father) return;
+  // Stamp the conception time once, here, so both snack-coupled and
+  // standalone reproduction paths set it consistently.
+  lastReproductionAt = Date.now();
+
 
   // Mother gets up off any perch and flies to floor to incubate.
   mother.setSitting(false);
@@ -764,11 +768,12 @@ async function runReproductionPhase() {
   father.setFetchingFood(false);
   father.setAway(false);
   emitFamilyEvent({ type: "brood-end" });
-  lastReproductionAt = Date.now();
-  // Fallback so a fresh clutch is guaranteed eligible even if
-  // `goslings-grown` is somehow missed.
-  reproductionEarliestAt = Date.now() + REPRODUCTION_COOLDOWN_MS;
+  // NOTE: do NOT bump lastReproductionAt or reproductionEarliestAt here —
+  // those were stamped when the clutch was laid and are advanced again on
+  // `goslings-grown`. Resetting them here would zero the debug counters
+  // while goslings are still growing.
 }
+
 
 
 async function runFlyAway() {
@@ -882,9 +887,8 @@ async function step() {
       now - lastBroodEndAt >= POST_HATCH_SETTLE_MS &&
       !familyHasLiveOffspring()
     ) {
-
-      lastReproductionAt = now;
       await runReproductionPhase();
+
     } else if (
       !familyHasLiveOffspring() &&
       now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS &&
