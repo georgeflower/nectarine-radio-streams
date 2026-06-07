@@ -195,7 +195,7 @@ const GooseDebugOverlay = () => {
     : 0;
 
   const panelStyle: React.CSSProperties = {
-    position: "fixed", top: 8, right: 8, zIndex: 9999,
+    position: "fixed", top: pos.top, left: pos.left, zIndex: 9999,
     maxHeight: "calc(100vh - 16px)", overflowY: "auto",
     width: 460, padding: 10,
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
@@ -205,10 +205,15 @@ const GooseDebugOverlay = () => {
     border: "1px solid rgba(120, 180, 255, 0.4)",
     borderRadius: 6,
     pointerEvents: "auto",
+    userSelect: "none",
   };
   const h: React.CSSProperties = { fontWeight: 700, color: "#7fd2ff", marginTop: 8, marginBottom: 2, textTransform: "uppercase", letterSpacing: 0.6, fontSize: 9 };
   const td: React.CSSProperties = { padding: "1px 4px", whiteSpace: "nowrap" };
   const dim: React.CSSProperties = { color: "#9aa9bd" };
+  const onHeaderPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    dragState.current = { dx: e.clientX - pos.left, dy: e.clientY - pos.top };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
 
   return (
     <>
