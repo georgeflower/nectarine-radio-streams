@@ -589,7 +589,7 @@ const FlyingGoose = ({
         motherWatch = mothering && active;
       },
     };
-    const unregisterGoose = registerGoose(api);
+    const unregisterGoose = role === "family" ? () => {} : registerGoose(api);
 
 
 
