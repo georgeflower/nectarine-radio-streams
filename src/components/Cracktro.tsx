@@ -805,6 +805,9 @@ const Cracktro = ({
         {brownGooseOn && <FlyingGoose oneliners={oneliners} variant="brown" />}
         {(gooseOn || brownGooseOn) && <GooseFamily />}
         {boingOn && <BoingBall />}
+        <GooseDebugOverlay />
+
+
 
         <button
           type="button"
