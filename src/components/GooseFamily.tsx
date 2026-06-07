@@ -15,6 +15,7 @@
 //     special chatter pool.
 
 import { useEffect, useRef, useState } from "react";
+import FlyingGoose from "@/components/FlyingGoose";
 import {
   emitFamilyEvent,
   getGoosePositions,
