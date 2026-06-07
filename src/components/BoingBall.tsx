@@ -154,13 +154,19 @@ const BoingBall = () => {
         return !!raw && raw !== "[]" && (JSON.parse(raw) as unknown[]).length > 0;
       } catch { return false; }
     };
-    const parkOnShelf = () => {
+    // When true, the ball is parked but still "available" so the geese can
+    // request play and pull it back from the shelf. Brood-driven parking
+    // marks the ball unavailable (geese are busy nesting); user/idle
+    // parking leaves it available.
+    let parkedAvailable = true;
+    const parkOnShelf = (keepAvailable = true) => {
       if (parkMode === "live" || parkMode === "returning") {
         parkMode = "parking";
         parkT = 0;
         parkStartX = x;
         parkStartY = y;
-        setBallAvailable(false);
+        parkedAvailable = keepAvailable;
+        setBallAvailable(keepAvailable);
         showShelf(true);
       }
     };
@@ -183,10 +189,10 @@ const BoingBall = () => {
     }, 2000);
     const unsubFamily = subscribeFamilyEvents((ev) => {
       if (ev.type === "incubation-start") {
-        parkOnShelf();
+        parkOnShelf(false);
       } else if (ev.type === "all-eggs-hatched") {
         // Eggs just hatched — keep the ball parked through the mothering phase.
-        parkOnShelf();
+        parkOnShelf(false);
       } else if (ev.type === "brood-end") {
         // Only release if the goslings haven't even appeared (e.g. failed clutch).
         if (!goslingsPresent()) returnFromShelf();
@@ -197,16 +203,32 @@ const BoingBall = () => {
       }
     });
 
-    // Initial mount: if goslings or eggs already exist (page reload mid-cycle),
-    // park the ball immediately so the rule holds across refreshes.
-    try {
-      const eggsRaw = localStorage.getItem("cracktro-goose-eggs-v2");
-      const hasEggs = !!eggsRaw && eggsRaw !== "[]" && (JSON.parse(eggsRaw) as unknown[]).length > 0;
-      if (hasEggs || goslingsPresent()) {
-        // Defer one tick so layout is ready.
-        setTimeout(parkOnShelf, 0);
+    // Initial mount: park the ball on the shelf by default. The geese will
+    // call it back into play via ball-play directives, and the user can
+    // toggle it manually by clicking.
+    setTimeout(() => parkOnShelf(true), 0);
+
+    // Click toggle: clicking the ball flips it between parked and live.
+    // Canvas keeps pointer-events:none so it doesn't block the rest of the
+    // stage; we listen on the stage element and only consume the event when
+    // the click lands within the ball's hit radius.
+    const onClick = (ev: MouseEvent) => {
+      const target = stageEl ?? canvas;
+      const rect = target.getBoundingClientRect();
+      const cx = ev.clientX - rect.left;
+      const cy = ev.clientY - rect.top;
+      const r = radius() * (parkMode === "parked" || parkMode === "parking" ? SHELF_SCALE : 1);
+      const hit = Math.hypot(cx - x, cy - y) <= r + 6;
+      if (!hit) return;
+      ev.stopPropagation();
+      if (parkMode === "parked" || parkMode === "parking") {
+        returnFromShelf();
+      } else if (parkMode === "live") {
+        parkOnShelf();
       }
-    } catch { /* ignore */ }
+    };
+    const clickTarget = stageEl ?? window;
+    clickTarget.addEventListener("click", onClick as EventListener, true);
 
     const gravity = () => BASE_GRAVITY * sceneScale;
     const bounce = 0.94;
@@ -313,6 +335,11 @@ const BoingBall = () => {
       const r = radius();
       let squash = 0;
       let renderScale = 1;
+
+      // Auto-return from the shelf as soon as the geese want to play.
+      if ((parkMode === "parked" || parkMode === "parking") && getBallPlayDirective()) {
+        returnFromShelf();
+      }
 
       if (parkMode === "live") {
         const directive = getBallPlayDirective();
@@ -434,9 +461,12 @@ const BoingBall = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBall(x, y, r * renderScale, squash);
 
-      // Only publish position while live so the geese don't chase the tiny
-      // far-away ball or react to a parked ball.
-      setBallPos(parkMode === "live" ? { x, y } : null);
+      // Publish position while live, or while parked-and-available so the
+      // geese can still target the shelf to initiate ball-play. During
+      // brood-driven parking (parkedAvailable=false) the ball is hidden
+      // from the social coordinator entirely.
+      const publish = parkMode === "live" || ((parkMode === "parked" || parkMode === "parking") && parkedAvailable);
+      setBallPos(publish ? { x, y } : null);
 
       raf = requestAnimationFrame(tick);
     };
@@ -450,6 +480,7 @@ const BoingBall = () => {
       setBallPos(null);
       setBallAvailable(true);
       unsubFamily();
+      clickTarget.removeEventListener("click", onClick as EventListener, true);
     };
   }, []);
 
