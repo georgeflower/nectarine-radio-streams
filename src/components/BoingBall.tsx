@@ -471,6 +471,7 @@ const BoingBall = () => {
       setBallPos(null);
       setBallAvailable(true);
       unsubFamily();
+      clickTarget.removeEventListener("click", onClick as EventListener, true);
     };
   }, []);
 
