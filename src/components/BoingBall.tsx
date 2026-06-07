@@ -197,16 +197,26 @@ const BoingBall = () => {
       }
     });
 
-    // Initial mount: if goslings or eggs already exist (page reload mid-cycle),
-    // park the ball immediately so the rule holds across refreshes.
-    try {
-      const eggsRaw = localStorage.getItem("cracktro-goose-eggs-v2");
-      const hasEggs = !!eggsRaw && eggsRaw !== "[]" && (JSON.parse(eggsRaw) as unknown[]).length > 0;
-      if (hasEggs || goslingsPresent()) {
-        // Defer one tick so layout is ready.
-        setTimeout(parkOnShelf, 0);
+    // Initial mount: park the ball on the shelf by default. The geese will
+    // call it back into play via ball-play directives, and the user can
+    // toggle it manually by clicking.
+    setTimeout(parkOnShelf, 0);
+
+    // Click toggle: clicking the ball flips it between parked and live.
+    const onClick = (ev: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const cx = ev.clientX - rect.left;
+      const cy = ev.clientY - rect.top;
+      const r = radius() * (parkMode === "parked" ? SHELF_SCALE : 1);
+      const hit = Math.hypot(cx - x, cy - y) <= r + 6;
+      if (!hit) return;
+      if (parkMode === "parked" || parkMode === "parking") {
+        returnFromShelf();
+      } else if (parkMode === "live") {
+        parkOnShelf();
       }
-    } catch { /* ignore */ }
+    };
+    canvas.addEventListener("click", onClick);
 
     const gravity = () => BASE_GRAVITY * sceneScale;
     const bounce = 0.94;
