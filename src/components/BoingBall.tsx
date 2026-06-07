@@ -324,6 +324,11 @@ const BoingBall = () => {
       let squash = 0;
       let renderScale = 1;
 
+      // Auto-return from the shelf as soon as the geese want to play.
+      if ((parkMode === "parked" || parkMode === "parking") && getBallPlayDirective()) {
+        returnFromShelf();
+      }
+
       if (parkMode === "live") {
         const directive = getBallPlayDirective();
         const playing = !!directive;
