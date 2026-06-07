@@ -887,9 +887,8 @@ async function step() {
       now - lastBroodEndAt >= POST_HATCH_SETTLE_MS &&
       !familyHasLiveOffspring()
     ) {
-
-      lastReproductionAt = now;
       await runReproductionPhase();
+
     } else if (
       !familyHasLiveOffspring() &&
       now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS &&
