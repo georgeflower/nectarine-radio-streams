@@ -385,6 +385,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
       },
       getPosition: () => ({ x, y }),
       setAway: (a: boolean) => {
+        if (mothering) return;
         away = a;
         if (a) {
           // Head toward the nearest horizontal edge.
@@ -403,6 +404,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         }
       },
       setChaseTarget: (target: { x: number; y: number } | null) => {
+        if (mothering) return;
         chaseTarget = target;
         if (target) {
           // Ball-play overrides sitting: clear any lingering meal/sitting state.
@@ -424,6 +426,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         carryingFoodBag = carrying;
       },
       setSitting: (sitting: boolean) => {
+        if (mothering) return;
         sittingForMeal = sitting;
         if (sitting) {
           eatingGooseIds.add(gooseId);
@@ -454,6 +457,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
 
       },
       setFetchingFood: (fetching: boolean) => {
+        if (mothering) return;
         fetchingFood = fetching;
         if (!fetching) {
           nextPerchAt = Math.min(nextPerchAt, elapsed + rand(2500, 6500));
@@ -472,6 +476,7 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
         nextPerchAt = elapsed + INDEFINITE_PERCH_DELAY_MS;
       },
       setBallPlayActive: (active: boolean) => {
+        if (mothering) return;
         ballPlayActive = active;
         if (active) {
           sittingForMeal = false;
@@ -503,6 +508,55 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           incubating = false;
           if (mode === "ground") takeoff();
         }
+      },
+      setMothering: (active: boolean, atX?: number) => {
+        if (active) {
+          mothering = true;
+          motherWatch = false;
+          // Clear every other behavioral state so she settles on the floor.
+          incubating = false;
+          sittingForMeal = false;
+          eatingGooseIds.delete(gooseId);
+          eatingMode = false;
+          chaseTarget = null;
+          restingFromTiredness = false;
+          fetchingFood = false;
+          carryingFoodBag = false;
+          away = false;
+          ballPlayActive = false;
+          perchEl = null;
+          // Enter perpetual ground-waddle inside the floor band.
+          waddlingOnGround = true;
+          groundWaddleUntil = Number.POSITIVE_INFINITY;
+          groundWaddleTargetX = typeof atX === "number"
+            ? Math.max(w * 0.1, Math.min(w * 0.9, atX))
+            : Math.max(w * 0.1, Math.min(w * 0.9, x));
+          groundWaddleY = floorBandY();
+          nextGroundWaddleStepAt = elapsed + rand(1500, 3500);
+          // Force a takeoff transition if perched, so the fly→ground flow
+          // brings her down to the floor band.
+          if (mode === "land" || mode === "approach") {
+            mode = "fly";
+            img.style.opacity = "1";
+            imgBody.style.opacity = "0";
+            imgHead.style.opacity = "0";
+          }
+        } else {
+          mothering = false;
+          motherWatch = false;
+          // End perpetual waddle and resume normal flight cycles.
+          if (waddlingOnGround) {
+            waddlingOnGround = false;
+            groundWaddleUntil = 0;
+            nextGroundWaddleAt = elapsed + rand(45_000, 110_000);
+            nextPerchAt = elapsed + rand(2_000, 6_000);
+            if (mode === "ground") takeoff();
+          }
+        }
+      },
+      setMotherWatch: (active: boolean) => {
+        // Only meaningful while in mothering mode.
+        motherWatch = mothering && active;
       },
     };
     const unregisterGoose = registerGoose(api);
