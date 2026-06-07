@@ -1,8 +1,8 @@
 // Pure helpers for the wall-clock egg → hatch flow used by GooseFamily.
 // Kept side-effect-free so tests can drive the logic deterministically.
 
-export const HATCH_MIN_MS = 18_000;
-export const HATCH_MAX_MS = 32_000;
+export const HATCH_MIN_MS = 3 * 60_000;
+export const HATCH_MAX_MS = 3 * 60_000;
 
 export type Egg = {
   id: string;
@@ -41,13 +41,13 @@ export function hatchDueEggs(
   return { stillEggs, hatched };
 }
 
-/** Returns true if the egg's hatch time falls within the documented 18–32 s window. */
+/** Returns true if the egg's hatch time matches the documented 3 minute window. */
 export function isHatchWindowValid(egg: Pick<Egg, "laidAt" | "hatchAt">): boolean {
   const delta = egg.hatchAt - egg.laidAt;
   return delta >= HATCH_MIN_MS && delta <= HATCH_MAX_MS;
 }
 
-/** Build an egg with a hatch time drawn from the documented window. */
+/** Build an egg with a hatch time drawn from the documented 3 minute window. */
 export function makeEgg(args: {
   id: string;
   x: number;

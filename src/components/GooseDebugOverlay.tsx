@@ -22,7 +22,7 @@ const RULES = {
   GROW_UP_MS: 8 * 60_000,
   ADULT_LIFE_BEFORE_DEATH_MS: 5 * 60_000,
   MOURNING_DURATION_MS: 45_000,
-  HATCH_WINDOW: [18_000, 32_000] as const,
+  HATCH_WINDOW: [3 * 60_000, 3 * 60_000] as const,
 };
 
 function fmtMs(ms: number): string {
