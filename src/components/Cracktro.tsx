@@ -7,7 +7,7 @@ import GooseFamily from "./GooseFamily";
 import BoingBall from "./BoingBall";
 import RosterWindow from "./RosterWindow";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
-import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl } from "@/lib/nectarine";
+import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl, formatDuration, computeTimeLeft } from "@/lib/nectarine";
 import { StageProvider } from "@/lib/stage";
 import { renderBBCode } from "@/lib/bbcode";
 import { getSceneEraConfig, getSceneEraFromListeningMs } from "@/lib/gooseSceneEra";
@@ -34,6 +34,7 @@ type Props = {
   artist: string;
   title: string;
   songId?: string;
+  nowPlaying?: QueueEntry | null;
   onExit: () => void;
   onStyleChange?: (s: VisualizerStyle) => void;
   oneliners?: OnelinerEntry[];
@@ -92,6 +93,7 @@ const Cracktro = ({
   artist,
   title,
   songId,
+  nowPlaying,
   onExit,
   onStyleChange,
   oneliners = [],
@@ -248,6 +250,15 @@ const Cracktro = ({
   const [, setTimeTick] = useState(0);
   useEffect(() => subscribePlayerTime(() => setTimeTick((t) => (t + 1) % 1_000_000)), []);
   const { currentTime, duration } = getPlayerTime();
+
+  // Refresh remaining time every second.
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const timeLeft = nowPlaying ? computeTimeLeft(nowPlaying.playstart, nowPlaying.lengthSec) : "-";
+  const songLength = nowPlaying ? formatDuration(nowPlaying.lengthSec) : "";
 
   // Song-rating chatter — fire once per (track, ratingTier) combo.
   const lastChatterKeyRef = useRef<string>("");
@@ -880,7 +891,7 @@ const Cracktro = ({
               >
                 by {artist || "Unknown Artist"}
               </p>
-              {(platform || rating !== undefined || duration > 0) && (
+              {(platform || rating !== undefined || duration > 0 || songLength) && (
                 <p
                   className="text-foreground uppercase tracking-[0.3em] mt-3"
                   style={{ fontSize: `clamp(${0.95 * tMult}rem, ${1.8 * tMult}vw, ${1.5 * tMult}rem)` }}
@@ -893,7 +904,21 @@ const Cracktro = ({
                       {votes ? ` (${votes})` : ""}
                     </span>
                   )}
-                  {(platform || rating !== undefined) && duration > 0 && (
+                  {(platform || rating !== undefined) && songLength && (
+                    <span className="mx-3 opacity-50">·</span>
+                  )}
+                  {songLength && (
+                    <span>
+                      {songLength}
+                    </span>
+                  )}
+                  {songLength && timeLeft !== "-" && (
+                    <span className="mx-3 opacity-50">·</span>
+                  )}
+                  {timeLeft !== "-" && (
+                    <span className="tabular-nums">{timeLeft}</span>
+                  )}
+                  {(platform || rating !== undefined || songLength || timeLeft !== "-") && duration > 0 && (
                     <span className="mx-3 opacity-50">·</span>
                   )}
                   {duration > 0 && (
