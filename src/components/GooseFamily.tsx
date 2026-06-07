@@ -267,39 +267,17 @@ const GooseFamily = () => {
     });
     if (rosterChanged) setRoster(roster);
 
-    const w = rootRef.current?.clientWidth ?? window.innerWidth;
-    const h = rootRef.current?.clientHeight ?? window.innerHeight;
-    const sceneScale = getSceneScale(w, h);
-    const adultFloorY = h - BASE_SPRITE_H * sceneScale * 0.6 - 12;
-    const ceilingY = h * 0.8;
     adultsRef.current = roster
       .filter((e) => e.kind === "adult")
-      .map((e): FamilyAdult => {
-        const x = rand(80, Math.max(160, w - 80));
-        const y = rand(ceilingY, adultFloorY);
-        const startGround = Math.abs(y - adultFloorY) < 12;
-        return {
-          id: `adult-${e.id}`,
-          rosterId: e.id,
-          color: e.color,
-          x,
-          y: startGround ? adultFloorY : y,
-          dir: Math.random() < 0.5 ? -1 : 1,
-          phase: Math.random() * Math.PI * 2,
-          targetX: rand(80, Math.max(160, w - 80)),
-          targetY: startGround ? adultFloorY : rand(h * 0.2, h * 0.5),
-          bornAt: e.bornAt,
-          bubbleUntil: 0,
-          bubbleText: "",
-          activity: "waddle",
-          activityUntil: Date.now() + 4000 + Math.random() * 6000,
-          playHopPhase: 0,
-          mode: startGround ? "ground" : "flying",
-          takeoffAt: Date.now() + sitDuration(),
-        };
-      });
+      .map((e): FamilyAdult => ({
+        id: `adult-${e.id}`,
+        rosterId: e.id,
+        color: e.color,
+        bornAt: e.bornAt,
+      }));
     setTick((t) => t + 1);
   }, []);
+
 
   // Family events: snack toggles gosling sit/peck flag; incubation-start
   // is when the mother has descended and dropped 1–3 eggs on the floor.
