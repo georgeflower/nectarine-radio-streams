@@ -675,81 +675,111 @@ const GooseFamily = () => {
       }
 
       // === Collision avoidance: grounded adults + goslings + originals ===
+      // Uses GOOSE_COLLISION (centralized tuning). Asymmetric resolution:
+      // the more "committed" mover (larger |targetX - x|) re-targets; the
+      // other just gets a position nudge. A bumpCooldownMs cool-down with a
+      // hysteresis band prevents the per-frame flip-back oscillation.
       if (!mourningActive) {
-        const psp = PERSONAL_SPACE_PX * sceneScale;
+        const psp = GOOSE_COLLISION.personalSpacePx * sceneScale;
+        const jitterMin = GOOSE_COLLISION.retargetJitterPx[0];
+        const jitterMax = GOOSE_COLLISION.retargetJitterPx[1];
+        const cool = GOOSE_COLLISION.bumpCooldownMs;
         const groundAdults = adultsRef.current.filter((a) => a.mode === "ground");
         const originalsPos = getGoosePositions();
         const obstacles: Array<{ x: number; y: number }> = [];
         if (originalsPos?.white) obstacles.push(originalsPos.white);
         if (originalsPos?.brown) obstacles.push(originalsPos.brown);
-        // Adult-adult separation
+
+        // Adult <-> Adult — asymmetric retarget with cooldown / hysteresis.
         for (let i = 0; i < groundAdults.length; i++) {
           for (let j = i + 1; j < groundAdults.length; j++) {
             const a = groundAdults[i];
             const b = groundAdults[j];
             const dx = a.x - b.x;
-            if (Math.abs(dx) < psp && Math.abs(a.y - b.y) < psp) {
-              const overlap = psp - Math.abs(dx);
-              const sign = dx >= 0 ? 1 : -1;
-              a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap * 0.5));
-              b.x = Math.max(20, Math.min(w - 20, b.x - sign * overlap * 0.5));
-              if (!a.avoidUntil || wallNow > a.avoidUntil) {
-                a.targetX = clampX(a.x + sign * (60 + Math.random() * 80));
-                a.avoidUntil = wallNow + 400;
-              }
-              if (!b.avoidUntil || wallNow > b.avoidUntil) {
-                b.targetX = clampX(b.x - sign * (60 + Math.random() * 80));
-                b.avoidUntil = wallNow + 400;
-              }
+            const ady = Math.abs(a.y - b.y);
+            const adx = Math.abs(dx);
+            if (adx >= psp || ady >= psp) continue;
+            const overlap = psp - adx;
+            const sign = dx >= 0 ? 1 : -1;
+            // Position nudge (always — half overlap each).
+            a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap * 0.5));
+            b.x = Math.max(20, Math.min(w - 20, b.x - sign * overlap * 0.5));
+            // Asymmetric retarget: only the "committed" mover re-rolls a target.
+            const aCommit = Math.abs(a.targetX - a.x);
+            const bCommit = Math.abs(b.targetX - b.x);
+            const aFree = !a.avoidUntil || wallNow > a.avoidUntil;
+            const bFree = !b.avoidUntil || wallNow > b.avoidUntil;
+            if (aCommit >= bCommit && aFree) {
+              a.targetX = clampX(a.x + sign * (jitterMin + Math.random() * (jitterMax - jitterMin)));
+              a.avoidUntil = wallNow + cool;
+              recordBump();
+            } else if (bFree) {
+              b.targetX = clampX(b.x - sign * (jitterMin + Math.random() * (jitterMax - jitterMin)));
+              b.avoidUntil = wallNow + cool;
+              recordBump();
             }
           }
         }
-        // Adults vs originals (only push the adult)
+
+        // Adults vs originals — push the family adult only.
         for (const a of groundAdults) {
           for (const o of obstacles) {
             const dx = a.x - o.x;
-            if (Math.abs(dx) < psp && Math.abs(a.y - o.y) < psp) {
-              const overlap = psp - Math.abs(dx);
-              const sign = dx >= 0 ? 1 : -1;
-              a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap));
-              if (!a.avoidUntil || wallNow > a.avoidUntil) {
-                a.targetX = clampX(a.x + sign * (60 + Math.random() * 80));
-                a.avoidUntil = wallNow + 400;
-              }
+            if (Math.abs(dx) >= psp || Math.abs(a.y - o.y) >= psp) continue;
+            const overlap = psp - Math.abs(dx);
+            const sign = dx >= 0 ? 1 : -1;
+            a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap));
+            if (!a.avoidUntil || wallNow > a.avoidUntil) {
+              a.targetX = clampX(a.x + sign * (jitterMin + Math.random() * (jitterMax - jitterMin)));
+              a.avoidUntil = wallNow + cool;
+              recordBump();
             }
           }
         }
-        // Adults vs goslings (push adult slightly, goslings the rest)
+
+        // Adults vs goslings — gosling yields more.
         for (const a of groundAdults) {
           for (const g of goslingsRef.current) {
             const dx = a.x - g.x;
-            if (Math.abs(dx) < psp && Math.abs(a.y - g.y) < psp) {
-              const overlap = psp - Math.abs(dx);
-              const sign = dx >= 0 ? 1 : -1;
-              a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap * 0.4));
-              g.x = Math.max(20, Math.min(w - 20, g.x - sign * overlap * 0.6));
-              g.targetX = Math.max(40, Math.min(w - 40, g.x - sign * (40 + Math.random() * 60)));
-            }
+            if (Math.abs(dx) >= psp || Math.abs(a.y - g.y) >= psp) continue;
+            const overlap = psp - Math.abs(dx);
+            const sign = dx >= 0 ? 1 : -1;
+            a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap * 0.4));
+            g.x = Math.max(20, Math.min(w - 20, g.x - sign * overlap * 0.6));
+            g.targetX = Math.max(40, Math.min(w - 40,
+              g.x - sign * (jitterMin * 0.6 + Math.random() * (jitterMax - jitterMin) * 0.6)));
+            recordBump();
           }
         }
-        // Gosling-gosling separation
+
+        // Gosling <-> Gosling.
         const goslings = goslingsRef.current;
+        const gpsp = psp * 0.8;
         for (let i = 0; i < goslings.length; i++) {
           for (let j = i + 1; j < goslings.length; j++) {
             const g1 = goslings[i];
             const g2 = goslings[j];
             const dx = g1.x - g2.x;
-            if (Math.abs(dx) < psp * 0.8 && Math.abs(g1.y - g2.y) < psp * 0.8) {
-              const overlap = psp * 0.8 - Math.abs(dx);
-              const sign = dx >= 0 ? 1 : -1;
-              g1.x = Math.max(20, Math.min(w - 20, g1.x + sign * overlap * 0.5));
-              g2.x = Math.max(20, Math.min(w - 20, g2.x - sign * overlap * 0.5));
-              g1.targetX = Math.max(40, Math.min(w - 40, g1.x + sign * (40 + Math.random() * 60)));
-              g2.targetX = Math.max(40, Math.min(w - 40, g2.x - sign * (40 + Math.random() * 60)));
+            if (Math.abs(dx) >= gpsp || Math.abs(g1.y - g2.y) >= gpsp) continue;
+            const overlap = gpsp - Math.abs(dx);
+            const sign = dx >= 0 ? 1 : -1;
+            g1.x = Math.max(20, Math.min(w - 20, g1.x + sign * overlap * 0.5));
+            g2.x = Math.max(20, Math.min(w - 20, g2.x - sign * overlap * 0.5));
+            // Asymmetric: only one re-targets to avoid the both-flip oscillation.
+            const g1Commit = Math.abs(g1.targetX - g1.x);
+            const g2Commit = Math.abs(g2.targetX - g2.x);
+            if (g1Commit >= g2Commit) {
+              g1.targetX = Math.max(40, Math.min(w - 40,
+                g1.x + sign * (jitterMin * 0.6 + Math.random() * (jitterMax - jitterMin) * 0.6)));
+            } else {
+              g2.targetX = Math.max(40, Math.min(w - 40,
+                g2.x - sign * (jitterMin * 0.6 + Math.random() * (jitterMax - jitterMin) * 0.6)));
             }
+            recordBump();
           }
         }
       }
+
 
       // Mourning chatter pulse — pick a random adult and a random line every ~3s.
       if (mourningActive && wallNow - lastMourningChatterAtRef.current > 3000 && adultsRef.current.length > 0) {
