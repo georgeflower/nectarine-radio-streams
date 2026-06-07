@@ -824,14 +824,26 @@ const FlyingGoose = ({ oneliners = [], variant = "white" }: Props) => {
           targetHeading = heading;
         } else if (waddlingOnGround) {
           // Walk slowly toward groundWaddleTargetX inside the floor band.
-          if (elapsed >= nextGroundWaddleStepAt) {
-            groundWaddleTargetX = rand(w * 0.1, w * 0.9);
-            groundWaddleY = floorBandY();
-            nextGroundWaddleStepAt = elapsed + rand(2500, 5000);
+          // While mothering, freeze if watching sleeping goslings.
+          if (mothering && motherWatch) {
+            // Don't re-target, don't step. Stand vigilant.
+          } else if (elapsed >= nextGroundWaddleStepAt) {
+            if (mothering) {
+              // Pace gently around the floor; keep within the safe band.
+              groundWaddleTargetX = rand(w * 0.1, w * 0.9);
+              groundWaddleY = floorBandY();
+              nextGroundWaddleStepAt = elapsed + rand(3500, 6500);
+            } else {
+              groundWaddleTargetX = rand(w * 0.1, w * 0.9);
+              groundWaddleY = floorBandY();
+              nextGroundWaddleStepAt = elapsed + rand(2500, 5000);
+            }
           }
-          const walkSpeed = scale(28); // px/sec — leisurely waddle
+          const walkSpeed = scale(mothering ? 22 : 28); // px/sec — leisurely waddle
           const dx = groundWaddleTargetX - x;
-          const step = Math.sign(dx) * Math.min(Math.abs(dx), walkSpeed * dt);
+          const step = (mothering && motherWatch)
+            ? 0
+            : Math.sign(dx) * Math.min(Math.abs(dx), walkSpeed * dt);
           x += step;
           y += (groundWaddleY - y) * Math.min(1, dt * 2);
           if (step !== 0) lookDir = step > 0 ? 1 : -1;
