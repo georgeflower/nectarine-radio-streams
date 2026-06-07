@@ -19,7 +19,13 @@ import {
   emitFamilyEvent,
   getGoosePositions,
   subscribeFamilyEvents,
+  setFamilySnapshotProvider,
+  recordBump,
+  recordDeath,
+  recordMourning,
+  GOOSE_COLLISION,
 } from "@/lib/gooseSocial";
+
 import {
   BASE_SPRITE_H,
   BASE_SPRITE_W,
