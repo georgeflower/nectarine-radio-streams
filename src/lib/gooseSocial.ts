@@ -735,10 +735,10 @@ async function runReproductionPhase() {
     if (ev.type === "all-eggs-hatched") allHatched = true;
   });
 
-  // Incubation phase: up to ~60s, but cuts short the moment the last egg
+  // Incubation phase: long enough for the 3-minute hatch, but cuts short the moment the last egg
   // hatches so mother can switch to parenting mode. Chatter is rationed
   // so she doesn't talk every 3 seconds while just sitting.
-  const INCUBATION_MS = 60_000;
+  const INCUBATION_MS = 3 * 60_000 + 15_000;
   const incEnd = Date.now() + INCUBATION_MS;
   let chatterIdx = 0;
   while (Date.now() < incEnd && getPair() && !allHatched) {
