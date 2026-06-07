@@ -446,6 +446,7 @@ const BoingBall = () => {
       cancelAnimationFrame(raf);
       if (ro) ro.disconnect();
       else window.removeEventListener("resize", resize);
+      clearInterval(broodPoll);
       setBallPos(null);
       setBallAvailable(true);
       unsubFamily();
