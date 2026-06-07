@@ -189,10 +189,10 @@ const BoingBall = () => {
     }, 2000);
     const unsubFamily = subscribeFamilyEvents((ev) => {
       if (ev.type === "incubation-start") {
-        parkOnShelf();
+        parkOnShelf(false);
       } else if (ev.type === "all-eggs-hatched") {
         // Eggs just hatched — keep the ball parked through the mothering phase.
-        parkOnShelf();
+        parkOnShelf(false);
       } else if (ev.type === "brood-end") {
         // Only release if the goslings haven't even appeared (e.g. failed clutch).
         if (!goslingsPresent()) returnFromShelf();
@@ -206,7 +206,7 @@ const BoingBall = () => {
     // Initial mount: park the ball on the shelf by default. The geese will
     // call it back into play via ball-play directives, and the user can
     // toggle it manually by clicking.
-    setTimeout(parkOnShelf, 0);
+    setTimeout(() => parkOnShelf(true), 0);
 
     // Click toggle: clicking the ball flips it between parked and live.
     // Canvas keeps pointer-events:none so it doesn't block the rest of the
