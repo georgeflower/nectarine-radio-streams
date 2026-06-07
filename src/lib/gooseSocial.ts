@@ -885,10 +885,14 @@ async function step() {
 
       lastReproductionAt = now;
       await runReproductionPhase();
-    } else if (now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS && Math.random() < FLY_AWAY_CHANCE) {
+    } else if (
+      !familyHasLiveOffspring() &&
+      now - lastFlyAwayAt > FLY_AWAY_COOLDOWN_MS &&
+      Math.random() < FLY_AWAY_CHANCE
+    ) {
       lastFlyAwayAt = now;
       await runFlyAway();
-    } else if (canStartBallPlay(now)) {
+    } else if (!familyHasLiveOffspring() && canStartBallPlay(now)) {
       try {
         await runBallPlay();
       } finally {
