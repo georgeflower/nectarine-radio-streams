@@ -456,6 +456,7 @@ const GooseFamily = () => {
       const adultCount = adultsRef.current.length + 2; // +2 originals
       const grownOut: Gosling[] = [];
       const remaining: Gosling[] = [];
+      let anyGoslingAsleep = false;
       for (const g of goslingsRef.current) {
         if (wallNow - g.bornAt > GROW_UP_MS && adultCount + grownOut.length < MAX_TOTAL_ADULTS) {
           grownOut.push(g);
@@ -466,6 +467,32 @@ const GooseFamily = () => {
           remaining.push(g);
           continue;
         }
+
+        // Sleep cycle: each gosling naps periodically. While asleep they
+        // do not move and emit a "Zzz" bubble. The mother freezes to
+        // watch over them (see `setMotherWatchingGoslings` below).
+        if (!g.nextSleepAt) g.nextSleepAt = wallNow + rand(25_000, 60_000);
+        if (g.sleepUntil && wallNow < g.sleepUntil) {
+          anyGoslingAsleep = true;
+          g.phase += dt * 0.2; // gentle breathing
+          if (g.bubbleUntil < wallNow) {
+            g.bubbleUntil = wallNow + 2400;
+            g.bubbleText = "Zzz...";
+          }
+          remaining.push(g);
+          continue;
+        } else if (g.sleepUntil && wallNow >= g.sleepUntil) {
+          g.sleepUntil = undefined;
+          g.nextSleepAt = wallNow + rand(35_000, 80_000);
+        } else if (g.nextSleepAt && wallNow >= g.nextSleepAt) {
+          g.sleepUntil = wallNow + rand(8_000, 16_000);
+          g.targetX = g.x;
+          g.targetY = goslingFloorY;
+          anyGoslingAsleep = true;
+          remaining.push(g);
+          continue;
+        }
+
         // Roam: re-target every time we arrive (clamped + opposite-side push to avoid corner-stick).
         const dxToTarget = g.targetX - g.x;
         const dyToTarget = g.targetY - g.y;
@@ -492,6 +519,8 @@ const GooseFamily = () => {
         g.phase += dt;
         remaining.push(g);
       }
+      // Tell the mother to stand still and watch whenever a gosling sleeps.
+      setMotherWatchingGoslings(anyGoslingAsleep && remaining.length > 0);
       if (grownOut.length > 0) {
         // Promote goslings to family adults — preserve their roster identity
         // (name, sex, original bornAt), just swap kind + pick adult color.
