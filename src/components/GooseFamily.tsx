@@ -106,6 +106,10 @@ type Gosling = {
   bornAt: number;
   bubbleUntil: number;
   bubbleText: string;
+  /** Wall-clock when this gosling should next start a nap. */
+  nextSleepAt?: number;
+  /** Wall-clock until which the gosling is asleep (stationary, eyes closed). */
+  sleepUntil?: number;
 };
 
 type AdultActivity = "waddle" | "sit" | "socialise" | "play";
