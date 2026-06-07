@@ -1,43 +1,77 @@
-## Problem 1 — Grown-up adults use the wrong sprite when flying
+## Why adult geese look/behave different
 
-Grown-up offspring adults in `src/components/GooseFamily.tsx` always render the standing waddle sprite (frames `STAND_BODY`/`STAND_HEAD` = 5/6), even when their internal `mode` is `"flying"` or `"descending"`. The two original geese (rendered by `FlyingGoose.tsx`) correctly swap to the flight sprite cycle (frames 0–3). Result: a grown-up labelled `flying·play` in debug visibly bobs along with the walking animation instead of flapping like an original.
+Today there are two completely separate goose implementations:
 
-(The `mode: "?"` shown for originals in the debug HUD is just because `getGoosePositions()` only exposes `{x,y}` — cosmetic, not part of this fix.)
+- **Originals (`src/components/FlyingGoose.tsx`, ~1250 lines)** — full state machine: takeoff, fly, descend, land, perch on letters/windows, ground waddle, head bobs, stamina, tiredness, panic, smiley reactions, snack/sitting, incubation, mothering, ball-play chase. Renders flap frames 0–3 in flight and body+head split when grounded. Registers itself with `gooseSocial` via `registerGoose()`.
+- **Grown-up offspring (`src/components/GooseFamily.tsx` "Family adults")** — its own tiny `ground | flying | descending` state machine (~150 lines), no perches, no stamina, no panic, no perch claims, no oneliner reactions. Renders body+head split with the waddle bob even while airborne (the recent fix swaps in flap frames but the underlying motion is still its mini-FSM, so it doesn't match the originals).
 
-### Fix
+That divergence is the root cause. Layering more patches onto the family-adult FSM will never make it match. The right fix is to delete the parallel implementation and reuse `FlyingGoose` for adults too.
 
-In the "Family adults" render block of `src/components/GooseFamily.tsx`:
+## Plan
 
-1. Detect flight state: `const flying = a.mode === "flying" || a.mode === "descending";`
-2. When `flying`, render a single flight sprite instead of the body/head split:
-   - Cycle through frames `0..3` derived from `a.phase` at a flap cadence comparable to `FlyingGoose` (~110 ms/frame): `const frameIdx = Math.floor(phase * FLAP_FREQ) & 3;`
-   - Replace the walking sway with a subtle vertical flap bob (`sin(phase * 2π * FLAP_FREQ) * scale`).
-   - Skip `bodyTilt` while flying.
-3. When `!flying`, keep the existing body/head split waddle render exactly as today.
-4. Keep the directional `scaleX(a.dir)` and color filter logic in both branches.
+### 1. Parameterize FlyingGoose so it can drive any adult
 
-No state-machine or debug overlay changes — purely a render-time branch on `a.mode`.
+Extend `FlyingGoose` props:
 
-## Problem 2 — Boing ball never returns to play
+```ts
+type Props = {
+  oneliners?: OnelinerEntry[];
+  variant?: GooseVariant;             // sprite palette / behavior tag
+  role?: "original" | "family";       // default "original"
+  rosterId?: string;                  // for family adults
+  colorFilter?: string;               // CSS filter used today in GooseFamily
+                                       // (pink/lightgr/etc.) — applied to <img>
+  startPos?: { x: number; y: number };
+  startMode?: "fly" | "ground";
+  isDying?: boolean;                  // drives the slumped pose + opacity
+  onDeath?: () => void;               // fired after the death animation
+};
+```
 
-The Amiga boing ball is supposed to leave the shelf and zoom into play when the geese want to ball-play, then zoom back up to the shelf when the play session ends. Currently it stays parked on the shelf forever after the first brood (debug HUD: `last ball play 24m58s ago`, cooldown `0s` — eligible, but it never re-enters play).
+Behavior gating when `role === "family"`:
 
-### Investigation needed (read-only)
+- Do **not** participate in coordinator-driven flows that are reserved for the two originals: incubation/mothering, food-fetch, ball-play chase, away/fly-away. (`registerGoose` will accept a flag, see step 2.)
+- Still uses the full flight/perch/waddle/stamina/panic logic — that's exactly what the user wants.
+- Color is applied via the existing CSS `filter` approach already used in `GooseFamily` (the sprite palette stays `white`; filter shifts hue).
+- When `isDying` toggles on, run the existing dying visual (lowered head, opacity/grayscale), then call `onDeath` after the mourning duration ends so GooseFamily can remove it from the roster.
 
-- `src/components/BoingBall.tsx` — current shelf/in-play state machine, what triggers `play` mode, what triggers return to shelf.
-- `src/lib/gooseSocial.ts` — how ball-play is scheduled (`lastBallPlayAt`, `ballPlayCooldownMs`, any `wantsBallPlay`/event emission) and what gates it. Confirm whether the gate is being held permanently by a stale flag (e.g. brood active, goslings present, post-hatch settle, mothering mode).
-- `src/components/GooseFamily.tsx` / `src/components/FlyingGoose.tsx` — any consumer that toggles the ball or that blocks ball-play while a brood/goslings exist.
+### 2. Extend `gooseSocial.registerGoose` with a role tag
 
-### Fix (after investigation, scope to be confirmed)
+```ts
+registerGoose(api, { role: "original" | "family" })
+```
 
-1. In whichever module owns the "should ball-play start now?" decision, ensure the gate clears once goslings are grown / brood has ended and no eggs are live, so the cooldown alone governs re-entry.
-2. `BoingBall.tsx`: on the ball-play start signal, animate from shelf → into play (zoom-in); on the end signal (or after the play window expires), animate back to the shelf (zoom-out). Both transitions must be re-entrant so the ball can cycle indefinitely.
-3. Emit/consume a clear start/stop event pair (reuse the existing snack/play event bus rather than adding a new global) and stamp `lastBallPlayAt` only at play start (not at every re-render) so the debug timer reflects reality.
-4. Verify in the debug HUD: after a play session, `last ball play` resets to `0s ago` and the next session fires once `cooldown` elapses, regardless of whether goslings or eggs exist.
+- `getPair()` only ever returns the white+brown **originals** (skip `family` entries) — preserves all current dialogue / incubation / ball-play targeting.
+- The family entries are still tracked in `geese` so the perch-claim registry and collision constants apply uniformly (originals + family share perches the same way two originals do today).
+
+### 3. Replace the adult render/tick in `GooseFamily.tsx`
+
+Keep in `GooseFamily`:
+
+- Spawning of new adults from grown-up goslings (roster promotion, name, color, sex).
+- The adult cap (`MAX_TOTAL_ADULTS`), dying selection, mourning ritual orchestration.
+- Eggs + goslings rendering and behavior (unchanged).
+
+Replace:
+
+- The `FamilyAdult` type, `adultsRef` tick loop (~lines 116–760), the per-adult collision pass against originals, and the flying/descending/ground state machine.
+- Render adults as `<FlyingGoose role="family" rosterId={a.id} colorFilter={...} startPos={...} isDying={...} onDeath={...} />` (one component per adult). Mount via a keyed list so adding/removing adults at promotion/death just adds/removes children.
+
+The post-hatch fly-in (the brief moment after a gosling is promoted) reuses `FlyingGoose`'s natural mount path: it starts in the air, descends, lands, perches, waddles — exactly like an original.
+
+### 4. Debug overlay
+
+`getFamilySnapshot()` already exposes adult state for the HUD. Replace its source: instead of reading from `adultsRef`, iterate `geese` filtered to `role === "family"` and pull mode/position via the existing `getPosition()` (plus a new `getMode()` on `GooseAPI`, also added for originals so the HUD's `mode: "?"` rows go away as a free side benefit).
+
+### 5. Cleanup / out of scope
+
+- `AdultMode`, `FamilyAdult`, collision-vs-originals loop, sitting flag for adults, mourning chatter tick → all moved/deleted along with the adult FSM.
+- Eggs, goslings, mother behavior, ball, originals — untouched apart from `registerGoose` getting a role tag.
 
 ## Files
 
-- `src/components/GooseFamily.tsx` — branch adult render for flying vs waddling.
-- `src/components/BoingBall.tsx` — shelf ↔ play state machine, re-entrant.
-- `src/lib/gooseSocial.ts` — unblock ball-play scheduling after broods; ensure `lastBallPlayAt` is stamped on start.
-- (Possibly) `src/components/FlyingGoose.tsx` — if it gates ball-play participation while mothering/parenting.
+- `src/components/FlyingGoose.tsx` — add `role`, `rosterId`, `colorFilter`, `startPos`, `startMode`, `isDying`, `onDeath` props; expose `getMode()` on the API; gate coordinator-only flows when `role==="family"`.
+- `src/lib/gooseSocial.ts` — `registerGoose(api, opts)`, `getPair()` filters to originals, add `getMode()` to `GooseAPI`.
+- `src/components/GooseFamily.tsx` — drop the adult FSM and adult render block; render adults as `<FlyingGoose role="family" ... />`; keep promotion, capping, dying, mourning, eggs, goslings, mother orchestration.
+- `src/components/GooseDebugOverlay.tsx` — source adult rows from the unified `geese` map; show real mode for originals too.
+- `src/test/flyingGooseEggs.test.tsx`, `src/test/gooseSocial.test.ts` — update for the new `registerGoose` signature and the unified adult flow.

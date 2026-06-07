@@ -15,6 +15,7 @@
 //     special chatter pool.
 
 import { useEffect, useRef, useState } from "react";
+import FlyingGoose from "@/components/FlyingGoose";
 import {
   emitFamilyEvent,
   getGoosePositions,
@@ -112,33 +113,19 @@ type Gosling = {
   sleepUntil?: number;
 };
 
-type AdultActivity = "waddle" | "sit" | "socialise" | "play";
-type AdultMode = "ground" | "flying" | "descending";
-
+// Family adults are now rendered as <FlyingGoose role="family" .../> so they
+// share the exact same flight/perch/waddle/stamina state machine as the two
+// originals. This component only owns the lifecycle (promotion, cap, dying,
+// mourning, persistence) — not the per-frame motion.
 type FamilyAdult = {
   id: string;
   rosterId: string;
   color: GooseColor;
-  x: number;
-  y: number;
-  dir: 1 | -1;
-  phase: number;
-  targetX: number;
-  targetY: number;
   bornAt: number;
-  bubbleUntil: number;
-  bubbleText: string;
   diesAt?: number;
   isDying?: boolean;
-  activity: AdultActivity;
-  activityUntil: number;
-  playHopPhase: number;
-  mode: AdultMode;
-  takeoffAt: number;
-  avoidUntil?: number;
 };
 
-const sitDuration = () => 9000 + Math.random() * 16000; // ms on the floor before next takeoff
 
 
 function rand(a: number, b: number) { return a + Math.random() * (b - a); }
@@ -281,39 +268,17 @@ const GooseFamily = () => {
     });
     if (rosterChanged) setRoster(roster);
 
-    const w = rootRef.current?.clientWidth ?? window.innerWidth;
-    const h = rootRef.current?.clientHeight ?? window.innerHeight;
-    const sceneScale = getSceneScale(w, h);
-    const adultFloorY = h - BASE_SPRITE_H * sceneScale * 0.6 - 12;
-    const ceilingY = h * 0.8;
     adultsRef.current = roster
       .filter((e) => e.kind === "adult")
-      .map((e): FamilyAdult => {
-        const x = rand(80, Math.max(160, w - 80));
-        const y = rand(ceilingY, adultFloorY);
-        const startGround = Math.abs(y - adultFloorY) < 12;
-        return {
-          id: `adult-${e.id}`,
-          rosterId: e.id,
-          color: e.color,
-          x,
-          y: startGround ? adultFloorY : y,
-          dir: Math.random() < 0.5 ? -1 : 1,
-          phase: Math.random() * Math.PI * 2,
-          targetX: rand(80, Math.max(160, w - 80)),
-          targetY: startGround ? adultFloorY : rand(h * 0.2, h * 0.5),
-          bornAt: e.bornAt,
-          bubbleUntil: 0,
-          bubbleText: "",
-          activity: "waddle",
-          activityUntil: Date.now() + 4000 + Math.random() * 6000,
-          playHopPhase: 0,
-          mode: startGround ? "ground" : "flying",
-          takeoffAt: Date.now() + sitDuration(),
-        };
-      });
+      .map((e): FamilyAdult => ({
+        id: `adult-${e.id}`,
+        rosterId: e.id,
+        color: e.color,
+        bornAt: e.bornAt,
+      }));
     setTick((t) => t + 1);
   }, []);
+
 
   // Family events: snack toggles gosling sit/peck flag; incubation-start
   // is when the mother has descended and dropped 1–3 eggs on the floor.
@@ -364,10 +329,10 @@ const GooseFamily = () => {
     setFamilySnapshotProvider(() => ({
       adults: adultsRef.current.map((a) => ({
         id: a.id, rosterId: a.rosterId, color: a.color,
-        x: a.x, y: a.y, dir: a.dir,
-        targetX: a.targetX, targetY: a.targetY,
-        mode: a.mode, activity: a.activity,
-        takeoffAt: a.takeoffAt, avoidUntil: a.avoidUntil,
+        x: 0, y: 0, dir: 1 as const,
+        targetX: undefined, targetY: undefined,
+        mode: "flyinggoose", activity: undefined,
+        takeoffAt: 0, avoidUntil: undefined,
         isDying: a.isDying, diesAt: a.diesAt, bornAt: a.bornAt,
       })),
       goslings: goslingsRef.current.map((g) => ({
@@ -546,34 +511,15 @@ const GooseFamily = () => {
           };
         });
         for (let i = 0; i < grownOut.length; i++) {
-          const g = grownOut[i];
           const entry = promoted[i];
-          // Promoted gosling enters FLIGHT (not waddle) — mirrors a fresh
-          // FlyingGoose appearance. Spawned up in the air band with a
-          // horizontal fly target; the standard flying -> descending -> ground
-          // chain takes over from there.
-          const startY = rand(h * 0.18, h * 0.42);
-          const flySign = Math.random() < 0.5 ? -1 : 1;
-          const flyTargetX = Math.max(60, Math.min(w - 60,
-            g.x + flySign * (160 + Math.random() * 220)));
+          // Adult is rendered as a <FlyingGoose role="family" .../> instance,
+          // so it spawns up in the air and runs the same fly/perch/waddle
+          // logic as the originals — no per-adult state machine here.
           adultsRef.current.push({
             id: `a-${entry.id}`,
             rosterId: entry.id,
             color: entry.color,
-            x: g.x,
-            y: startY,
-            dir: flyTargetX > g.x ? 1 : -1,
-            phase: Math.random() * Math.PI * 2,
-            targetX: flyTargetX,
-            targetY: rand(h * 0.2, h * 0.5),
             bornAt: entry.bornAt,
-            bubbleUntil: wallNow + 2400,
-            bubbleText: `I'm ${entry.name}! 🎉`,
-            activity: "waddle",
-            activityUntil: wallNow + 4000 + Math.random() * 8000,
-            playHopPhase: 0,
-            mode: "flying",
-            takeoffAt: 0, // set on first landing
           });
         }
 
@@ -618,207 +564,16 @@ const GooseFamily = () => {
         setMourningActive(false);
       }
 
-      // === Adults: ground / flying / descending state machine (mirrors FlyingGoose) ===
-      const mourningActive = mourningUntilRef.current > 0;
-      const clampX = (v: number) => Math.max(80, Math.min(w - 80, v));
-      const pickFlyTargetX = (fromX: number) => {
-        const minTravel = 160;
-        const sign = Math.random() < 0.5 ? -1 : 1;
-        const span = minTravel + Math.random() * 220;
-        let tx = fromX + sign * span;
-        if (tx < 80 || tx > w - 80) tx = fromX - sign * span;
-        return Math.max(60, Math.min(w - 60, tx));
-      };
-      for (const a of adultsRef.current) {
-        if (mourningActive) {
-          const dying = adultsRef.current.filter((x) => x.isDying);
-          const cx = dying.length > 0
-            ? dying.reduce((s, x) => s + x.x, 0) / dying.length
-            : w / 2;
-          const dx = cx + (a.id.charCodeAt(2) % 80 - 40) - a.x;
-          a.x += Math.sign(dx) * Math.min(Math.abs(dx), 14 * sceneScale * dt);
-          a.dir = dx >= 0 ? 1 : -1;
-          a.phase += dt * 0.4;
-          a.y = adultFloorY;
-          continue;
-        }
+      // === Adults: motion + collisions are owned by their FlyingGoose
+      // instances now (one per adult). This loop only handles the
+      // collective-state side effects: mourning ritual mark/end. ===
 
-        if (a.mode === "ground") {
-          // Sub-activity rotation while grounded.
-          if (wallNow >= a.activityUntil) {
-            const r = Math.random();
-            a.activity = r < 0.42 ? "waddle"
-              : r < 0.66 ? "sit"
-              : r < 0.86 ? "socialise"
-              : "play";
-            a.activityUntil = wallNow + 4500 + Math.random() * 7000;
-            if (a.activity === "waddle") {
-              a.targetX = clampX(a.x + rand(-200, 200));
-            } else if (a.activity === "socialise") {
-              const others = adultsRef.current.filter((x) => x.id !== a.id && x.mode === "ground");
-              if (others.length > 0) {
-                const peer = others[Math.floor(Math.random() * others.length)];
-                a.targetX = clampX(peer.x + rand(-40, 40));
-              } else {
-                a.targetX = clampX(a.x + rand(-180, 180));
-              }
-            } else if (a.activity === "play") {
-              a.playHopPhase = 0;
-            }
-            a.targetY = adultFloorY;
-          }
-          if (a.activity === "sit") {
-            a.phase += dt * 0.6;
-          } else if (a.activity === "play") {
-            a.playHopPhase += dt;
-            a.phase += dt * 1.4;
-            if (Math.random() < 0.01) a.dir = (Math.random() < 0.5 ? -1 : 1) as 1 | -1;
-          } else {
-            if (Math.abs(a.targetX - a.x) < 18) {
-              a.targetX = clampX(a.x + rand(-180, 180));
-            }
-            a.dir = a.targetX > a.x ? 1 : -1;
-            const speed = a.activity === "socialise" ? 34 : 28;
-            const stepX = a.dir * speed * sceneScale * dt;
-            a.x = Math.max(20, Math.min(w - 20, a.x + stepX));
-            a.y = adultFloorY;
-            a.phase += dt;
-          }
-          // Re-takeoff timing (mirrors FlyingGoose sit-then-fly cycle).
-          if (wallNow >= a.takeoffAt) {
-            a.mode = "flying";
-            a.targetX = pickFlyTargetX(a.x);
-            a.targetY = rand(h * 0.2, h * 0.5);
-            a.dir = a.targetX > a.x ? 1 : -1;
-          }
-        } else if (a.mode === "flying") {
-          const dxToTarget = a.targetX - a.x;
-          if (Math.abs(dxToTarget) > 30) a.dir = dxToTarget > 0 ? 1 : -1;
-          const speed = 60;
-          const stepX = a.dir * speed * sceneScale * dt;
-          const dyTotal = a.targetY - a.y;
-          const stepY = Math.sign(dyTotal) * Math.min(Math.abs(dyTotal), speed * sceneScale * dt);
-          a.x = Math.max(20, Math.min(w - 20, a.x + stepX));
-          a.y = Math.max(20, Math.min(adultFloorY, a.y + stepY));
-          a.phase += dt * 1.6;
-          if (Math.abs(dxToTarget) < 24 && Math.abs(dyTotal) < 24) {
-            // Either continue cruising or begin descent.
-            if (Math.random() < 0.55) {
-              a.targetX = pickFlyTargetX(a.x);
-              a.targetY = rand(h * 0.2, h * 0.5);
-            } else {
-              a.mode = "descending";
-              a.targetX = clampX(a.x + rand(-150, 150));
-              a.targetY = adultFloorY;
-            }
-          }
-        } else if (a.mode === "descending") {
-          const dxToTarget = a.targetX - a.x;
-          if (Math.abs(dxToTarget) > 30) a.dir = dxToTarget > 0 ? 1 : -1;
-          const speed = 60;
-          const stepX = a.dir * speed * sceneScale * dt;
-          const dyTotal = a.targetY - a.y;
-          const stepY = Math.sign(dyTotal) * Math.min(Math.abs(dyTotal), speed * 0.8 * sceneScale * dt);
-          a.x = Math.max(20, Math.min(w - 20, a.x + stepX));
-          a.y = Math.min(adultFloorY, a.y + stepY);
-          a.phase += dt * 1.4;
-          if (Math.abs(a.y - adultFloorY) < 2) {
-            a.y = adultFloorY;
-            a.mode = "ground";
-            a.activity = "waddle";
-            a.activityUntil = wallNow + 4500 + Math.random() * 7000;
-            a.takeoffAt = wallNow + sitDuration();
-            a.targetX = clampX(a.x + rand(-180, 180));
-          }
-        }
-        // Apply playful hop offset on y (only for sit/play in ground mode).
-        if (a.mode === "ground" && (a.activity === "sit" || a.activity === "play")) {
-          const hopY = a.activity === "play"
-            ? -Math.abs(Math.sin(a.playHopPhase * 6)) * 10 * sceneScale
-            : 0;
-          a.y = adultFloorY + hopY;
-        }
-      }
-
-      // === Collision avoidance: grounded adults + goslings + originals ===
-      // Uses GOOSE_COLLISION (centralized tuning). Asymmetric resolution:
-      // the more "committed" mover (larger |targetX - x|) re-targets; the
-      // other just gets a position nudge. A bumpCooldownMs cool-down with a
-      // hysteresis band prevents the per-frame flip-back oscillation.
-      if (!mourningActive) {
+      // Gosling <-> Gosling collision (still local — goslings aren't
+      // FlyingGoose instances).
+      {
         const psp = GOOSE_COLLISION.personalSpacePx * sceneScale;
         const jitterMin = GOOSE_COLLISION.retargetJitterPx[0];
         const jitterMax = GOOSE_COLLISION.retargetJitterPx[1];
-        const cool = GOOSE_COLLISION.bumpCooldownMs;
-        const groundAdults = adultsRef.current.filter((a) => a.mode === "ground");
-        const originalsPos = getGoosePositions();
-        const obstacles: Array<{ x: number; y: number }> = [];
-        if (originalsPos?.white) obstacles.push(originalsPos.white);
-        if (originalsPos?.brown) obstacles.push(originalsPos.brown);
-
-        // Adult <-> Adult — asymmetric retarget with cooldown / hysteresis.
-        for (let i = 0; i < groundAdults.length; i++) {
-          for (let j = i + 1; j < groundAdults.length; j++) {
-            const a = groundAdults[i];
-            const b = groundAdults[j];
-            const dx = a.x - b.x;
-            const ady = Math.abs(a.y - b.y);
-            const adx = Math.abs(dx);
-            if (adx >= psp || ady >= psp) continue;
-            const overlap = psp - adx;
-            const sign = dx >= 0 ? 1 : -1;
-            // Position nudge (always — half overlap each).
-            a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap * 0.5));
-            b.x = Math.max(20, Math.min(w - 20, b.x - sign * overlap * 0.5));
-            // Asymmetric retarget: only the "committed" mover re-rolls a target.
-            const aCommit = Math.abs(a.targetX - a.x);
-            const bCommit = Math.abs(b.targetX - b.x);
-            const aFree = !a.avoidUntil || wallNow > a.avoidUntil;
-            const bFree = !b.avoidUntil || wallNow > b.avoidUntil;
-            if (aCommit >= bCommit && aFree) {
-              a.targetX = clampX(a.x + sign * (jitterMin + Math.random() * (jitterMax - jitterMin)));
-              a.avoidUntil = wallNow + cool;
-              recordBump();
-            } else if (bFree) {
-              b.targetX = clampX(b.x - sign * (jitterMin + Math.random() * (jitterMax - jitterMin)));
-              b.avoidUntil = wallNow + cool;
-              recordBump();
-            }
-          }
-        }
-
-        // Adults vs originals — push the family adult only.
-        for (const a of groundAdults) {
-          for (const o of obstacles) {
-            const dx = a.x - o.x;
-            if (Math.abs(dx) >= psp || Math.abs(a.y - o.y) >= psp) continue;
-            const overlap = psp - Math.abs(dx);
-            const sign = dx >= 0 ? 1 : -1;
-            a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap));
-            if (!a.avoidUntil || wallNow > a.avoidUntil) {
-              a.targetX = clampX(a.x + sign * (jitterMin + Math.random() * (jitterMax - jitterMin)));
-              a.avoidUntil = wallNow + cool;
-              recordBump();
-            }
-          }
-        }
-
-        // Adults vs goslings — gosling yields more.
-        for (const a of groundAdults) {
-          for (const g of goslingsRef.current) {
-            const dx = a.x - g.x;
-            if (Math.abs(dx) >= psp || Math.abs(a.y - g.y) >= psp) continue;
-            const overlap = psp - Math.abs(dx);
-            const sign = dx >= 0 ? 1 : -1;
-            a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap * 0.4));
-            g.x = Math.max(20, Math.min(w - 20, g.x - sign * overlap * 0.6));
-            g.targetX = Math.max(40, Math.min(w - 40,
-              g.x - sign * (jitterMin * 0.6 + Math.random() * (jitterMax - jitterMin) * 0.6)));
-            recordBump();
-          }
-        }
-
-        // Gosling <-> Gosling.
         const goslings = goslingsRef.current;
         const gpsp = psp * 0.8;
         for (let i = 0; i < goslings.length; i++) {
@@ -831,7 +586,6 @@ const GooseFamily = () => {
             const sign = dx >= 0 ? 1 : -1;
             g1.x = Math.max(20, Math.min(w - 20, g1.x + sign * overlap * 0.5));
             g2.x = Math.max(20, Math.min(w - 20, g2.x - sign * overlap * 0.5));
-            // Asymmetric: only one re-targets to avoid the both-flip oscillation.
             const g1Commit = Math.abs(g1.targetX - g1.x);
             const g2Commit = Math.abs(g2.targetX - g2.x);
             if (g1Commit >= g2Commit) {
@@ -847,13 +601,10 @@ const GooseFamily = () => {
       }
 
 
-      // Mourning chatter pulse — pick a random adult and a random line every ~3s.
-      if (mourningActive && wallNow - lastMourningChatterAtRef.current > 3000 && adultsRef.current.length > 0) {
-        const speaker = adultsRef.current[Math.floor(Math.random() * adultsRef.current.length)];
-        speaker.bubbleText = MOURNING_LINES[Math.floor(Math.random() * MOURNING_LINES.length)];
-        speaker.bubbleUntil = wallNow + 2600;
-        lastMourningChatterAtRef.current = wallNow;
-      }
+
+      // Mourning chatter intentionally dropped: adults are FlyingGoose
+      // instances and we don't reach into them imperatively to set bubbles.
+
 
       setTick((t) => (t + 1) % 1_000_000);
       raf = requestAnimationFrame(tick);
@@ -1027,91 +778,17 @@ const GooseFamily = () => {
         </div>
       ))}
 
-      {/* Family adults (grown-up offspring) */}
-      {adultsRef.current.map((a) => {
-        const frames = adultFramesWhite.current!;
-        const dying = a.isDying;
-        const phase = a.phase;
-        // While airborne (flying / descending) use the same flap cycle as the
-        // original FlyingGoose (frames 0..3 at ~9 Hz). When grounded use the
-        // body/head split waddle.
-        const flying = !dying && (a.mode === "flying" || a.mode === "descending");
-        const tx = a.x - adultW / 2;
-        const ty = a.y - adultH / 2;
-        const bubble = a.bubbleUntil > now;
-        const filter = `${COLOR_FILTER[a.color]} drop-shadow(0 2px 0 rgba(0,0,0,0.28))${dying ? " opacity(0.5) grayscale(0.6)" : ""}`;
-
-        if (flying) {
-          const FLAP_HZ = 9;
-          const flapFrameIdx = Math.floor(phase * FLAP_HZ) & 3; // 0..3
-          const flapBob = Math.sin(phase * FLAP_HZ * Math.PI * 2) * 2 * sceneScale;
-          return (
-            <div key={a.id}
-              style={{
-                position: "absolute",
-                left: 0, top: 0, width: adultW, height: adultH,
-                transform: `translate3d(${tx}px, ${ty + flapBob}px, 0) scaleX(${a.dir})`,
-                transformOrigin: "center center",
-                filter,
-                transition: "filter 800ms ease-out",
-              }}
-            >
-              <img src={frames[flapFrameIdx]} alt="" width={adultW} height={adultH}
-                style={{ position: "absolute", inset: 0, width: adultW, height: adultH,
-                  imageRendering: "pixelated" }} />
-              {bubble && (
-                <div style={{ position: "absolute", left: 0, top: 0, transform: `scaleX(${a.dir})` }} />
-              )}
-            </div>
-          );
-        }
-
-        const stepCycle = Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2);
-        const stepLanding = Math.abs(stepCycle);
-        const bodyTX = stepCycle * WADDLE_CHAR_BODY_SWAY * sceneScale * (dying ? 0.4 : 1);
-        const bodyTY = stepLanding * WADDLE_CHAR_BODY_BOB * sceneScale * (dying ? 0.4 : 1);
-        const bodyTilt = stepCycle * WADDLE_CHAR_BODY_TILT * (dying ? 0.4 : 1);
-        // Head stays welded to the neck socket: no independent translate;
-        // only a gentle tilt rotating around the neck pivot.
-        const headTX = 0;
-        const headTY = dying ? 6 * sceneScale : 0;
-        const headTilt = (Math.sin(phase * WADDLE_CHAR_CYCLE_FREQ * Math.PI * 2 * 1.1) * WADDLE_CHAR_HEAD_TILT * 0.5 * (dying ? 0.3 : 1)) - (dying ? 18 : 0);
-        return (
-          <div key={a.id}
-            style={{
-              position: "absolute",
-              left: 0, top: 0, width: adultW, height: adultH,
-              transform: `translate3d(${tx}px, ${ty}px, 0) scaleX(${a.dir})`,
-              transformOrigin: "center center",
-              filter,
-              transition: "filter 800ms ease-out",
-            }}
-          >
-            <div style={{ position: "absolute", inset: 0, width: adultW, height: adultH,
-              transform: `translate(${bodyTX}px, ${bodyTY}px) rotate(${bodyTilt}deg)`,
-              transformOrigin: "center center" }}>
-              <img src={frames[STAND_BODY]} alt="" width={adultW} height={adultH}
-                style={{ position: "absolute", inset: 0, width: adultW, height: adultH,
-                  imageRendering: "pixelated" }} />
-              <img src={frames[STAND_HEAD]} alt="" width={adultW} height={adultH}
-                style={{ position: "absolute", inset: 0, width: adultW, height: adultH,
-                  imageRendering: "pixelated",
-                  transformOrigin: `${NECK_PIVOT_X_PX * sceneScale}px ${NECK_PIVOT_Y_PX * sceneScale}px`,
-                  transform: `translate(${headTX}px, ${headTY}px) rotate(${headTilt}deg)` }} />
-            </div>
-
-            {bubble && (
-              <div style={{ position: "absolute", left: 0, top: 0, transform: `scaleX(${a.dir})` }} />
-            )}
-          </div>
-        );
-      })}
-
-      {/* Adult bubbles (clamped) */}
-      {adultsRef.current.filter((a) => a.bubbleUntil > now && a.bubbleText).map((a) => (
-        <div key={`ab-${a.id}`}>
-          {renderBubble(a.bubbleText, a.x, a.y, adultH, a.dir)}
-        </div>
+      {/* Family adults (grown-up offspring) — each is a full FlyingGoose
+          instance, so they use the same flight/perch/waddle/stamina state
+          machine as the originals. Color recolor is done with CSS filter. */}
+      {adultsRef.current.map((a) => (
+        <FlyingGoose
+          key={a.id}
+          role="family"
+          variant="white"
+          colorFilter={COLOR_FILTER[a.color]}
+          isDying={!!a.isDying}
+        />
       ))}
     </div>
   );
