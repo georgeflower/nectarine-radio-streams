@@ -354,6 +354,32 @@ const GooseFamily = () => {
     return () => { unsub(); };
   }, []);
 
+  // Expose a live debug snapshot to the overlay (read on demand).
+  useEffect(() => {
+    setFamilySnapshotProvider(() => ({
+      adults: adultsRef.current.map((a) => ({
+        id: a.id, rosterId: a.rosterId, color: a.color,
+        x: a.x, y: a.y, dir: a.dir,
+        targetX: a.targetX, targetY: a.targetY,
+        mode: a.mode, activity: a.activity,
+        takeoffAt: a.takeoffAt, avoidUntil: a.avoidUntil,
+        isDying: a.isDying, diesAt: a.diesAt, bornAt: a.bornAt,
+      })),
+      goslings: goslingsRef.current.map((g) => ({
+        id: g.id, rosterId: g.rosterId, name: g.name, variant: g.variant,
+        x: g.x, y: g.y, dir: g.dir,
+        targetX: g.targetX, targetY: g.targetY, bornAt: g.bornAt,
+      })),
+      eggs: eggsRef.current.map((e) => ({
+        id: e.id, x: e.x, y: e.y, laidAt: e.laidAt, hatchAt: e.hatchAt,
+      })),
+      mourningUntil: mourningUntilRef.current,
+    }));
+    return () => setFamilySnapshotProvider(null);
+  }, []);
+
+
+
 
   // Main animation loop.
   useEffect(() => {
