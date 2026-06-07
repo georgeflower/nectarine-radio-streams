@@ -19,7 +19,13 @@ import {
   emitFamilyEvent,
   getGoosePositions,
   subscribeFamilyEvents,
+  setFamilySnapshotProvider,
+  recordBump,
+  recordDeath,
+  recordMourning,
+  GOOSE_COLLISION,
 } from "@/lib/gooseSocial";
+
 import {
   BASE_SPRITE_H,
   BASE_SPRITE_W,
@@ -127,8 +133,8 @@ type FamilyAdult = {
   avoidUntil?: number;
 };
 
-const PERSONAL_SPACE_PX = 28;
 const sitDuration = () => 9000 + Math.random() * 16000; // ms on the floor before next takeoff
+
 
 function rand(a: number, b: number) { return a + Math.random() * (b - a); }
 
@@ -348,6 +354,32 @@ const GooseFamily = () => {
     return () => { unsub(); };
   }, []);
 
+  // Expose a live debug snapshot to the overlay (read on demand).
+  useEffect(() => {
+    setFamilySnapshotProvider(() => ({
+      adults: adultsRef.current.map((a) => ({
+        id: a.id, rosterId: a.rosterId, color: a.color,
+        x: a.x, y: a.y, dir: a.dir,
+        targetX: a.targetX, targetY: a.targetY,
+        mode: a.mode, activity: a.activity,
+        takeoffAt: a.takeoffAt, avoidUntil: a.avoidUntil,
+        isDying: a.isDying, diesAt: a.diesAt, bornAt: a.bornAt,
+      })),
+      goslings: goslingsRef.current.map((g) => ({
+        id: g.id, rosterId: g.rosterId, name: g.name, variant: g.variant,
+        x: g.x, y: g.y, dir: g.dir,
+        targetX: g.targetX, targetY: g.targetY, bornAt: g.bornAt,
+      })),
+      eggs: eggsRef.current.map((e) => ({
+        id: e.id, x: e.x, y: e.y, laidAt: e.laidAt, hatchAt: e.hatchAt,
+      })),
+      mourningUntil: mourningUntilRef.current,
+    }));
+    return () => setFamilySnapshotProvider(null);
+  }, []);
+
+
+
 
   // Main animation loop.
   useEffect(() => {
@@ -482,26 +514,35 @@ const GooseFamily = () => {
         for (let i = 0; i < grownOut.length; i++) {
           const g = grownOut[i];
           const entry = promoted[i];
+          // Promoted gosling enters FLIGHT (not waddle) — mirrors a fresh
+          // FlyingGoose appearance. Spawned up in the air band with a
+          // horizontal fly target; the standard flying -> descending -> ground
+          // chain takes over from there.
+          const startY = rand(h * 0.18, h * 0.42);
+          const flySign = Math.random() < 0.5 ? -1 : 1;
+          const flyTargetX = Math.max(60, Math.min(w - 60,
+            g.x + flySign * (160 + Math.random() * 220)));
           adultsRef.current.push({
             id: `a-${entry.id}`,
             rosterId: entry.id,
             color: entry.color,
             x: g.x,
-            y: adultFloorY,
-            dir: g.dir,
+            y: startY,
+            dir: flyTargetX > g.x ? 1 : -1,
             phase: Math.random() * Math.PI * 2,
-            targetX: Math.max(80, Math.min(w - 80, g.x + rand(-100, 100))),
-            targetY: adultFloorY,
+            targetX: flyTargetX,
+            targetY: rand(h * 0.2, h * 0.5),
             bornAt: entry.bornAt,
             bubbleUntil: wallNow + 2400,
             bubbleText: `I'm ${entry.name}! 🎉`,
             activity: "waddle",
             activityUntil: wallNow + 4000 + Math.random() * 8000,
             playHopPhase: 0,
-            mode: "ground",
-            takeoffAt: wallNow + sitDuration(),
+            mode: "flying",
+            takeoffAt: 0, // set on first landing
           });
         }
+
         setRoster([...kept, ...promoted]);
         emitFamilyEvent({ type: "goslings-grown" });
         goslingsRef.current = remaining;
@@ -525,14 +566,17 @@ const GooseFamily = () => {
         for (const a of dyingNow) a.isDying = true;
         mourningUntilRef.current = wallNow + MOURNING_DURATION_MS;
         setMourningActive(true);
+        recordMourning();
       }
       if (mourningUntilRef.current > 0 && wallNow >= mourningUntilRef.current) {
         // Ritual ends — remove the dying adults from roster + render.
         const dyingIds = new Set(adultsRef.current.filter((a) => a.isDying).map((a) => a.rosterId));
         adultsRef.current = adultsRef.current.filter((a) => !dyingIds.has(a.rosterId));
         if (dyingIds.size > 0) {
+          for (let i = 0; i < dyingIds.size; i++) recordDeath();
           setRoster(getRoster().filter((e) => !dyingIds.has(e.id)));
         }
+
         mourningUntilRef.current = 0;
         setMourningActive(false);
       }
@@ -660,81 +704,111 @@ const GooseFamily = () => {
       }
 
       // === Collision avoidance: grounded adults + goslings + originals ===
+      // Uses GOOSE_COLLISION (centralized tuning). Asymmetric resolution:
+      // the more "committed" mover (larger |targetX - x|) re-targets; the
+      // other just gets a position nudge. A bumpCooldownMs cool-down with a
+      // hysteresis band prevents the per-frame flip-back oscillation.
       if (!mourningActive) {
-        const psp = PERSONAL_SPACE_PX * sceneScale;
+        const psp = GOOSE_COLLISION.personalSpacePx * sceneScale;
+        const jitterMin = GOOSE_COLLISION.retargetJitterPx[0];
+        const jitterMax = GOOSE_COLLISION.retargetJitterPx[1];
+        const cool = GOOSE_COLLISION.bumpCooldownMs;
         const groundAdults = adultsRef.current.filter((a) => a.mode === "ground");
         const originalsPos = getGoosePositions();
         const obstacles: Array<{ x: number; y: number }> = [];
         if (originalsPos?.white) obstacles.push(originalsPos.white);
         if (originalsPos?.brown) obstacles.push(originalsPos.brown);
-        // Adult-adult separation
+
+        // Adult <-> Adult — asymmetric retarget with cooldown / hysteresis.
         for (let i = 0; i < groundAdults.length; i++) {
           for (let j = i + 1; j < groundAdults.length; j++) {
             const a = groundAdults[i];
             const b = groundAdults[j];
             const dx = a.x - b.x;
-            if (Math.abs(dx) < psp && Math.abs(a.y - b.y) < psp) {
-              const overlap = psp - Math.abs(dx);
-              const sign = dx >= 0 ? 1 : -1;
-              a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap * 0.5));
-              b.x = Math.max(20, Math.min(w - 20, b.x - sign * overlap * 0.5));
-              if (!a.avoidUntil || wallNow > a.avoidUntil) {
-                a.targetX = clampX(a.x + sign * (60 + Math.random() * 80));
-                a.avoidUntil = wallNow + 400;
-              }
-              if (!b.avoidUntil || wallNow > b.avoidUntil) {
-                b.targetX = clampX(b.x - sign * (60 + Math.random() * 80));
-                b.avoidUntil = wallNow + 400;
-              }
+            const ady = Math.abs(a.y - b.y);
+            const adx = Math.abs(dx);
+            if (adx >= psp || ady >= psp) continue;
+            const overlap = psp - adx;
+            const sign = dx >= 0 ? 1 : -1;
+            // Position nudge (always — half overlap each).
+            a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap * 0.5));
+            b.x = Math.max(20, Math.min(w - 20, b.x - sign * overlap * 0.5));
+            // Asymmetric retarget: only the "committed" mover re-rolls a target.
+            const aCommit = Math.abs(a.targetX - a.x);
+            const bCommit = Math.abs(b.targetX - b.x);
+            const aFree = !a.avoidUntil || wallNow > a.avoidUntil;
+            const bFree = !b.avoidUntil || wallNow > b.avoidUntil;
+            if (aCommit >= bCommit && aFree) {
+              a.targetX = clampX(a.x + sign * (jitterMin + Math.random() * (jitterMax - jitterMin)));
+              a.avoidUntil = wallNow + cool;
+              recordBump();
+            } else if (bFree) {
+              b.targetX = clampX(b.x - sign * (jitterMin + Math.random() * (jitterMax - jitterMin)));
+              b.avoidUntil = wallNow + cool;
+              recordBump();
             }
           }
         }
-        // Adults vs originals (only push the adult)
+
+        // Adults vs originals — push the family adult only.
         for (const a of groundAdults) {
           for (const o of obstacles) {
             const dx = a.x - o.x;
-            if (Math.abs(dx) < psp && Math.abs(a.y - o.y) < psp) {
-              const overlap = psp - Math.abs(dx);
-              const sign = dx >= 0 ? 1 : -1;
-              a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap));
-              if (!a.avoidUntil || wallNow > a.avoidUntil) {
-                a.targetX = clampX(a.x + sign * (60 + Math.random() * 80));
-                a.avoidUntil = wallNow + 400;
-              }
+            if (Math.abs(dx) >= psp || Math.abs(a.y - o.y) >= psp) continue;
+            const overlap = psp - Math.abs(dx);
+            const sign = dx >= 0 ? 1 : -1;
+            a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap));
+            if (!a.avoidUntil || wallNow > a.avoidUntil) {
+              a.targetX = clampX(a.x + sign * (jitterMin + Math.random() * (jitterMax - jitterMin)));
+              a.avoidUntil = wallNow + cool;
+              recordBump();
             }
           }
         }
-        // Adults vs goslings (push adult slightly, goslings the rest)
+
+        // Adults vs goslings — gosling yields more.
         for (const a of groundAdults) {
           for (const g of goslingsRef.current) {
             const dx = a.x - g.x;
-            if (Math.abs(dx) < psp && Math.abs(a.y - g.y) < psp) {
-              const overlap = psp - Math.abs(dx);
-              const sign = dx >= 0 ? 1 : -1;
-              a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap * 0.4));
-              g.x = Math.max(20, Math.min(w - 20, g.x - sign * overlap * 0.6));
-              g.targetX = Math.max(40, Math.min(w - 40, g.x - sign * (40 + Math.random() * 60)));
-            }
+            if (Math.abs(dx) >= psp || Math.abs(a.y - g.y) >= psp) continue;
+            const overlap = psp - Math.abs(dx);
+            const sign = dx >= 0 ? 1 : -1;
+            a.x = Math.max(20, Math.min(w - 20, a.x + sign * overlap * 0.4));
+            g.x = Math.max(20, Math.min(w - 20, g.x - sign * overlap * 0.6));
+            g.targetX = Math.max(40, Math.min(w - 40,
+              g.x - sign * (jitterMin * 0.6 + Math.random() * (jitterMax - jitterMin) * 0.6)));
+            recordBump();
           }
         }
-        // Gosling-gosling separation
+
+        // Gosling <-> Gosling.
         const goslings = goslingsRef.current;
+        const gpsp = psp * 0.8;
         for (let i = 0; i < goslings.length; i++) {
           for (let j = i + 1; j < goslings.length; j++) {
             const g1 = goslings[i];
             const g2 = goslings[j];
             const dx = g1.x - g2.x;
-            if (Math.abs(dx) < psp * 0.8 && Math.abs(g1.y - g2.y) < psp * 0.8) {
-              const overlap = psp * 0.8 - Math.abs(dx);
-              const sign = dx >= 0 ? 1 : -1;
-              g1.x = Math.max(20, Math.min(w - 20, g1.x + sign * overlap * 0.5));
-              g2.x = Math.max(20, Math.min(w - 20, g2.x - sign * overlap * 0.5));
-              g1.targetX = Math.max(40, Math.min(w - 40, g1.x + sign * (40 + Math.random() * 60)));
-              g2.targetX = Math.max(40, Math.min(w - 40, g2.x - sign * (40 + Math.random() * 60)));
+            if (Math.abs(dx) >= gpsp || Math.abs(g1.y - g2.y) >= gpsp) continue;
+            const overlap = gpsp - Math.abs(dx);
+            const sign = dx >= 0 ? 1 : -1;
+            g1.x = Math.max(20, Math.min(w - 20, g1.x + sign * overlap * 0.5));
+            g2.x = Math.max(20, Math.min(w - 20, g2.x - sign * overlap * 0.5));
+            // Asymmetric: only one re-targets to avoid the both-flip oscillation.
+            const g1Commit = Math.abs(g1.targetX - g1.x);
+            const g2Commit = Math.abs(g2.targetX - g2.x);
+            if (g1Commit >= g2Commit) {
+              g1.targetX = Math.max(40, Math.min(w - 40,
+                g1.x + sign * (jitterMin * 0.6 + Math.random() * (jitterMax - jitterMin) * 0.6)));
+            } else {
+              g2.targetX = Math.max(40, Math.min(w - 40,
+                g2.x - sign * (jitterMin * 0.6 + Math.random() * (jitterMax - jitterMin) * 0.6)));
             }
+            recordBump();
           }
         }
       }
+
 
       // Mourning chatter pulse — pick a random adult and a random line every ~3s.
       if (mourningActive && wallNow - lastMourningChatterAtRef.current > 3000 && adultsRef.current.length > 0) {

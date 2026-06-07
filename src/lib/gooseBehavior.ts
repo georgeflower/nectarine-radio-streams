@@ -53,7 +53,7 @@ export const pickPerchCandidate = <T>(
   from: { x: number; y: number } | null,
   random: () => number = Math.random,
   occupied: Array<{ ref: unknown; anchorX: number }> = [],
-  personalSpacePx = 28,
+  personalSpacePx = 36,
 ): SelectedPerch<T> | null => {
   if (candidates.length === 0) return null;
 

@@ -4,7 +4,9 @@ import BeatOverlay from "./BeatOverlay";
 import FloatingWindow from "./FloatingWindow";
 import FlyingGoose from "./FlyingGoose";
 import GooseFamily from "./GooseFamily";
+import GooseDebugOverlay from "./GooseDebugOverlay";
 import BoingBall from "./BoingBall";
+
 import RosterWindow from "./RosterWindow";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl, formatDuration, computeTimeLeft } from "@/lib/nectarine";
@@ -803,6 +805,9 @@ const Cracktro = ({
         {brownGooseOn && <FlyingGoose oneliners={oneliners} variant="brown" />}
         {(gooseOn || brownGooseOn) && <GooseFamily />}
         {boingOn && <BoingBall />}
+        <GooseDebugOverlay />
+
+
 
         <button
           type="button"

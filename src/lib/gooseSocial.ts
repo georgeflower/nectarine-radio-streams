@@ -139,6 +139,96 @@ export function getPerchClaims(excludeId?: string): Array<{ ref: unknown; anchor
   }
   return out;
 }
+export function getAllPerchClaims(): Array<{ id: string; anchorX: number }> {
+  return Array.from(perchClaims.values()).map((c) => ({ id: c.id, anchorX: c.anchorX }));
+}
+
+// Centralized collision tuning. Imported by GooseFamily / FlyingGoose so all
+// ground-body avoidance and perch-anchor exclusion share the same defaults.
+export const GOOSE_COLLISION = {
+  /** Pairwise horizontal distance below which two grounded bodies are considered overlapping. */
+  personalSpacePx: 34,
+  /** Hysteresis: separation only triggers under personalSpacePx, clears at +this. */
+  hysteresisPx: 6,
+  /** Cooldown after a bump during which the goose may not re-pick a target across the partner. */
+  bumpCooldownMs: 650,
+  /** Min/max horizontal jitter applied when re-targeting the more-committed mover. */
+  retargetJitterPx: [80, 160] as const,
+  /** Anchor-exclusion radius used when selecting perches. */
+  perchPersonalSpacePx: 36,
+};
+
+// ----- Debug counters (session-scoped, reset via resetStateForTests) -----
+type DebugCounters = {
+  bumps: number;
+  deaths: number;
+  mournings: number;
+  lastBumpAt: number;
+  lastDeathAt: number;
+  lastMourningAt: number;
+};
+const debugCounters: DebugCounters = {
+  bumps: 0, deaths: 0, mournings: 0,
+  lastBumpAt: 0, lastDeathAt: 0, lastMourningAt: 0,
+};
+export function recordBump() { debugCounters.bumps += 1; debugCounters.lastBumpAt = Date.now(); }
+export function recordDeath() { debugCounters.deaths += 1; debugCounters.lastDeathAt = Date.now(); }
+export function recordMourning() { debugCounters.mournings += 1; debugCounters.lastMourningAt = Date.now(); }
+
+// Family-side snapshot for the debug overlay (provided by GooseFamily).
+export type FamilyDebugSnapshot = {
+  adults: Array<{
+    id: string; rosterId: string; color: string;
+    x: number; y: number; dir: 1 | -1;
+    targetX: number; targetY: number;
+    mode: string; activity?: string;
+    takeoffAt?: number; avoidUntil?: number;
+    isDying?: boolean; diesAt?: number; bornAt: number;
+  }>;
+  goslings: Array<{
+    id: string; rosterId: string; name: string; variant: string;
+    x: number; y: number; dir: 1 | -1;
+    targetX: number; targetY: number; bornAt: number;
+  }>;
+  eggs: Array<{ id: string; x: number; y: number; laidAt: number; hatchAt: number }>;
+  mourningUntil: number;
+};
+let familySnapshotProvider: (() => FamilyDebugSnapshot) | null = null;
+export function setFamilySnapshotProvider(fn: (() => FamilyDebugSnapshot) | null) {
+  familySnapshotProvider = fn;
+}
+export function getFamilySnapshot(): FamilyDebugSnapshot | null {
+  return familySnapshotProvider ? familySnapshotProvider() : null;
+}
+
+export type GooseDebugCountersSnapshot = {
+  counters: DebugCounters;
+  lastBallPlayAt: number;
+  lastFlyAwayAt: number;
+  lastReproductionAt: number;
+  reproductionEarliestAt: number;
+  lastBroodEndAt: number;
+  ballPlayCooldownMs: number;
+  flyAwayCooldownMs: number;
+  reproductionCooldownMs: number;
+  postHatchSettleMs: number;
+};
+export function getDebugCounters(): GooseDebugCountersSnapshot {
+  return {
+    counters: { ...debugCounters },
+    lastBallPlayAt,
+    lastFlyAwayAt,
+    lastReproductionAt,
+    reproductionEarliestAt,
+    lastBroodEndAt,
+    ballPlayCooldownMs: BALL_PLAY_COOLDOWN_MS,
+    flyAwayCooldownMs: FLY_AWAY_COOLDOWN_MS,
+    reproductionCooldownMs: REPRODUCTION_COOLDOWN_MS,
+    postHatchSettleMs: POST_HATCH_SETTLE_MS,
+  };
+}
+
+
 
 export function reportBallBump(by: GooseRole) {
   lastBumpEvent = { by, at: Date.now() };
@@ -861,6 +951,11 @@ export const __testing = {
     lastReproductionAt = 0;
     reproductionEarliestAt = 0;
     lastBumpEvent = null;
+    debugCounters.bumps = 0; debugCounters.deaths = 0; debugCounters.mournings = 0;
+    debugCounters.lastBumpAt = 0; debugCounters.lastDeathAt = 0; debugCounters.lastMourningAt = 0;
+    perchClaims.clear();
+    familySnapshotProvider = null;
+
     recentOneliner = null;
     recentOnelinerTrail = [];
     dialogueUsage.clear();
