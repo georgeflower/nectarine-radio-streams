@@ -234,11 +234,10 @@ const BoingBall = () => {
       if (!hit) return;
       ev.stopPropagation();
       if (parkMode === "parked" || parkMode === "parking") {
-        returnFromShelf();
+        returnFromShelf(true);
       } else if (parkMode === "live") {
-        // User-initiated park: mark unavailable so the geese can't yank it
-        // back. Stays on the shelf until the user clicks it again.
-        parkOnShelf(false);
+        // User-initiated park: stays on the shelf until the user clicks it again.
+        parkOnShelf(false, true);
       }
     };
     const clickTarget = stageEl ?? window;
