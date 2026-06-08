@@ -433,9 +433,9 @@ const Cracktro = ({
   const [procreationOn, setProcreationOn] = useState<boolean>(() => {
     try {
       const v = localStorage.getItem("cracktro-procreation");
-      return v === null ? true : v === "1";
+      return v === null ? false : v === "1";
     } catch {
-      return true;
+      return false;
     }
   });
   useEffect(() => {
