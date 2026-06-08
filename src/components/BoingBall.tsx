@@ -159,24 +159,34 @@ const BoingBall = () => {
     // marks the ball unavailable (geese are busy nesting); user/idle
     // parking leaves it available.
     let parkedAvailable = true;
-    const parkOnShelf = (keepAvailable = true) => {
+    // When true, the ball was parked by an explicit user click. No automatic
+    // path (brood events, ball-play directives, broodPoll) may unpark it —
+    // only another user click can put it back into play.
+    let userParked = false;
+    const parkOnShelf = (keepAvailable = true, byUser = false) => {
       if (parkMode === "live" || parkMode === "returning") {
         parkMode = "parking";
         parkT = 0;
         parkStartX = x;
         parkStartY = y;
-        parkedAvailable = keepAvailable;
-        setBallAvailable(keepAvailable);
+        parkedAvailable = keepAvailable && !byUser;
+        if (byUser) userParked = true;
+        setBallAvailable(parkedAvailable);
         showShelf(true);
+        console.log(`[BoingBall] parked (${byUser ? "user" : "auto"})`);
       }
     };
-    const returnFromShelf = () => {
+    const returnFromShelf = (byUser = false) => {
+      // Never auto-unpark a user-parked ball.
+      if (userParked && !byUser) return;
       if (parkMode === "parked" || parkMode === "parking") {
         parkMode = "returning";
         parkT = 0;
         parkStartX = shelfAnchorX();
         parkStartY = shelfAnchorY();
         parkedAvailable = true;
+        if (byUser) userParked = false;
+        console.log(`[BoingBall] playing (${byUser ? "user" : "auto"})`);
       }
     };
     // Poll for the brood ending: GooseFamily's "goslings-grown" event can
@@ -184,11 +194,12 @@ const BoingBall = () => {
     // re-check every 2s — whenever no eggs and no goslings remain the ball
     // is allowed back into play.
     const broodPoll = window.setInterval(() => {
-      if ((parkMode === "parked" || parkMode === "parking") && !goslingsPresent() && !eggsPresent()) {
+      if (!userParked && (parkMode === "parked" || parkMode === "parking") && !goslingsPresent() && !eggsPresent()) {
         returnFromShelf();
       }
     }, 2000);
     const unsubFamily = subscribeFamilyEvents((ev) => {
+      if (userParked) return;
       if (ev.type === "incubation-start") {
         parkOnShelf(false);
       } else if (ev.type === "all-eggs-hatched") {
@@ -223,11 +234,10 @@ const BoingBall = () => {
       if (!hit) return;
       ev.stopPropagation();
       if (parkMode === "parked" || parkMode === "parking") {
-        returnFromShelf();
+        returnFromShelf(true);
       } else if (parkMode === "live") {
-        // User-initiated park: mark unavailable so the geese can't yank it
-        // back. Stays on the shelf until the user clicks it again.
-        parkOnShelf(false);
+        // User-initiated park: stays on the shelf until the user clicks it again.
+        parkOnShelf(false, true);
       }
     };
     const clickTarget = stageEl ?? window;
