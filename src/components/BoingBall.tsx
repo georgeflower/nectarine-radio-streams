@@ -176,6 +176,7 @@ const BoingBall = () => {
         parkT = 0;
         parkStartX = shelfAnchorX();
         parkStartY = shelfAnchorY();
+        parkedAvailable = true;
       }
     };
     // Poll for the brood ending: GooseFamily's "goslings-grown" event can
