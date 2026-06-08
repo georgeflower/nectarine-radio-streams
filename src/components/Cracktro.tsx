@@ -429,6 +429,22 @@ const Cracktro = ({
       /* ignore */
     }
   }, [boingOn]);
+
+  const [procreationOn, setProcreationOn] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem("cracktro-procreation");
+      return v === null ? true : v === "1";
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("cracktro-procreation", procreationOn ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [procreationOn]);
   // Clean up any leftover sim-mode storage keys from previous versions.
   useEffect(() => {
     try {
@@ -803,7 +819,7 @@ const Cracktro = ({
         <BeatOverlay analyser={analyser} enabled />
         {gooseOn && <FlyingGoose oneliners={oneliners} />}
         {brownGooseOn && <FlyingGoose oneliners={oneliners} variant="brown" />}
-        {(gooseOn || brownGooseOn) && <GooseFamily />}
+        {(gooseOn || brownGooseOn) && procreationOn && <GooseFamily />}
         {boingOn && <BoingBall />}
         <GooseDebugOverlay />
 
@@ -1224,6 +1240,21 @@ const Cracktro = ({
               title="Toggle Amiga boing ball"
             >
               {boingOn ? "ON" : "OFF"}
+            </button>
+
+            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Procreation</span>
+            <button
+              type="button"
+              onClick={() => setProcreationOn((v) => !v)}
+              className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                procreationOn
+                  ? "border-primary bg-primary/20 text-foreground"
+                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+              }`}
+              aria-pressed={procreationOn}
+              title="Toggle goose procreation (eggs, goslings, family adults)"
+            >
+              {procreationOn ? "ON" : "OFF"}
             </button>
             <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Scene Eras</span>
             <button
