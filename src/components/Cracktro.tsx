@@ -819,7 +819,7 @@ const Cracktro = ({
         <BeatOverlay analyser={analyser} enabled />
         {gooseOn && <FlyingGoose oneliners={oneliners} />}
         {brownGooseOn && <FlyingGoose oneliners={oneliners} variant="brown" />}
-        {(gooseOn || brownGooseOn) && <GooseFamily />}
+        {(gooseOn || brownGooseOn) && procreationOn && <GooseFamily />}
         {boingOn && <BoingBall />}
         <GooseDebugOverlay />
 
