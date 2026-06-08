@@ -176,6 +176,7 @@ const BoingBall = () => {
         parkT = 0;
         parkStartX = shelfAnchorX();
         parkStartY = shelfAnchorY();
+        parkedAvailable = true;
       }
     };
     // Poll for the brood ending: GooseFamily's "goslings-grown" event can
@@ -338,8 +339,10 @@ const BoingBall = () => {
       let squash = 0;
       let renderScale = 1;
 
-      // Auto-return from the shelf as soon as the geese want to play.
-      if ((parkMode === "parked" || parkMode === "parking") && getBallPlayDirective()) {
+      // Auto-return from the shelf as soon as the geese want to play —
+      // but only if the ball is still "available". A user-initiated park
+      // marks it unavailable and the geese must not yank it back.
+      if (parkedAvailable && (parkMode === "parked" || parkMode === "parking") && getBallPlayDirective()) {
         returnFromShelf();
       }
 
