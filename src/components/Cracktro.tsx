@@ -429,6 +429,22 @@ const Cracktro = ({
       /* ignore */
     }
   }, [boingOn]);
+
+  const [procreationOn, setProcreationOn] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem("cracktro-procreation");
+      return v === null ? true : v === "1";
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("cracktro-procreation", procreationOn ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [procreationOn]);
   // Clean up any leftover sim-mode storage keys from previous versions.
   useEffect(() => {
     try {
