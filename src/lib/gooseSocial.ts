@@ -324,6 +324,14 @@ const REPRODUCTION_COOLDOWN_MS = 18 * 60_000;
 const POST_HATCH_SETTLE_MS = 4 * 60_000;
 let lastReproductionAt = 0;
 
+// External toggle: when false, the family never enters the reproduction
+// phase (no brooding, no eggs, no goslings). Defaults to false so the
+// scene matches the procreation switch's default-off state.
+let procreationEnabled = false;
+export function setProcreationEnabled(v: boolean) {
+  procreationEnabled = v;
+}
+
 
 const DIALOGUE_COOLDOWN_BY_ERA: Record<GooseSceneEra, number> = {
   intro: DIALOGUE_COOLDOWN_MS,
