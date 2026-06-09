@@ -549,7 +549,7 @@ const Visualizer = ({ analyser, style }: Props) => {
 
         const size = (1.4 + mid * 3) * dpr * (0.4 + p.life);
         ctx.fillStyle = `hsla(${p.hue}, 100%, ${60 + bass * 20}%, ${p.life})`;
-        ctx.shadowBlur = 10 * dpr * p.life;
+        ctx.shadowBlur = glow(10 * dpr * p.life);
         ctx.shadowColor = `hsl(${p.hue}, 100%, 60%)`;
         ctx.beginPath();
         ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
