@@ -470,7 +470,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const usable = freq?.length ?? 0;
       const step = Math.max(1, Math.floor(usable / bins));
 
-      ctx.shadowBlur = 14 * dpr;
+      ctx.shadowBlur = glow(14 * dpr);
       ctx.lineCap = "round";
 
       for (let i = 0; i < bins; i++) {
