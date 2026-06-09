@@ -85,7 +85,15 @@ const Visualizer = ({ analyser, style }: Props) => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const isFirefox =
+      typeof navigator !== "undefined" && /Firefox/i.test(navigator.userAgent);
+    // Firefox's Canvas2D backend renders shadowBlur on the CPU and the blur
+    // kernel scales with pixel count, so cap dpr more aggressively there.
+    const dpr = Math.min(window.devicePixelRatio || 1, isFirefox ? 1.5 : 2);
+    // shadowBlur is a major bottleneck in Firefox: every stroke/fill that
+    // happens while shadowBlur > 0 hits a slow software path. Disable it
+    // entirely on Firefox; individual scenes substitute a cheaper neon look.
+    const glow = (px: number) => (isFirefox ? 0 : px);
     const freq: Uint8Array<ArrayBuffer> | null = analyser
       ? (new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>)
       : null;
