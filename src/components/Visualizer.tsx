@@ -345,7 +345,7 @@ const Visualizer = ({ analyser, style }: Props) => {
 
       const cx = w / 2;
       const cy = h / 2;
-      const slices = 36;
+      const slices = isFirefox ? 24 : 36;
       const baseR = Math.min(w, h) * 0.55;
       // Tunnel curvature amplitude reacts to mid.
       const curve = (60 + mid * 220) * dpr;
@@ -357,13 +357,11 @@ const Visualizer = ({ analyser, style }: Props) => {
       type Slice = { x: number; y: number; r: number; roll: number; hue: number; depth: number };
       const sl: Slice[] = [];
       for (let i = slices; i >= 1; i--) {
-        const phase = (i - (t % 1)) ;
+        const phase = (i - (t % 1));
         const z = phase + 0.4; // avoid div by 0
         const depth = z / slices; // 0..1 (near..far)
-        // Path through the tunnel: sin/cos in z create twisting bends.
         const px = Math.sin(z * 0.35 + t * 0.6) * curve;
         const py = Math.cos(z * 0.28 + t * 0.4) * curve * 0.8;
-        // Perspective shrink.
         const persp = 1 / z;
         const r = baseR * persp * (1 + bass * 0.25);
         const roll = z * twist + t * 0.7;
@@ -371,40 +369,72 @@ const Visualizer = ({ analyser, style }: Props) => {
         sl.push({ x: cx + px, y: cy + py, r, roll, hue, depth });
       }
 
-      // Connecting wireframe between consecutive slices (12-gon segments).
-      const sides = 14;
+      const sides = isFirefox ? 10 : 14;
+      const ringCutoff = isFirefox ? 0.15 : 0.05;
+      const segCutoff = isFirefox ? 0.08 : 0.02;
       ctx.lineCap = "round";
+
+      // --- Connecting wireframe between consecutive slices ---
+      // Batch by hue bucket (30° on FF) so we issue a handful of strokes
+      // instead of one per slice. Big win since each stroke() flushes state.
+      const hueBucket = isFirefox ? 30 : 360; // 360 == no bucketing
+      type Bucket = { hue: number; fadeSum: number; count: number; segs: Array<[number, number, number, number]> };
+      const buckets = new Map<number, Bucket>();
       for (let i = 0; i < sl.length - 1; i++) {
         const a = sl[i];
         const b = sl[i + 1];
         const fade = 1 - a.depth;
-        if (fade <= 0.02) continue;
-        ctx.strokeStyle = `hsla(${a.hue}, 100%, ${48 + bass * 22}%, ${fade * 0.85})`;
-        ctx.lineWidth = Math.max(0.5, (1.2 + bass * 1.8) * dpr * fade);
-        ctx.shadowBlur = 14 * dpr * fade;
-        ctx.shadowColor = `hsl(${a.hue}, 100%, 60%)`;
-        ctx.beginPath();
+        if (fade <= segCutoff) continue;
+        const key = hueBucket >= 360 ? i : Math.round(a.hue / hueBucket);
+        let bucket = buckets.get(key);
+        if (!bucket) {
+          bucket = { hue: a.hue, fadeSum: 0, count: 0, segs: [] };
+          buckets.set(key, bucket);
+        }
+        bucket.hue = a.hue;
+        bucket.fadeSum += fade;
+        bucket.count += 1;
         for (let k = 0; k < sides; k++) {
           const angA = (k / sides) * Math.PI * 2 + a.roll;
           const angB = (k / sides) * Math.PI * 2 + b.roll;
-          const ax = a.x + Math.cos(angA) * a.r;
-          const ay = a.y + Math.sin(angA) * a.r;
-          const bx = b.x + Math.cos(angB) * b.r;
-          const by = b.y + Math.sin(angB) * b.r;
+          bucket.segs.push([
+            a.x + Math.cos(angA) * a.r,
+            a.y + Math.sin(angA) * a.r,
+            b.x + Math.cos(angB) * b.r,
+            b.y + Math.sin(angB) * b.r,
+          ]);
+        }
+      }
+      for (const bucket of buckets.values()) {
+        const fade = bucket.fadeSum / Math.max(1, bucket.count);
+        ctx.strokeStyle = `hsla(${bucket.hue}, 100%, ${48 + bass * 22}%, ${fade * 0.85})`;
+        ctx.lineWidth = Math.max(0.5, (1.2 + bass * 1.8) * dpr * fade);
+        ctx.shadowBlur = glow(14 * dpr * fade);
+        ctx.shadowColor = `hsl(${bucket.hue}, 100%, 60%)`;
+        ctx.beginPath();
+        for (const [ax, ay, bx, by] of bucket.segs) {
           ctx.moveTo(ax, ay);
           ctx.lineTo(bx, by);
         }
         ctx.stroke();
+        // On Firefox we have no shadow glow; fake it with a wider, low-alpha
+        // pass underneath. Cheaper than shadowBlur because it's still a flat
+        // stroke, no per-pixel blur kernel.
+        if (isFirefox) {
+          ctx.strokeStyle = `hsla(${bucket.hue}, 100%, 60%, ${fade * 0.25})`;
+          ctx.lineWidth = Math.max(1, (3 + bass * 2) * dpr * fade);
+          ctx.stroke();
+        }
       }
 
-      // Ring outlines on each slice (subtle, foreground only).
+      // --- Ring outlines on each slice (subtle, foreground only) ---
       for (const s of sl) {
         const fade = Math.pow(1 - s.depth, 1.4);
-        if (fade <= 0.05) continue;
+        if (fade <= ringCutoff) continue;
+        ctx.shadowBlur = glow(12 * dpr * fade);
+        ctx.shadowColor = `hsl(${s.hue}, 100%, 60%)`;
         ctx.strokeStyle = `hsla(${s.hue}, 100%, ${60 + bass * 20}%, ${fade * 0.7})`;
         ctx.lineWidth = Math.max(0.5, (1 + bass * 2) * dpr * fade);
-        ctx.shadowBlur = 12 * dpr * fade;
-        ctx.shadowColor = `hsl(${s.hue}, 100%, 60%)`;
         ctx.beginPath();
         for (let k = 0; k <= sides; k++) {
           const ang = (k / sides) * Math.PI * 2 + s.roll;
@@ -414,6 +444,11 @@ const Visualizer = ({ analyser, style }: Props) => {
           else ctx.lineTo(x, y);
         }
         ctx.stroke();
+        if (isFirefox) {
+          ctx.strokeStyle = `hsla(${s.hue}, 100%, 70%, ${fade * 0.22})`;
+          ctx.lineWidth = Math.max(1, (3 + bass * 2.4) * dpr * fade);
+          ctx.stroke();
+        }
       }
       ctx.shadowBlur = 0;
     };
