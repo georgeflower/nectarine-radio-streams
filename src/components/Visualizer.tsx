@@ -230,7 +230,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const energy = Math.max(rms * 4, bass * 1.2, mid, treble * 0.8);
       const baseline = h - 16 * dpr;
 
-      ctx.shadowBlur = 18 * dpr;
+      ctx.shadowBlur = glow(18 * dpr);
       ctx.shadowColor = "hsl(28 100% 60%)";
 
       for (let i = 0; i < bins; i++) {
