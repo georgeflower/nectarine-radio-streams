@@ -849,6 +849,7 @@ async function runFlyAway() {
       // immediately after the previous brood ends.
       const now2 = Date.now();
       if (
+        procreationEnabled &&
         reproductionEarliestAt > 0 &&
         now2 >= reproductionEarliestAt &&
         now2 - lastReproductionAt >= REPRODUCTION_COOLDOWN_MS &&
