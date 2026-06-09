@@ -890,6 +890,7 @@ async function step() {
     // Only fires once reproductionEarliestAt has been explicitly set (i.e.
     // after a first clutch has grown up or finished brooding).
     if (
+      procreationEnabled &&
       reproductionEarliestAt > 0 &&
       now >= reproductionEarliestAt &&
       now - lastReproductionAt >= REPRODUCTION_COOLDOWN_MS &&
