@@ -299,7 +299,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const centerY = h * 0.5;
       ctx.strokeStyle = `hsla(${28 + treble * 60}, 100%, ${62 + bass * 16}%, 0.95)`;
       ctx.lineWidth = (2 + bass * 2) * dpr;
-      ctx.shadowBlur = 14 * dpr;
+      ctx.shadowBlur = glow(14 * dpr);
       ctx.shadowColor = "hsl(28 100% 60%)";
       ctx.beginPath();
 
