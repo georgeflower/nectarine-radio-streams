@@ -13,7 +13,7 @@ import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl, formatDura
 import { StageProvider } from "@/lib/stage";
 import { renderBBCode } from "@/lib/bbcode";
 import { getSceneEraConfig, getSceneEraFromListeningMs } from "@/lib/gooseSceneEra";
-import { sayFromAnyGoose, setGoosePerformanceState, setGooseSceneEra } from "@/lib/gooseSocial";
+import { sayFromAnyGoose, setGoosePerformanceState, setGooseSceneEra, setProcreationEnabled } from "@/lib/gooseSocial";
 import { pickRatingLine } from "@/lib/gooseSongChatter";
 import {
   formatMmSs,
