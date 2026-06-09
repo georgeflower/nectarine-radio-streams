@@ -444,6 +444,7 @@ const Cracktro = ({
     } catch {
       /* ignore */
     }
+    setProcreationEnabled(procreationOn);
   }, [procreationOn]);
   // Clean up any leftover sim-mode storage keys from previous versions.
   useEffect(() => {
