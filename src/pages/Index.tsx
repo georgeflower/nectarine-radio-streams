@@ -25,6 +25,7 @@ import Visualizer, { useAudioLevel, useBpm, type VisualizerStyle } from "@/compo
 import BeatOverlay from "@/components/BeatOverlay";
 import { setBpm } from "@/lib/gooseBeat";
 import Cracktro from "@/components/Cracktro";
+import ChangelogModal, { APP_VERSION } from "@/components/ChangelogModal";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
@@ -176,6 +177,7 @@ const Index = () => {
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
   const [bpmDebugOpen, setBpmDebugOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
+  const [changelogOpen, setChangelogOpen] = useState(false);
   const [seekCount, setSeekCount] = useState(0);
 
   useEffect(() => {
@@ -345,6 +347,7 @@ const Index = () => {
           history={playlist.history}
         />
       )}
+      {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
       <main
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"
         style={{
@@ -833,6 +836,15 @@ const Index = () => {
           >
             https://scenestream.net/
           </a>
+          {" · "}
+          <button
+            type="button"
+            onClick={() => setChangelogOpen(true)}
+            className="text-primary hover:underline uppercase tracking-widest"
+            title="View changelog"
+          >
+            v{APP_VERSION}
+          </button>
         </footer>
       </main>
     </div>
