@@ -6,6 +6,7 @@ import FlyingGoose from "./FlyingGoose";
 import GooseFamily from "./GooseFamily";
 import GooseDebugOverlay from "./GooseDebugOverlay";
 import BoingBall from "./BoingBall";
+import ChangelogModal, { APP_VERSION } from "./ChangelogModal";
 
 import RosterWindow from "./RosterWindow";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
@@ -446,6 +447,7 @@ const Cracktro = ({
     }
     setProcreationEnabled(procreationOn);
   }, [procreationOn]);
+  const [changelogOpen, setChangelogOpen] = useState(false);
   // Clean up any leftover sim-mode storage keys from previous versions.
   useEffect(() => {
     try {
@@ -1332,6 +1334,14 @@ const Cracktro = ({
             >
               Reset
             </button>
+            <button
+              type="button"
+              onClick={() => setChangelogOpen(true)}
+              className="min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-muted-foreground hover:text-foreground hover:border-primary transition-colors ml-3"
+              title="View changelog"
+            >
+              v{APP_VERSION}
+            </button>
           </div>
 
 
@@ -1359,6 +1369,7 @@ const Cracktro = ({
           )}
         </div>
       </StageProvider>
+      {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
     </div>
   );
 };
