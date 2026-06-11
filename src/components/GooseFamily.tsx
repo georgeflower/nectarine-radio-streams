@@ -38,11 +38,7 @@ import {
   STAND_HEAD,
 } from "@/lib/gooseSprite";
 import { getSceneScale } from "@/lib/gooseScene";
-import {
-  hatchDueEggs,
-  makeEgg,
-  type Egg,
-} from "@/lib/gooseLife/eggHatch";
+import { hatchDueEggs, makeEgg, type Egg } from "@/lib/gooseLife/eggHatch";
 import {
   COLOR_FILTER,
   formatAge,
@@ -126,9 +122,9 @@ type FamilyAdult = {
   isDying?: boolean;
 };
 
-
-
-function rand(a: number, b: number) { return a + Math.random() * (b - a); }
+function rand(a: number, b: number) {
+  return a + Math.random() * (b - a);
+}
 
 function loadEggs(): Egg[] {
   try {
@@ -136,13 +132,17 @@ function loadEggs(): Egg[] {
     if (!raw) return [];
     const data = JSON.parse(raw) as Egg[];
     if (!Array.isArray(data)) return [];
-    return data.filter(
-      (e) => e && typeof e.hatchAt === "number" && e.hatchAt > Date.now() - 5 * 60_000,
-    );
-  } catch { return []; }
+    return data.filter((e) => e && typeof e.hatchAt === "number" && e.hatchAt > Date.now() - 5 * 60_000);
+  } catch {
+    return [];
+  }
 }
 function saveEggs(eggs: Egg[]) {
-  try { localStorage.setItem(STORAGE_EGGS, JSON.stringify(eggs)); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(STORAGE_EGGS, JSON.stringify(eggs));
+  } catch {
+    /* ignore */
+  }
 }
 function loadGoslings(): Gosling[] {
   try {
@@ -174,29 +174,48 @@ function loadGoslings(): Gosling[] {
         y: g.y ?? 0,
         dir: (g.dir ?? 1) as 1 | -1,
         phase: g.phase ?? 0,
-        targetX: g.targetX ?? (g.x ?? 0),
-        targetY: g.targetY ?? (g.y ?? 0),
+        targetX: g.targetX ?? g.x ?? 0,
+        targetY: g.targetY ?? g.y ?? 0,
         bornAt: g.bornAt ?? Date.now(),
         bubbleUntil: 0,
         bubbleText: "",
       };
     });
     if (rosterUpdates.size > 0) {
-      const next = roster.map((e) =>
-        rosterUpdates.has(e.id) ? { ...e, name: rosterUpdates.get(e.id)! } : e,
-      );
+      const next = roster.map((e) => (rosterUpdates.has(e.id) ? { ...e, name: rosterUpdates.get(e.id)! } : e));
       setRoster(next);
     }
     return result;
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 function saveGoslings(g: Gosling[]) {
   try {
-    localStorage.setItem(STORAGE_GOSLINGS, JSON.stringify(
-      g.map(({ id, rosterId, name, sex, variant, x, y, dir, phase, targetX, targetY, bornAt }) =>
-        ({ id, rosterId, name, sex, variant, x, y, dir, phase, targetX, targetY, bornAt, bubbleUntil: 0, bubbleText: "" })),
-    ));
-  } catch { /* ignore */ }
+    localStorage.setItem(
+      STORAGE_GOSLINGS,
+      JSON.stringify(
+        g.map(({ id, rosterId, name, sex, variant, x, y, dir, phase, targetX, targetY, bornAt }) => ({
+          id,
+          rosterId,
+          name,
+          sex,
+          variant,
+          x,
+          y,
+          dir,
+          phase,
+          targetX,
+          targetY,
+          bornAt,
+          bubbleUntil: 0,
+          bubbleText: "",
+        })),
+      ),
+    );
+  } catch {
+    /* ignore */
+  }
 }
 
 // Ensure originals (white + brown) exist in the roster.
@@ -204,7 +223,8 @@ function ensureOriginals() {
   const roster = getRoster();
   if (roster.some((e) => e.kind === "original")) return;
   const taken = new Set(roster.map((e) => e.name));
-  const motherName = pickUniqueName(taken); taken.add(motherName);
+  const motherName = pickUniqueName(taken);
+  taken.add(motherName);
   const fatherName = pickUniqueName(taken);
   const now = Date.now();
   setRoster([
@@ -244,24 +264,22 @@ const GooseFamily = () => {
     let rosterChanged = false;
     roster = roster.map((e) => {
       // Stuck gosling with no live render → promote to adult.
-      if (
-        e.kind === "gosling" &&
-        !liveGoslingIds.has(e.id) &&
-        wallNow - e.bornAt > GROW_UP_MS
-      ) {
+      if (e.kind === "gosling" && !liveGoslingIds.has(e.id) && wallNow - e.bornAt > GROW_UP_MS) {
         rosterChanged = true;
         let name = e.name;
         if (isPlaceholderName(name)) {
           name = pickUniqueName(taken);
         }
-        taken.delete(e.name); taken.add(name);
+        taken.delete(e.name);
+        taken.add(name);
         return { ...e, name, kind: "adult", color: pickRandomAdultColor() };
       }
       // Adult still wearing the placeholder "Gosling" name → rename.
       if (e.kind === "adult" && isPlaceholderName(e.name)) {
         rosterChanged = true;
         const name = pickUniqueName(taken);
-        taken.delete(e.name); taken.add(name);
+        taken.delete(e.name);
+        taken.add(name);
         return { ...e, name };
       }
       return e;
@@ -270,15 +288,16 @@ const GooseFamily = () => {
 
     adultsRef.current = roster
       .filter((e) => e.kind === "adult")
-      .map((e): FamilyAdult => ({
-        id: `adult-${e.id}`,
-        rosterId: e.id,
-        color: e.color,
-        bornAt: e.bornAt,
-      }));
+      .map(
+        (e): FamilyAdult => ({
+          id: `adult-${e.id}`,
+          rosterId: e.id,
+          color: e.color,
+          bornAt: e.bornAt,
+        }),
+      );
     setTick((t) => t + 1);
   }, []);
-
 
   // Family events: snack toggles gosling sit/peck flag; incubation-start
   // is when the mother has descended and dropped 1–3 eggs on the floor.
@@ -321,35 +340,54 @@ const GooseFamily = () => {
         setTick((t) => t + 1);
       }
     });
-    return () => { unsub(); };
+    return () => {
+      unsub();
+    };
   }, []);
 
   // Expose a live debug snapshot to the overlay (read on demand).
   useEffect(() => {
     setFamilySnapshotProvider(() => ({
       adults: adultsRef.current.map((a) => ({
-        id: a.id, rosterId: a.rosterId, color: a.color,
-        x: 0, y: 0, dir: 1 as const,
-        targetX: undefined, targetY: undefined,
-        mode: "flyinggoose", activity: undefined,
-        takeoffAt: 0, avoidUntil: undefined,
-        isDying: a.isDying, diesAt: a.diesAt, bornAt: a.bornAt,
+        id: a.id,
+        rosterId: a.rosterId,
+        color: a.color,
+        x: 0,
+        y: 0,
+        dir: 1 as const,
+        targetX: undefined,
+        targetY: undefined,
+        mode: "flyinggoose",
+        activity: undefined,
+        takeoffAt: 0,
+        avoidUntil: undefined,
+        isDying: a.isDying,
+        diesAt: a.diesAt,
+        bornAt: a.bornAt,
       })),
       goslings: goslingsRef.current.map((g) => ({
-        id: g.id, rosterId: g.rosterId, name: g.name, variant: g.variant,
-        x: g.x, y: g.y, dir: g.dir,
-        targetX: g.targetX, targetY: g.targetY, bornAt: g.bornAt,
+        id: g.id,
+        rosterId: g.rosterId,
+        name: g.name,
+        variant: g.variant,
+        x: g.x,
+        y: g.y,
+        dir: g.dir,
+        targetX: g.targetX,
+        targetY: g.targetY,
+        bornAt: g.bornAt,
       })),
       eggs: eggsRef.current.map((e) => ({
-        id: e.id, x: e.x, y: e.y, laidAt: e.laidAt, hatchAt: e.hatchAt,
+        id: e.id,
+        x: e.x,
+        y: e.y,
+        laidAt: e.laidAt,
+        hatchAt: e.hatchAt,
       })),
       mourningUntil: mourningUntilRef.current,
     }));
     return () => setFamilySnapshotProvider(null);
   }, []);
-
-
-
 
   // Main animation loop.
   useEffect(() => {
@@ -376,14 +414,19 @@ const GooseFamily = () => {
         const taken = new Set(rosterNow.map((e) => e.name));
         const newGoslingRoster: RosterEntry[] = [];
         for (const egg of hatched) {
-          const variant: "gosling-white" | "gosling-brown" =
-            Math.random() < 0.5 ? "gosling-white" : "gosling-brown";
-          const name = pickUniqueName(taken); taken.add(name);
+          const variant: "gosling-white" | "gosling-brown" = Math.random() < 0.5 ? "gosling-white" : "gosling-brown";
+          const name = pickUniqueName(taken);
+          taken.add(name);
           const sex = pickRandomSex();
           const rosterId = `gosling-${wallNow}-${Math.random().toString(36).slice(2, 6)}`;
           const color: GooseColor = variant === "gosling-white" ? "white" : "brown";
           newGoslingRoster.push({
-            id: rosterId, name, sex, color, bornAt: wallNow, kind: "gosling",
+            id: rosterId,
+            name,
+            sex,
+            color,
+            bornAt: wallNow,
+            kind: "gosling",
           });
           goslingsRef.current.push({
             id: `g-${wallNow}-${Math.random().toString(36).slice(2, 6)}`,
@@ -412,7 +455,6 @@ const GooseFamily = () => {
           emitFamilyEvent({ type: "all-eggs-hatched" });
         }
       }
-
 
       // === Goslings: grow up after GROW_UP_MS, otherwise waddle ===
       const positions = getGoosePositions();
@@ -470,9 +512,7 @@ const GooseFamily = () => {
           else nextTargetX = Math.max(40, Math.min(w - 40, base + rand(-110, 110)));
           g.targetX = nextTargetX;
           // 30 % of the time, fly a little — up to 20 % above the floor.
-          g.targetY = Math.random() < 0.3
-            ? rand(ceilingY, goslingFloorY)
-            : goslingFloorY;
+          g.targetY = Math.random() < 0.3 ? rand(ceilingY, goslingFloorY) : goslingFloorY;
         }
         const speedX = 36 * sceneScale;
         const speedY = 28 * sceneScale;
@@ -535,7 +575,7 @@ const GooseFamily = () => {
       }
 
       // === Cap check: if adults exceed cap, mark oldest two to die in 5 min ===
-      if (adultsRef.current.length + 2 > MAX_TOTAL_ADULTS) {
+      if (adultsRef.current.length + 2 >= MAX_TOTAL_ADULTS) {
         const unmarked = adultsRef.current.filter((a) => !a.diesAt);
         unmarked.sort((a, b) => a.bornAt - b.bornAt);
         for (let i = 0; i < Math.min(2, unmarked.length); i++) {
@@ -589,22 +629,23 @@ const GooseFamily = () => {
             const g1Commit = Math.abs(g1.targetX - g1.x);
             const g2Commit = Math.abs(g2.targetX - g2.x);
             if (g1Commit >= g2Commit) {
-              g1.targetX = Math.max(40, Math.min(w - 40,
-                g1.x + sign * (jitterMin * 0.6 + Math.random() * (jitterMax - jitterMin) * 0.6)));
+              g1.targetX = Math.max(
+                40,
+                Math.min(w - 40, g1.x + sign * (jitterMin * 0.6 + Math.random() * (jitterMax - jitterMin) * 0.6)),
+              );
             } else {
-              g2.targetX = Math.max(40, Math.min(w - 40,
-                g2.x - sign * (jitterMin * 0.6 + Math.random() * (jitterMax - jitterMin) * 0.6)));
+              g2.targetX = Math.max(
+                40,
+                Math.min(w - 40, g2.x - sign * (jitterMin * 0.6 + Math.random() * (jitterMax - jitterMin) * 0.6)),
+              );
             }
             recordBump();
           }
         }
       }
 
-
-
       // Mourning chatter intentionally dropped: adults are FlyingGoose
       // instances and we don't reach into them imperatively to set bubbles.
-
 
       setTick((t) => (t + 1) % 1_000_000);
       raf = requestAnimationFrame(tick);
@@ -665,7 +706,10 @@ const GooseFamily = () => {
       >
         {text}
         {/* dir/flipped used only to avoid lint warnings */}
-        <span style={{ display: "none" }}>{dir}{flipped ? "f" : "n"}</span>
+        <span style={{ display: "none" }}>
+          {dir}
+          {flipped ? "f" : "n"}
+        </span>
       </div>
     );
   };
@@ -703,13 +747,15 @@ const GooseFamily = () => {
 
       {/* Goslings */}
       {goslingsRef.current.map((g) => {
-        const frames = g.variant === "gosling-white"
-          ? goslingFramesWhite.current!
-          : goslingFramesBrown.current!;
+        const frames = g.variant === "gosling-white" ? goslingFramesWhite.current! : goslingFramesBrown.current!;
         const phase = g.phase;
         const sitting = adultsSittingRef.current;
-        let bodyTX = 0, bodyTY = 0, bodyTilt = 0;
-        let headTX = 0, headTY = 0, headTilt = 0;
+        let bodyTX = 0,
+          bodyTY = 0,
+          bodyTilt = 0;
+        let headTX = 0,
+          headTY = 0,
+          headTilt = 0;
         if (sitting) {
           const peck = Math.sin(phase * (1000 / PECK_CYCLE_MS) * Math.PI * 2);
           const peckDown = Math.max(0, peck);
@@ -744,26 +790,55 @@ const GooseFamily = () => {
               filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.28))",
             }}
           >
-            <div style={{ position: "absolute", inset: 0, width: goslingW, height: goslingH,
-              transform: `translate(${bodyTX}px, ${bodyTY}px) rotate(${bodyTilt}deg)`,
-              transformOrigin: "center center" }}>
-              <img src={frames[STAND_BODY]} alt="" width={goslingW} height={goslingH}
-                style={{ position: "absolute", inset: 0, width: goslingW, height: goslingH,
-                  imageRendering: "pixelated" }} />
-              <img src={frames[STAND_HEAD]} alt="" width={goslingW} height={goslingH}
-                style={{ position: "absolute", inset: 0, width: goslingW, height: goslingH,
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: goslingW,
+                height: goslingH,
+                transform: `translate(${bodyTX}px, ${bodyTY}px) rotate(${bodyTilt}deg)`,
+                transformOrigin: "center center",
+              }}
+            >
+              <img
+                src={frames[STAND_BODY]}
+                alt=""
+                width={goslingW}
+                height={goslingH}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: goslingW,
+                  height: goslingH,
+                  imageRendering: "pixelated",
+                }}
+              />
+              <img
+                src={frames[STAND_HEAD]}
+                alt=""
+                width={goslingW}
+                height={goslingH}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: goslingW,
+                  height: goslingH,
                   imageRendering: "pixelated",
                   transformOrigin: `${NECK_PIVOT_X_PX * sceneScale * GOSLING_SCALE_FACTOR}px ${NECK_PIVOT_Y_PX * sceneScale * GOSLING_SCALE_FACTOR}px`,
-                  transform: `translate(${headTX}px, ${headTY}px) rotate(${headTilt}deg)` }} />
+                  transform: `translate(${headTX}px, ${headTY}px) rotate(${headTilt}deg)`,
+                }}
+              />
             </div>
 
             {bubble && (
-              <div style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                transform: `scaleX(${g.dir})`, // un-mirror bubble
-              }}>
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  transform: `scaleX(${g.dir})`, // un-mirror bubble
+                }}
+              >
                 {/* bubble is clamped via absolute parent — re-render bubble at root */}
               </div>
             )}
@@ -772,11 +847,11 @@ const GooseFamily = () => {
       })}
 
       {/* Gosling bubbles (rendered outside the mirror transform, clamped to stage) */}
-      {goslingsRef.current.filter((g) => g.bubbleUntil > now && g.bubbleText).map((g) => (
-        <div key={`gb-${g.id}`}>
-          {renderBubble(g.bubbleText, g.x, g.y, goslingH, g.dir)}
-        </div>
-      ))}
+      {goslingsRef.current
+        .filter((g) => g.bubbleUntil > now && g.bubbleText)
+        .map((g) => (
+          <div key={`gb-${g.id}`}>{renderBubble(g.bubbleText, g.x, g.y, goslingH, g.dir)}</div>
+        ))}
 
       {/* Family adults (grown-up offspring) — each is a full FlyingGoose
           instance, so they use the same flight/perch/waddle/stamina state
