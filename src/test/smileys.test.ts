@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { renderWithSmileys } from "@/lib/smileys";
-import type { ReactNode } from "react";
+import { isValidElement, type ReactNode } from "react";
 
 /** Returns true when at least one rendered node is a React element (= a smiley img). */
 function hasSmiley(nodes: ReactNode[]): boolean {
-  return nodes.some((n) => typeof n !== "string");
+  return nodes.some((n) => isValidElement(n));
 }
 
 describe("renderWithSmileys – word-boundary guard", () => {
