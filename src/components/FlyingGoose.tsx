@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { SMILEYS } from "@/lib/smileys";
+import { buildSmileyRegex, SMILEYS } from "@/lib/smileys";
 import {
   claimPerch,
   getPerchClaims,
@@ -45,12 +45,9 @@ let nextGooseInstanceId = 1;
 
 // --- Smiley detection ----------------------------------------------------
 // Build lookup once; sorted longest-first so e.g. ":facepalm2:" beats ":facepalm:".
-function escapeRegex(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 const SMILEY_KEYS = Object.keys(SMILEYS).sort((a, b) => b.length - a.length);
-const SMILEY_RE = new RegExp(SMILEY_KEYS.map(escapeRegex).join("|"), "i");
-const SMILEY_RE_G = new RegExp(SMILEY_KEYS.map(escapeRegex).join("|"), "gi");
+const SMILEY_RE = buildSmileyRegex("i");
+const SMILEY_RE_G = buildSmileyRegex("gi");
 const SMILEY_LC: Record<string, string> = {};
 for (const k of SMILEY_KEYS) SMILEY_LC[k.toLowerCase()] = k;
 const REACTION_SMILEY: Record<"heart" | "laughter" | "wink", string> = {

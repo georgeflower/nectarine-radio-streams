@@ -146,11 +146,28 @@ function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Build a single regex once, sorted longest-first so e.g. ":facepalm2:" wins over ":facepalm:"
-const SMILEY_PATTERN = (() => {
+// Wraps an escaped smiley code with word-boundary assertions so that codes
+// starting or ending with a \w character are not matched inside a longer word.
+// E.g. "D:" → "(?<!\w)D:" so "Scarhead:" does NOT become a smiley.
+function smileyToRegexPart(code: string): string {
+  const escaped = escapeRegex(code);
+  const pre = /^\w/.test(code) ? "(?<!\\w)" : "";
+  const post = /\w$/.test(code) ? "(?!\\w)" : "";
+  return pre + escaped + post;
+}
+
+/**
+ * Build a smiley-matching regex with the given flags.
+ * Codes are sorted longest-first and wrapped with word-boundary assertions.
+ * Exported so FlyingGoose.tsx can use the same safe pattern.
+ */
+export function buildSmileyRegex(flags: string): RegExp {
   const codes = Object.keys(SMILEYS).sort((a, b) => b.length - a.length);
-  return new RegExp(codes.map(escapeRegex).join("|"), "gi");
-})();
+  return new RegExp(codes.map(smileyToRegexPart).join("|"), flags);
+}
+
+// Build a single regex once, sorted longest-first so e.g. ":facepalm2:" wins over ":facepalm:"
+const SMILEY_PATTERN = buildSmileyRegex("gi");
 
 export function renderWithSmileys(text: string): ReactNode[] {
   if (!text) return [];
