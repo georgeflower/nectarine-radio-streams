@@ -910,6 +910,41 @@ const Cracktro = ({
           </div>
         )}
 
+        {/* Subtle top audio bar — play / stop / stream chooser. Fades in on
+            mouse movement, hides 2s after movement stops. Centered so it
+            doesn't conflict with the EXIT/Era badges on the left. */}
+        <div
+          className={`absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-sm border border-border/40 bg-background/20 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground/80 backdrop-blur-sm transition-opacity duration-500 ${
+            showAudioBar ? "opacity-60 hover:opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+          aria-label="Audio controls"
+        >
+          <button
+            type="button"
+            onClick={audioState.playing ? handleAudioStop : handleAudioPlay}
+            disabled={audioState.loading || (!audioState.playing && !audioState.selectedUrl)}
+            className="min-h-7 px-2 py-1 rounded-sm border border-border/40 bg-card/30 hover:bg-card/60 disabled:opacity-40"
+            aria-label={audioState.playing ? "Stop stream" : "Play stream"}
+            title={audioState.playing ? "Stop" : "Play"}
+          >
+            {audioState.loading ? "…" : audioState.playing ? "■ Stop" : "▶ Play"}
+          </button>
+          {audioState.streams.length > 0 && (
+            <select
+              value={audioState.selectedUrl ?? ""}
+              onChange={(e) => handleAudioSelect(e.target.value)}
+              className="min-h-7 max-w-[180px] px-1 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border/40 bg-card/30 text-foreground/90 hover:bg-card/60"
+              aria-label="Choose stream"
+              title="Choose stream"
+            >
+              {audioState.streams.map((s) => (
+                <option key={s.url} value={s.url}>{s.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+
+
         {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
         {scrollOn && (
           <canvas
