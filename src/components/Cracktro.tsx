@@ -1129,6 +1129,32 @@ const Cracktro = ({
           </button>
         )}
 
+        {/* Tutorial hint: points to the settings button. */}
+        {showSettingsHint && !settingsExpanded && (
+          <button
+            type="button"
+            onClick={dismissSettingsHint}
+            className="absolute right-14 bottom-4 z-[13] flex items-center gap-1 px-2 py-1 rounded-sm border border-primary/60 bg-card/90 backdrop-blur-sm text-foreground text-[10px] uppercase tracking-widest shadow-[0_0_12px_hsl(var(--primary)/0.45)] animate-pulse touch-manipulation"
+            aria-label="Settings are here — tap to dismiss"
+            title="Settings"
+          >
+            Settings <span aria-hidden>▶</span>
+          </button>
+        )}
+
+        {/* Tutorial hint: points near the parked Boing ball on the shelf. */}
+        {showBallHint && boingOn && (
+          <button
+            type="button"
+            onClick={dismissBallHint}
+            className="absolute z-[13] px-2 py-1 rounded-sm border border-primary/60 bg-card/90 backdrop-blur-sm text-foreground text-[10px] uppercase tracking-widest shadow-[0_0_12px_hsl(var(--primary)/0.45)] animate-pulse touch-manipulation max-w-[55vw] text-center leading-tight"
+            style={{ right: "6%", top: "26%" }}
+            aria-label="Click the ball to bump it into play — tap to dismiss"
+          >
+            ↗ Click the ball<br />to bump into play!
+          </button>
+        )}
+
         {/* Bottom controls bar — opened only by explicit click. */}
         <div
           className={`absolute left-0 right-0 bottom-0 flex flex-col gap-1.5 px-3 py-2 bg-card/70 border-t border-border backdrop-blur-sm transition-opacity duration-300 ${
