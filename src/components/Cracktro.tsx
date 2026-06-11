@@ -200,6 +200,27 @@ const Cracktro = ({
   // explicitly expanded.
   const [showHintChrome, setShowHintChrome] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
+
+  // Tutorial hints — show once per browser until dismissed.
+  const TUTORIAL_BALL_KEY = "cracktro:tutorial:ballHint:v1";
+  const TUTORIAL_SETTINGS_KEY = "cracktro:tutorial:settingsHint:v1";
+  const [showBallHint, setShowBallHint] = useState(() => {
+    try { return localStorage.getItem(TUTORIAL_BALL_KEY) !== "1"; } catch { return true; }
+  });
+  const [showSettingsHint, setShowSettingsHint] = useState(() => {
+    try { return localStorage.getItem(TUTORIAL_SETTINGS_KEY) !== "1"; } catch { return true; }
+  });
+  const dismissBallHint = useCallback(() => {
+    setShowBallHint(false);
+    try { localStorage.setItem(TUTORIAL_BALL_KEY, "1"); } catch { /* ignore */ }
+  }, []);
+  const dismissSettingsHint = useCallback(() => {
+    setShowSettingsHint(false);
+    try { localStorage.setItem(TUTORIAL_SETTINGS_KEY, "1"); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    if (settingsExpanded && showSettingsHint) dismissSettingsHint();
+  }, [settingsExpanded, showSettingsHint, dismissSettingsHint]);
   const hideTimerRef = useRef<number | null>(null);
   const lastRevealAtRef = useRef(0);
   useEffect(() => {
