@@ -246,6 +246,33 @@ const Cracktro = ({
     };
   }, []);
 
+  // Subtle audio control bar at the top — fades in on mouse movement and
+  // hides 2s after movement stops. Independent of the 5s hint chrome so it
+  // doesn't compete with the EXIT/Era badges.
+  const [showAudioBar, setShowAudioBar] = useState(false);
+  const audioBarTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    const reveal = () => {
+      setShowAudioBar(true);
+      if (audioBarTimerRef.current) window.clearTimeout(audioBarTimerRef.current);
+      audioBarTimerRef.current = window.setTimeout(() => setShowAudioBar(false), 2000);
+    };
+    window.addEventListener("mousemove", reveal);
+    window.addEventListener("touchstart", reveal, { passive: true });
+    return () => {
+      if (audioBarTimerRef.current) window.clearTimeout(audioBarTimerRef.current);
+      window.removeEventListener("mousemove", reveal);
+      window.removeEventListener("touchstart", reveal);
+    };
+  }, []);
+
+  const [audioState, setAudioStateLocal] = useState(() => getAudioControlState());
+  useEffect(() => subscribeAudioControl(() => setAudioStateLocal(getAudioControlState())), []);
+  const handleAudioPlay = useCallback(() => { getAudioController()?.play(); }, []);
+  const handleAudioStop = useCallback(() => { getAudioController()?.stop(); }, []);
+  const handleAudioSelect = useCallback((url: string) => { getAudioController()?.selectStream(url); }, []);
+
+
   // Pull song info (platform/rating) from the entity cache.
   const [info, setInfo] = useState(() => (songId ? getCachedInfo("song", songId) : undefined));
   useEffect(() => {
