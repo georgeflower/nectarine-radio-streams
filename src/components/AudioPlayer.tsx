@@ -375,6 +375,27 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady, onSeek }: Props) 
     [handleSelect, playable, selectedUrl],
   );
 
+  // Publish audio controller + state to the shared cracktro store so the
+  // Cracktro overlay can render play/stop/stream chooser controls.
+  useEffect(() => {
+    setAudioController({
+      play: () => { void playSelected(); },
+      stop: () => { stopPlayback(); },
+      selectStream: (url: string) => { void handleSelect(url, playing); },
+    });
+    return () => setAudioController(null);
+  }, [playSelected, stopPlayback, handleSelect, playing]);
+
+  useEffect(() => {
+    setAudioControlState({
+      playing,
+      loading,
+      selectedUrl,
+      streams: playable.map((s) => ({ url: s.url, name: s.name })),
+    });
+  }, [playing, loading, selectedUrl, playable]);
+
+
   useEffect(() => {
     if (!stationConfig?.nowPlayingUrl || !playing) return;
     let mounted = true;
