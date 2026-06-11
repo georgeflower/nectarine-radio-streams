@@ -200,6 +200,27 @@ const Cracktro = ({
   // explicitly expanded.
   const [showHintChrome, setShowHintChrome] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
+
+  // Tutorial hints — show once per browser until dismissed.
+  const TUTORIAL_BALL_KEY = "cracktro:tutorial:ballHint:v1";
+  const TUTORIAL_SETTINGS_KEY = "cracktro:tutorial:settingsHint:v1";
+  const [showBallHint, setShowBallHint] = useState(() => {
+    try { return localStorage.getItem(TUTORIAL_BALL_KEY) !== "1"; } catch { return true; }
+  });
+  const [showSettingsHint, setShowSettingsHint] = useState(() => {
+    try { return localStorage.getItem(TUTORIAL_SETTINGS_KEY) !== "1"; } catch { return true; }
+  });
+  const dismissBallHint = useCallback(() => {
+    setShowBallHint(false);
+    try { localStorage.setItem(TUTORIAL_BALL_KEY, "1"); } catch { /* ignore */ }
+  }, []);
+  const dismissSettingsHint = useCallback(() => {
+    setShowSettingsHint(false);
+    try { localStorage.setItem(TUTORIAL_SETTINGS_KEY, "1"); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    if (settingsExpanded && showSettingsHint) dismissSettingsHint();
+  }, [settingsExpanded, showSettingsHint, dismissSettingsHint]);
   const hideTimerRef = useRef<number | null>(null);
   const lastRevealAtRef = useRef(0);
   useEffect(() => {
@@ -1105,6 +1126,32 @@ const Cracktro = ({
             title="Expand settings"
           >
             ▲
+          </button>
+        )}
+
+        {/* Tutorial hint: points to the settings button. */}
+        {showSettingsHint && !settingsExpanded && (
+          <button
+            type="button"
+            onClick={dismissSettingsHint}
+            className="absolute right-14 bottom-4 z-[13] flex items-center gap-1 px-2 py-1 rounded-sm border border-primary/60 bg-card/90 backdrop-blur-sm text-foreground text-[10px] uppercase tracking-widest shadow-[0_0_12px_hsl(var(--primary)/0.45)] animate-pulse touch-manipulation"
+            aria-label="Settings are here — tap to dismiss"
+            title="Settings"
+          >
+            Settings <span aria-hidden>▶</span>
+          </button>
+        )}
+
+        {/* Tutorial hint: points near the parked Boing ball on the shelf. */}
+        {showBallHint && boingOn && (
+          <button
+            type="button"
+            onClick={dismissBallHint}
+            className="absolute z-[13] px-2 py-1 rounded-sm border border-primary/60 bg-card/90 backdrop-blur-sm text-foreground text-[10px] uppercase tracking-widest shadow-[0_0_12px_hsl(var(--primary)/0.45)] animate-pulse touch-manipulation max-w-[55vw] text-center leading-tight"
+            style={{ right: "6%", top: "26%" }}
+            aria-label="Click the ball to bump it into play — tap to dismiss"
+          >
+            ↗ Click the ball<br />to bump into play!
           </button>
         )}
 
