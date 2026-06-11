@@ -11,7 +11,7 @@ import {
   type NowPlayingTrack,
 } from "@/lib/nowPlaying";
 import { attachBufferedStream, isMseAudioSupported, type BufferedStreamHandle } from "@/lib/bufferedStream";
-import { setPlayerTime } from "@/lib/cracktroUi";
+import { setAudioController, setAudioControlState, setPlayerTime } from "@/lib/cracktroUi";
 
 type Props = {
   streams: StreamSource[];
