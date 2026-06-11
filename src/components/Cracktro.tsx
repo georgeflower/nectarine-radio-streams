@@ -18,10 +18,13 @@ import { sayFromAnyGoose, setGoosePerformanceState, setGooseSceneEra, setProcrea
 import { pickRatingLine } from "@/lib/gooseSongChatter";
 import {
   formatMmSs,
+  getAudioControlState,
+  getAudioController,
   getMourningActive,
   getPlayerTime,
   getWindowSize,
   setWindowSize,
+  subscribeAudioControl,
   subscribeMourning,
   subscribePlayerTime,
   type WindowSize,
