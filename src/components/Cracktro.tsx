@@ -18,10 +18,13 @@ import { sayFromAnyGoose, setGoosePerformanceState, setGooseSceneEra, setProcrea
 import { pickRatingLine } from "@/lib/gooseSongChatter";
 import {
   formatMmSs,
+  getAudioControlState,
+  getAudioController,
   getMourningActive,
   getPlayerTime,
   getWindowSize,
   setWindowSize,
+  subscribeAudioControl,
   subscribeMourning,
   subscribePlayerTime,
   type WindowSize,
@@ -242,6 +245,33 @@ const Cracktro = ({
       window.removeEventListener("keydown", reveal);
     };
   }, []);
+
+  // Subtle audio control bar at the top — fades in on mouse movement and
+  // hides 2s after movement stops. Independent of the 5s hint chrome so it
+  // doesn't compete with the EXIT/Era badges.
+  const [showAudioBar, setShowAudioBar] = useState(false);
+  const audioBarTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    const reveal = () => {
+      setShowAudioBar(true);
+      if (audioBarTimerRef.current) window.clearTimeout(audioBarTimerRef.current);
+      audioBarTimerRef.current = window.setTimeout(() => setShowAudioBar(false), 2000);
+    };
+    window.addEventListener("mousemove", reveal);
+    window.addEventListener("touchstart", reveal, { passive: true });
+    return () => {
+      if (audioBarTimerRef.current) window.clearTimeout(audioBarTimerRef.current);
+      window.removeEventListener("mousemove", reveal);
+      window.removeEventListener("touchstart", reveal);
+    };
+  }, []);
+
+  const [audioState, setAudioStateLocal] = useState(() => getAudioControlState());
+  useEffect(() => subscribeAudioControl(() => setAudioStateLocal(getAudioControlState())), []);
+  const handleAudioPlay = useCallback(() => { getAudioController()?.play(); }, []);
+  const handleAudioStop = useCallback(() => { getAudioController()?.stop(); }, []);
+  const handleAudioSelect = useCallback((url: string) => { getAudioController()?.selectStream(url); }, []);
+
 
   // Pull song info (platform/rating) from the entity cache.
   const [info, setInfo] = useState(() => (songId ? getCachedInfo("song", songId) : undefined));
@@ -879,6 +909,41 @@ const Cracktro = ({
             FPS: {fps ?? "--"}{lowFpsDetected ? " · SLOW GPU" : ""}
           </div>
         )}
+
+        {/* Subtle top audio bar — play / stop / stream chooser. Fades in on
+            mouse movement, hides 2s after movement stops. Centered so it
+            doesn't conflict with the EXIT/Era badges on the left. */}
+        <div
+          className={`absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-sm border border-border/40 bg-background/20 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground/80 backdrop-blur-sm transition-opacity duration-500 ${
+            showAudioBar ? "opacity-60 hover:opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+          aria-label="Audio controls"
+        >
+          <button
+            type="button"
+            onClick={audioState.playing ? handleAudioStop : handleAudioPlay}
+            disabled={audioState.loading || (!audioState.playing && !audioState.selectedUrl)}
+            className="min-h-7 px-2 py-1 rounded-sm border border-border/40 bg-card/30 hover:bg-card/60 disabled:opacity-40"
+            aria-label={audioState.playing ? "Stop stream" : "Play stream"}
+            title={audioState.playing ? "Stop" : "Play"}
+          >
+            {audioState.loading ? "…" : audioState.playing ? "■ Stop" : "▶ Play"}
+          </button>
+          {audioState.streams.length > 0 && (
+            <select
+              value={audioState.selectedUrl ?? ""}
+              onChange={(e) => handleAudioSelect(e.target.value)}
+              className="min-h-7 max-w-[180px] px-1 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border/40 bg-card/30 text-foreground/90 hover:bg-card/60"
+              aria-label="Choose stream"
+              title="Choose stream"
+            >
+              {audioState.streams.map((s) => (
+                <option key={s.url} value={s.url}>{s.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+
 
         {/* Scroller canvas — vertically centered, taller box so glyphs never clip. */}
         {scrollOn && (

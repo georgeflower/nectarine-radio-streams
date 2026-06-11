@@ -72,3 +72,38 @@ export function formatMmSs(seconds: number): string {
   const s = total % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
+
+// --- audio control (consumed by Cracktro overlay) ------------------------
+export type AudioStreamOption = { url: string; name: string };
+export type AudioControlState = {
+  playing: boolean;
+  loading: boolean;
+  selectedUrl: string | null;
+  streams: AudioStreamOption[];
+};
+export type AudioController = {
+  play: () => void;
+  stop: () => void;
+  selectStream: (url: string) => void;
+};
+
+let _audioState: AudioControlState = {
+  playing: false,
+  loading: false,
+  selectedUrl: null,
+  streams: [],
+};
+let _audioController: AudioController | null = null;
+const audioListeners = new Set<Listener>();
+
+export function getAudioControlState(): AudioControlState { return _audioState; }
+export function setAudioControlState(next: Partial<AudioControlState>) {
+  _audioState = { ..._audioState, ...next };
+  for (const l of audioListeners) { try { l(); } catch { /* ignore */ } }
+}
+export function getAudioController(): AudioController | null { return _audioController; }
+export function setAudioController(c: AudioController | null) { _audioController = c; }
+export function subscribeAudioControl(l: Listener) {
+  audioListeners.add(l);
+  return () => { audioListeners.delete(l); };
+}
