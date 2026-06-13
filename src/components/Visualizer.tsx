@@ -1,4 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  BANDS,
+  bandFlux,
+  dpBeats,
+  fuseBandEnvelopes,
+  pickTempo,
+  plpPhase,
+  whitenInPlace,
+} from "@/lib/bpm/tempogram";
 
 export type VisualizerStyle =
   | "off"
@@ -710,6 +719,7 @@ export type BpmDebug = {
 //      confidence. Recompute cadence stretches from 1 s -> 2 s once locked.
 //
 // Starts at 125 BPM (period = 480 ms), the demoscene/dance default.
+
 export const useBpm = (
   analyser: AnalyserNode | null,
   enabled = true,
@@ -720,7 +730,8 @@ export const useBpm = (
   const INITIAL_PERIOD = 60000 / INITIAL_BPM;
   const MIN_PERIOD = 60000 / 200;
   const MAX_PERIOD = 60000 / 60;
-  const TIGHTNESS = 100; // librosa default
+  const TIGHTNESS = 100;
+  const HOP_MS = 12; // fixed analysis hop (~83 Hz) for stable tempo resolution
 
   const [state, setState] = useState<BpmDebug>({
     bpm: INITIAL_BPM,
@@ -739,7 +750,6 @@ export const useBpm = (
   const rafRef = useRef<number | null>(null);
   const recomputeTimerRef = useRef<number | null>(null);
 
-  // Tracker / metronome state.
   const periodRef = useRef(INITIAL_PERIOD);
   const nextBeatAtRef = useRef(0);
   const confidenceRef = useRef(0);
@@ -748,13 +758,12 @@ export const useBpm = (
   const beatCountRef = useRef(0);
   const metronomeBeatsRef = useRef<number[]>([]);
   const startedAtRef = useRef(0);
-  const lastDpPeriodRef = useRef(0);
+  const lastPeriodRef = useRef(0);
   const lastBassRef = useRef(0);
   const lastFluxRef = useRef(0);
   const displayPeriodRef = useRef(INITIAL_PERIOD);
 
   useEffect(() => {
-    // Reset state when track changes so BPM detection starts fresh.
     setState({
       bpm: INITIAL_BPM,
       beatIndex: 0,
@@ -769,113 +778,78 @@ export const useBpm = (
       confidence: 0,
     });
 
-    if (!analyser || !enabled) {
-      setState((st) => ({ ...st, status: "no-audio" }));
-      return;
-    }
+    if (!analyser || !enabled) return;
+
     const previousSmoothing = analyser.smoothingTimeConstant;
-    analyser.smoothingTimeConstant = Math.min(previousSmoothing, 0.4);
+    // Onset detection wants raw frames — kill the analyser's IIR smoothing.
+    analyser.smoothingTimeConstant = 0;
 
     const NBINS = analyser.frequencyBinCount;
     const SR = analyser.context.sampleRate;
-    const buf = new Uint8Array(new ArrayBuffer(NBINS)) as Uint8Array<ArrayBuffer>;
+    const floatBuf = new Float32Array(NBINS);
+    const magBuf = new Float32Array(NBINS);
     const bassEnd = Math.max(1, Math.floor(NBINS * 0.1));
 
-    // ----- mel filterbank (40 bands, 0..min(8kHz, sr/2)) -----
-    const NMEL = 40;
-    const FMAX = Math.min(8000, SR / 2);
-    const hzToMel = (hz: number) => 2595 * Math.log10(1 + hz / 700);
-    const melToHz = (m: number) => 700 * (Math.pow(10, m / 2595) - 1);
-    const melLo = hzToMel(0);
-    const melHi = hzToMel(FMAX);
-    const melPts: number[] = [];
-    for (let i = 0; i < NMEL + 2; i++) {
-      melPts.push(melToHz(melLo + ((melHi - melLo) * i) / (NMEL + 1)));
-    }
-    const binFromHz = (hz: number) => (hz / (SR / 2)) * NBINS;
-    type MelFilter = { start: number; weights: Float32Array };
-    const filters: MelFilter[] = [];
-    for (let m = 1; m <= NMEL; m++) {
-      const lo = binFromHz(melPts[m - 1]);
-      const mid = binFromHz(melPts[m]);
-      const hi = binFromHz(melPts[m + 1]);
-      const startI = Math.max(0, Math.floor(lo));
-      const endI = Math.min(NBINS - 1, Math.ceil(hi));
-      const w = new Float32Array(Math.max(1, endI - startI + 1));
-      for (let i = startI; i <= endI; i++) {
-        let v = 0;
-        if (i >= lo && i <= mid) v = (i - lo) / Math.max(1e-6, mid - lo);
-        else if (i >= mid && i <= hi) v = (hi - i) / Math.max(1e-6, hi - mid);
-        w[i - startI] = Math.max(0, v);
-      }
-      filters.push({ start: startI, weights: w });
-    }
-    const melCur = new Float32Array(NMEL);
-    const melPrev = new Float32Array(NMEL);
+    // Per-band rolling state.
+    const NBANDS = BANDS.length;
+    const prevBands = new Float32Array(NBANDS);
+    const fluxBands = new Float32Array(NBANDS);
 
-    // ----- onset envelope ring buffer (~10s @ ~60Hz) -----
-    const FRAMES = 700;
+    // Ring buffers per band — onset envelope at HOP_MS.
+    const FRAMES = Math.ceil((WINDOW_MS * 1.2) / HOP_MS);
     const envT = new Float64Array(FRAMES);
-    const envV = new Float32Array(FRAMES);
+    const envBands: Float32Array[] = Array.from(
+      { length: NBANDS },
+      () => new Float32Array(FRAMES),
+    );
     let envIdx = 0;
     let envFilled = 0;
 
-    // ----- runtime state -----
     const now0 = performance.now();
     startedAtRef.current = now0;
     nextBeatAtRef.current = 0;
     let running = false;
     let silentSince = 0;
+    let lastHopAt = 0;
     const SILENT_BASS = 0.01;
     const SILENT_FLUX = 0.0005;
     const SILENT_TIMEOUT = 2500;
 
     const clampPeriod = (p: number) => Math.min(MAX_PERIOD, Math.max(MIN_PERIOD, p));
 
-    const foldOctave = (candidate: number, ref: number) => {
-      let p = candidate;
-      while (p < ref * 0.75) p *= 2;
-      while (p > ref * 1.5) p /= 2;
-      return p;
-    };
-
     // ---- rAF loop: build onset envelope + tick metronome ----
     const tick = () => {
-      analyser.getByteFrequencyData(buf);
+      analyser.getFloatFrequencyData(floatBuf);
       const now = performance.now();
 
-      // bass level (for silence detection / debug)
+      // dB → linear magnitude, and crude bass level for silence detection.
       let bassSum = 0;
-      for (let i = 0; i < bassEnd; i++) bassSum += buf[i] ?? 0;
-      lastBassRef.current = bassSum / bassEnd / 255;
-
-      // log-mel bands
-      for (let m = 0; m < NMEL; m++) {
-        const f = filters[m];
-        let s = 0;
-        const w = f.weights;
-        const start = f.start;
-        for (let i = 0; i < w.length; i++) s += (buf[start + i] ?? 0) * w[i];
-        melCur[m] = Math.log1p(s / 255);
+      for (let i = 0; i < NBINS; i++) {
+        const db = floatBuf[i];
+        // -100 dB floor → 0 magnitude.
+        const lin = db > -100 ? Math.pow(10, db / 20) : 0;
+        magBuf[i] = lin;
+        if (i < bassEnd) bassSum += lin;
       }
-      // half-wave-rectified flux summed across mel bands
-      let flux = 0;
-      for (let m = 0; m < NMEL; m++) {
-        const d = melCur[m] - melPrev[m];
-        if (d > 0) flux += d;
-        melPrev[m] = melCur[m];
+      lastBassRef.current = Math.min(1, bassSum / bassEnd * 4);
+
+      // Only accumulate a new onset frame every HOP_MS to keep the envelope
+      // at a fixed sample rate independent of display refresh.
+      if (now - lastHopAt >= HOP_MS) {
+        lastHopAt = now;
+        bandFlux(magBuf, SR, prevBands, fluxBands);
+        let totalFlux = 0;
+        for (let b = 0; b < NBANDS; b++) totalFlux += fluxBands[b];
+        lastFluxRef.current = totalFlux / NBANDS;
+
+        envT[envIdx] = now;
+        for (let b = 0; b < NBANDS; b++) envBands[b][envIdx] = fluxBands[b];
+        envIdx = (envIdx + 1) % FRAMES;
+        if (envFilled < FRAMES) envFilled++;
       }
-      flux /= NMEL;
-      lastFluxRef.current = flux;
 
-      // write into ring buffer
-      envT[envIdx] = now;
-      envV[envIdx] = flux;
-      envIdx = (envIdx + 1) % FRAMES;
-      if (envFilled < FRAMES) envFilled++;
-
-      // silence -> pause metronome
-      const audible = lastBassRef.current > SILENT_BASS || flux > SILENT_FLUX;
+      // silence handling → pause metronome and decay
+      const audible = lastBassRef.current > SILENT_BASS || lastFluxRef.current > SILENT_FLUX;
       if (audible) {
         silentSince = 0;
       } else if (silentSince === 0) {
@@ -904,140 +878,22 @@ export const useBpm = (
       rafRef.current = requestAnimationFrame(tick);
     };
 
-    // ---- copy ring buffer to linear oldest-to-newest arrays ----
-    const linearizeEnv = (): { t: Float64Array; v: Float32Array } | null => {
-      if (envFilled < 100) return null;
+    // Copy per-band ring buffers to linear oldest→newest arrays.
+    const linearize = (): { t: Float64Array; bands: Float32Array[] } | null => {
+      if (envFilled < 80) return null;
       const len = envFilled;
       const t = new Float64Array(len);
-      const v = new Float32Array(len);
+      const bands: Float32Array[] = envBands.map(() => new Float32Array(len));
       const start = envFilled < FRAMES ? 0 : envIdx;
       for (let i = 0; i < len; i++) {
         const j = (start + i) % FRAMES;
         t[i] = envT[j];
-        v[i] = envV[j];
+        for (let b = 0; b < NBANDS; b++) bands[b][i] = envBands[b][j];
       }
-      return { t, v };
+      return { t, bands };
     };
 
-    // ---- adaptive whitening: subtract local mean, divide by local std ----
-    const whiten = (src: Float32Array): Float32Array => {
-      const n = src.length;
-      const out = new Float32Array(n);
-      const win = Math.max(20, Math.floor(n * 0.1));
-      // rolling stats via prefix sums
-      const ps = new Float64Array(n + 1);
-      const ps2 = new Float64Array(n + 1);
-      for (let i = 0; i < n; i++) {
-        ps[i + 1] = ps[i] + src[i];
-        ps2[i + 1] = ps2[i] + src[i] * src[i];
-      }
-      for (let i = 0; i < n; i++) {
-        const a = Math.max(0, i - win);
-        const b = Math.min(n, i + win + 1);
-        const cnt = b - a;
-        const mean = (ps[b] - ps[a]) / cnt;
-        const variance = Math.max(0, (ps2[b] - ps2[a]) / cnt - mean * mean);
-        const std = Math.sqrt(variance) + 1e-6;
-        const x = (src[i] - mean) / std;
-        out[i] = x > 0 ? x : 0;
-      }
-      return out;
-    };
-
-    // ---- tempo via prior-weighted autocorrelation ----
-    type TempoResult = { period: number; strength: number } | null;
-    const estimateTempo = (env: Float32Array, frameMs: number): TempoResult => {
-      const n = env.length;
-      let mean = 0;
-      for (let i = 0; i < n; i++) mean += env[i];
-      mean /= n;
-      let norm = 0;
-      const s = new Float32Array(n);
-      for (let i = 0; i < n; i++) {
-        s[i] = env[i] - mean;
-        norm += s[i] * s[i];
-      }
-      if (norm < 1e-6) return null;
-
-      const minLag = Math.max(2, Math.floor(MIN_PERIOD / frameMs));
-      const maxLag = Math.min(Math.floor(n * 0.6), Math.ceil(MAX_PERIOD / frameMs));
-      if (maxLag <= minLag) return null;
-
-      let best = -Infinity;
-      let bestLag = minLag;
-      let sumScore = 0;
-      let count = 0;
-      for (let lag = minLag; lag <= maxLag; lag++) {
-        let ac = 0;
-        for (let i = lag; i < n; i++) ac += s[i] * s[i - lag];
-        ac /= norm;
-        const bpm = 60000 / (lag * frameMs);
-        const prior = Math.exp(-0.5 * Math.pow(Math.log2(bpm / 125), 2));
-        const w = ac * prior;
-        sumScore += w;
-        count++;
-        if (w > best) {
-          best = w;
-          bestLag = lag;
-        }
-      }
-      const meanAc = sumScore / Math.max(1, count);
-      const strength = (best - meanAc) / (Math.abs(meanAc) + 1e-6);
-      return { period: bestLag * frameMs, strength };
-    };
-
-    // ---- Ellis dynamic-programming beat tracker ----
-    const dpBeats = (env: Float32Array, periodFrames: number): number[] => {
-      const N = env.length;
-      if (N < 4 || periodFrames < 2) return [];
-      const score = new Float32Array(N);
-      const back = new Int32Array(N);
-      const wMin = Math.max(1, Math.floor(periodFrames * 0.5));
-      const wMax = Math.max(wMin + 1, Math.ceil(periodFrames * 2));
-      for (let i = 0; i < N; i++) {
-        let bestSc = -Infinity;
-        let bestJ = -1;
-        const jStart = Math.max(0, i - wMax);
-        const jEnd = i - wMin;
-        for (let j = jStart; j <= jEnd; j++) {
-          const dt = i - j;
-          const lp = Math.log(dt / periodFrames);
-          const penalty = TIGHTNESS * lp * lp;
-          const sc = score[j] - penalty;
-          if (sc > bestSc) {
-            bestSc = sc;
-            bestJ = j;
-          }
-        }
-        if (bestJ < 0) {
-          score[i] = env[i];
-          back[i] = -1;
-        } else {
-          score[i] = env[i] + bestSc;
-          back[i] = bestJ;
-        }
-      }
-      // pick best end in the last ~1.5 periods
-      const endStart = Math.max(0, N - Math.ceil(periodFrames * 1.5));
-      let bestEnd = N - 1;
-      let bestEndScore = -Infinity;
-      for (let i = endStart; i < N; i++) {
-        if (score[i] > bestEndScore) {
-          bestEndScore = score[i];
-          bestEnd = i;
-        }
-      }
-      const beats: number[] = [];
-      let k = bestEnd;
-      while (k >= 0) {
-        beats.push(k);
-        k = back[k];
-      }
-      beats.reverse();
-      return beats;
-    };
-
-    // ---- recompute: runs every 1-2s, updates metronome from DP grid ----
+    // ---- recompute: fused tempogram + DP + PLP phase ----
     let recomputing = false;
     const recompute = () => {
       const now = performance.now();
@@ -1050,21 +906,32 @@ export const useBpm = (
 
       if (audible && !recomputing) {
         recomputing = true;
-        const linear = linearizeEnv();
+        const linear = linearize();
         if (linear) {
-          const { t, v } = linear;
+          const { t, bands } = linear;
+          // Effective frame period across the window.
           const frameMs = (t[t.length - 1] - t[0]) / Math.max(1, t.length - 1);
-          if (Number.isFinite(frameMs) && frameMs > 0 && frameMs < 100) {
-            const w = whiten(v);
-            const tempo = estimateTempo(w, frameMs);
+          if (Number.isFinite(frameMs) && frameMs > 4 && frameMs < 80) {
+            // Whiten each band, then fuse.
+            for (let b = 0; b < NBANDS; b++) whitenInPlace(bands[b]);
+            const { fused, maxBand } = fuseBandEnvelopes(bands);
+
+            // Try fused first; if it's anemic, fall back to the strongest band.
+            let tempo = pickTempo(fused, frameMs);
+            let envForBeats = fused;
+            if (!tempo || tempo.prominence < 0.5) {
+              const altTempo = pickTempo(maxBand, frameMs);
+              if (altTempo && (!tempo || altTempo.prominence > tempo.prominence)) {
+                tempo = altTempo;
+                envForBeats = maxBand;
+              }
+            }
+
             if (tempo) {
-              // Fold the new period into the current period's octave band to
-              // avoid half/double-time flips once we're locked.
-              const oldPeriod = periodRef.current;
-              const folded =
-                conf >= 0.4 ? foldOctave(tempo.period, oldPeriod) : tempo.period;
-              const periodFrames = folded / frameMs;
-              const beats = dpBeats(w, periodFrames);
+              const candidatePeriod = clampPeriod(tempo.bpm > 0 ? 60000 / tempo.bpm : MIN_PERIOD);
+              const periodFrames = candidatePeriod / frameMs;
+              const beats = dpBeats(envForBeats, periodFrames, TIGHTNESS);
+
               if (beats.length >= 2) {
                 const ibis: number[] = [];
                 for (let i = 1; i < beats.length; i++) {
@@ -1074,23 +941,29 @@ export const useBpm = (
                 const medianPeriod = clampPeriod(ibis[Math.floor(ibis.length / 2)]);
                 const lastBeatTime = t[beats[beats.length - 1]];
 
-                // confidence: autocorr peak strength + run-to-run consistency
-                const tempoConf = Math.max(0, Math.min(1, tempo.strength * 0.5));
+                // PLP phase for sub-period nudging.
+                const plp = plpPhase(envForBeats, medianPeriod / frameMs);
+
+                // Confidence: tempogram prominence × period stability × phase coherence.
+                const tempoConf = Math.max(0, Math.min(1, tempo.prominence));
                 let consistency = 0.5;
-                if (lastDpPeriodRef.current > 0) {
+                if (lastPeriodRef.current > 0) {
                   const rel =
-                    Math.abs(medianPeriod - lastDpPeriodRef.current) /
-                    lastDpPeriodRef.current;
+                    Math.abs(medianPeriod - lastPeriodRef.current) /
+                    lastPeriodRef.current;
                   consistency = Math.exp(-rel * 10);
                 }
-                const dpConf = tempoConf * 0.6 + consistency * 0.4;
-                // EMA — slower changes once high
+                const dpConf = Math.cbrt(
+                  Math.max(0, tempoConf) *
+                    Math.max(0, consistency) *
+                    Math.max(0.05, plp.coherence),
+                );
                 const cAlpha = conf >= 0.7 ? 0.15 : 0.35;
                 conf = conf * (1 - cAlpha) + dpConf * cAlpha;
                 confidenceRef.current = conf;
-                lastDpPeriodRef.current = medianPeriod;
+                lastPeriodRef.current = medianPeriod;
 
-                // Project last DP beat forward to the next beat after `now`
+                // Project the last DP beat forward to land just after `now`.
                 let nextBeat = lastBeatTime + medianPeriod;
                 while (nextBeat < now) nextBeat += medianPeriod;
 
@@ -1100,10 +973,11 @@ export const useBpm = (
                   nextBeatAtRef.current = nextBeat;
                   phaseErrorRef.current = 0;
                 } else {
-                  // Period adaptation — much gentler when confident.
+                  const oldPeriod = periodRef.current;
+                  // Period adaptation — gentler when confident.
                   const beta = conf >= 0.7 ? 0.05 : conf >= 0.4 ? 0.2 : 0.5;
                   periodRef.current = clampPeriod(
-                    oldPeriod + (medianPeriod - oldPeriod) * beta
+                    oldPeriod + (medianPeriod - oldPeriod) * beta,
                   );
                   // Phase adaptation — nudge if close, snap if far + confident.
                   const error = nextBeat - nextBeatAtRef.current;
@@ -1124,12 +998,11 @@ export const useBpm = (
         }
         recomputing = false;
       } else if (!audible) {
-        // Decay confidence while silent so we re-lock fresh on resume.
         conf = Math.max(0, conf - 0.05);
         confidenceRef.current = conf;
       }
 
-      // Smooth the displayed BPM heavily when locked.
+      // Smoothed displayed BPM — heavier filtering once locked.
       const period = periodRef.current;
       const dispLerp = conf >= 0.7 ? 0.04 : conf >= 0.4 ? 0.12 : 0.3;
       displayPeriodRef.current =
@@ -1165,7 +1038,7 @@ export const useBpm = (
       });
 
       // Recompute cadence: faster while searching, slower once locked.
-      const nextDelay = conf >= 0.7 ? 2000 : 1000;
+      const nextDelay = conf >= 0.7 ? 2000 : 750;
       recomputeTimerRef.current = window.setTimeout(recompute, nextDelay);
     };
 
