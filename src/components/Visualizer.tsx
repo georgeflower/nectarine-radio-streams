@@ -1,4 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  BANDS,
+  bandFlux,
+  dpBeats,
+  fuseBandEnvelopes,
+  pickTempo,
+  plpPhase,
+  whitenInPlace,
+} from "@/lib/bpm/tempogram";
 
 export type VisualizerStyle =
   | "off"
