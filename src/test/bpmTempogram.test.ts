@@ -80,6 +80,13 @@ describe("spectralNovelty", () => {
     expect(repeated).toBeLessThan(0.05);
     expect(changed).toBeGreaterThan(repeated + 0.25);
   });
+
+  it("returns 0 for silent (all-zero) frames", () => {
+    const prev = new Float32Array(8);
+    const silence = new Float32Array(8);
+    const novelty = spectralNovelty(silence, prev);
+    expect(novelty).toBe(0);
+  });
 });
 
 describe("fuseBandEnvelopes", () => {

@@ -66,7 +66,11 @@ export function spectralNovelty(
     const v = Math.log1p(mag[i]);
     norm += v * v;
   }
-  const invNorm = norm > 1e-12 ? 1 / Math.sqrt(norm) : 0;
+  if (norm <= 1e-12) {
+    prevNorm.fill(0);
+    return 0;
+  }
+  const invNorm = 1 / Math.sqrt(norm);
   let dot = 0;
   for (let i = 0; i < n; i++) {
     const v = Math.log1p(mag[i]) * invNorm;
