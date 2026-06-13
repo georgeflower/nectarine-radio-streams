@@ -6,6 +6,7 @@ import {
   fuseBandEnvelopes,
   pickTempo,
   plpPhase,
+  spectralNovelty,
   whitenInPlace,
 } from "@/lib/bpm/tempogram";
 
@@ -792,14 +793,16 @@ export const useBpm = (
 
     // Per-band rolling state.
     const NBANDS = BANDS.length;
+    const TOTAL_FEATURES = NBANDS + 1;
     const prevBands = new Float32Array(NBANDS);
     const fluxBands = new Float32Array(NBANDS);
+    const prevSpectralShape = new Float32Array(NBINS);
 
     // Ring buffers per band — onset envelope at HOP_MS.
     const FRAMES = Math.ceil((WINDOW_MS * 1.2) / HOP_MS);
     const envT = new Float64Array(FRAMES);
     const envBands: Float32Array[] = Array.from(
-      { length: NBANDS },
+      { length: TOTAL_FEATURES },
       () => new Float32Array(FRAMES),
     );
     let envIdx = 0;
@@ -840,10 +843,14 @@ export const useBpm = (
         bandFlux(magBuf, SR, prevBands, fluxBands);
         let totalFlux = 0;
         for (let b = 0; b < NBANDS; b++) totalFlux += fluxBands[b];
-        lastFluxRef.current = totalFlux / NBANDS;
+        const shapeNovelty = spectralNovelty(magBuf, prevSpectralShape);
+        // Flux and spectral novelty are both sparse/whitened later; average them
+        // here only for coarse "audible rhythm present" gating.
+        lastFluxRef.current = (totalFlux + shapeNovelty) / TOTAL_FEATURES;
 
         envT[envIdx] = now;
         for (let b = 0; b < NBANDS; b++) envBands[b][envIdx] = fluxBands[b];
+        envBands[NBANDS][envIdx] = shapeNovelty;
         envIdx = (envIdx + 1) % FRAMES;
         if (envFilled < FRAMES) envFilled++;
       }
@@ -888,7 +895,7 @@ export const useBpm = (
       for (let i = 0; i < len; i++) {
         const j = (start + i) % FRAMES;
         t[i] = envT[j];
-        for (let b = 0; b < NBANDS; b++) bands[b][i] = envBands[b][j];
+        for (let b = 0; b < TOTAL_FEATURES; b++) bands[b][i] = envBands[b][j];
       }
       return { t, bands };
     };
@@ -913,8 +920,15 @@ export const useBpm = (
           const frameMs = (t[t.length - 1] - t[0]) / Math.max(1, t.length - 1);
           if (Number.isFinite(frameMs) && frameMs > 4 && frameMs < 80) {
             // Whiten each band, then fuse.
-            for (let b = 0; b < NBANDS; b++) whitenInPlace(bands[b]);
-            const { fused, maxBand } = fuseBandEnvelopes(bands);
+            for (let b = 0; b < TOTAL_FEATURES; b++) whitenInPlace(bands[b]);
+            const weights = new Float32Array(TOTAL_FEATURES);
+            for (let b = 0; b < TOTAL_FEATURES; b++) {
+              const tBand = pickTempo(bands[b], frameMs);
+              // Keep a floor so no feature stream disappears entirely; let
+              // stronger periodic prominence increase influence.
+              weights[b] = 0.3 + Math.max(0, Math.min(1, tBand?.prominence ?? 0));
+            }
+            const { fused, maxBand } = fuseBandEnvelopes(bands, weights);
 
             // Try fused first; if it's anemic, fall back to the strongest band.
             let tempo = pickTempo(fused, frameMs);
@@ -938,7 +952,27 @@ export const useBpm = (
                   ibis.push(t[beats[i]] - t[beats[i - 1]]);
                 }
                 ibis.sort((a, b) => a - b);
-                const medianPeriod = clampPeriod(ibis[Math.floor(ibis.length / 2)]);
+                let medianPeriod = clampPeriod(ibis[Math.floor(ibis.length / 2)]);
+                if (lastPeriodRef.current > 0 && conf >= 0.45) {
+                  const octaveCandidates = [0.5, 1, 2]
+                    .map((m) => clampPeriod(medianPeriod * m))
+                    .sort((a, b) => a - b);
+                  const currentRel =
+                    Math.abs(medianPeriod - lastPeriodRef.current) / lastPeriodRef.current;
+                  let bestPeriod = medianPeriod;
+                  let bestRel = currentRel;
+                  for (const candidate of octaveCandidates) {
+                    const rel =
+                      Math.abs(candidate - lastPeriodRef.current) / lastPeriodRef.current;
+                    if (rel < bestRel) {
+                      bestRel = rel;
+                      bestPeriod = candidate;
+                    }
+                  }
+                  if (currentRel > 0.3 && bestRel < currentRel * 0.7) {
+                    medianPeriod = bestPeriod;
+                  }
+                }
                 const lastBeatTime = t[beats[beats.length - 1]];
 
                 // PLP phase for sub-period nudging.
