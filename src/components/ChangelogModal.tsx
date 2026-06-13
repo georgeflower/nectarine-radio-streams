@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.6.2";
+export const APP_VERSION = "0.6.3";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,16 @@ interface ChangelogEntry {
 }
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.6.3",
+    date: "2026-06-13",
+    changes: [
+      "Reworked BPM detection with multi-band tempogram for accuracy across chiptune, breakbeat and ambient",
+      "Added subtle cracktro audio controls (play / stop / stream) that fade in on mouse movement",
+      "Added tutorial hints pointing to settings and ball-shelf click interaction",
+      "Improved favicon: transparent background and larger tab icon",
+    ],
+  },
   {
     version: "0.6.2",
     date: "2026-06-10",
