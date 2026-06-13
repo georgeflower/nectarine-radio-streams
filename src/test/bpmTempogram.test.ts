@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { pickTempo, dpBeats, whitenInPlace } from "@/lib/bpm/tempogram";
+import {
+  dpBeats,
+  fuseBandEnvelopes,
+  pickTempo,
+  spectralNovelty,
+  whitenInPlace,
+} from "@/lib/bpm/tempogram";
 
 function synthEnvelope(bpm: number, frameMs: number, seconds: number, weakDownbeat = false) {
   const n = Math.round((seconds * 1000) / frameMs);
@@ -57,5 +63,40 @@ describe("dpBeats", () => {
     // 8 seconds at 120 BPM ≈ 16 beats.
     expect(beats.length).toBeGreaterThan(12);
     expect(beats.length).toBeLessThan(20);
+  });
+});
+
+describe("spectralNovelty", () => {
+  it("is low for repeated spectra and rises on spectral change", () => {
+    const prev = new Float32Array(8);
+    const a = new Float32Array([1, 2, 3, 4, 3, 2, 1, 0.5]);
+    const b = new Float32Array([0.3, 0.2, 0.4, 0.5, 2, 3, 4, 5]);
+
+    const first = spectralNovelty(a, prev);
+    const repeated = spectralNovelty(a, prev);
+    const changed = spectralNovelty(b, prev);
+
+    expect(first).toBeGreaterThan(0.1);
+    expect(repeated).toBeLessThan(0.05);
+    expect(changed).toBeGreaterThan(repeated + 0.25);
+  });
+
+  it("returns 0 for silent (all-zero) frames", () => {
+    const prev = new Float32Array(8);
+    const silence = new Float32Array(8);
+    const novelty = spectralNovelty(silence, prev);
+    expect(novelty).toBe(0);
+  });
+});
+
+describe("fuseBandEnvelopes", () => {
+  it("respects adaptive feature weights", () => {
+    const a = new Float32Array([1, 1, 1]);
+    const b = new Float32Array([5, 5, 5]);
+    const equal = fuseBandEnvelopes([a, b]);
+    const weighted = fuseBandEnvelopes([a, b], new Float32Array([1, 3]));
+
+    expect(equal.fused[0]).toBeCloseTo(3, 5);
+    expect(weighted.fused[0]).toBeCloseTo(4, 5);
   });
 });

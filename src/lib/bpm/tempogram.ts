@@ -33,6 +33,9 @@ export function bandFlux(
   prevBands: Float32Array,
   outBands: Float32Array,
 ): void {
+  // Keep part of negative energy slope (release) so sustained/non-drum tracks
+  // still emit a rhythmic novelty signal when attacks are soft.
+  const releaseWeight = 0.35;
   const nBins = mag.length;
   const binHz = sampleRate / 2 / nBins;
   for (let b = 0; b < BANDS.length; b++) {
@@ -44,9 +47,37 @@ export function bandFlux(
     // log compression, then flux against previous frame value
     const logE = Math.log1p(sum);
     const d = logE - prevBands[b];
-    outBands[b] = d > 0 ? d : 0;
+    outBands[b] = d > 0 ? d : -d * releaseWeight;
     prevBands[b] = logE;
   }
+}
+
+// Broadband novelty from spectral shape change (cosine distance between
+// consecutive log-normalized spectra). Helps tracks with weak drums where
+// timbral/harmonic motion is the dominant rhythmic cue.
+export function spectralNovelty(
+  mag: Float32Array,
+  prevNorm: Float32Array,
+): number {
+  const n = mag.length;
+  if (prevNorm.length !== n) return 0;
+  let norm = 0;
+  for (let i = 0; i < n; i++) {
+    const v = Math.log1p(mag[i]);
+    norm += v * v;
+  }
+  if (norm <= 1e-12) {
+    prevNorm.fill(0);
+    return 0;
+  }
+  const invNorm = 1 / Math.sqrt(norm);
+  let dot = 0;
+  for (let i = 0; i < n; i++) {
+    const v = Math.log1p(mag[i]) * invNorm;
+    dot += v * prevNorm[i];
+    prevNorm[i] = v;
+  }
+  return Math.max(0, 1 - Math.max(-1, Math.min(1, dot)));
 }
 
 // ─── Adaptive whitening (per-band, in place). Subtracts local mean,
@@ -80,21 +111,28 @@ export type FusedEnvelopes = {
   meanEnergy: number;
 };
 
-export function fuseBandEnvelopes(bands: Float32Array[]): FusedEnvelopes {
+export function fuseBandEnvelopes(
+  bands: Float32Array[],
+  weights?: Float32Array,
+): FusedEnvelopes {
   const B = bands.length;
   const N = bands[0]?.length ?? 0;
   const fused = new Float32Array(N);
   const maxBand = new Float32Array(N);
+  const defaultWeight = B > 0 ? 1 / B : 0;
   let energy = 0;
   for (let i = 0; i < N; i++) {
     let s = 0;
     let m = 0;
+    let wSum = 0;
     for (let b = 0; b < B; b++) {
       const v = bands[b][i];
-      s += v;
+      const w = Math.max(0, weights?.[b] ?? defaultWeight);
+      s += v * w;
+      wSum += w;
       if (v > m) m = v;
     }
-    fused[i] = s / B;
+    fused[i] = wSum > 1e-9 ? s / wSum : 0;
     maxBand[i] = m;
     energy += fused[i];
   }
