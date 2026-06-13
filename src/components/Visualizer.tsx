@@ -719,15 +719,6 @@ export type BpmDebug = {
 //      confidence. Recompute cadence stretches from 1 s -> 2 s once locked.
 //
 // Starts at 125 BPM (period = 480 ms), the demoscene/dance default.
-import {
-  BANDS,
-  bandFlux,
-  dpBeats,
-  fuseBandEnvelopes,
-  pickTempo,
-  plpPhase,
-  whitenInPlace,
-} from "@/lib/bpm/tempogram";
 
 export const useBpm = (
   analyser: AnalyserNode | null,
