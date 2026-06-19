@@ -68,8 +68,9 @@ describe("amiga / atari platform banter", () => {
     vi.advanceTimersByTime(1500);
     notePlatformChange("Amiga", "t3|a3"); // fires (streak reset)
     vi.advanceTimersByTime(1500);
+    // 2 Amiga openings + 1 Amiga reply (after the Atari track) = 3.
     const amigaFires = calls.filter((c) => c.text === "AMIGAAAAAA!" && c.who === "white").length;
-    expect(amigaFires).toBe(2);
+    expect(amigaFires).toBe(3);
   });
 });
 
