@@ -15,6 +15,7 @@ import { StageProvider } from "@/lib/stage";
 import { renderBBCode } from "@/lib/bbcode";
 import { getSceneEraConfig, getSceneEraFromListeningMs } from "@/lib/gooseSceneEra";
 import { sayFromAnyGoose, setGoosePerformanceState, setGooseSceneEra, setProcreationEnabled } from "@/lib/gooseSocial";
+import { notePlatformChange } from "@/lib/gooseRaptureEvents";
 import { pickRatingLine } from "@/lib/gooseSongChatter";
 import {
   formatMmSs,
@@ -326,6 +327,13 @@ const Cracktro = ({
     const t = window.setTimeout(() => sayFromAnyGoose(line, 3000), 1800);
     return () => window.clearTimeout(t);
   }, [title, artist, rating]);
+
+  // Amiga/Atari platform banter — fires once per (track, platform) combo.
+  useEffect(() => {
+    if (!title && !artist) return;
+    notePlatformChange(platform, `${title}|${artist}`);
+  }, [platform, title, artist]);
+
 
 
   const [isFullscreen, setIsFullscreen] = useState(false);
