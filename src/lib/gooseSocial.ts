@@ -14,6 +14,12 @@ import { findLearnedTrigger, pickLearnedPhrase } from "@/lib/gooseLearnedPhrases
 import { queueOnelinerForCloud } from "@/lib/gooseLexiconCloud";
 import type { GooseSceneEra } from "@/lib/gooseSceneEra";
 import { GOOSE_DIALOGUES } from "@/lib/gooseDialogues";
+import {
+  configureRaptureSpeaker,
+  noteRaptureOnelinerIfMatch,
+  startRaptureRoutine,
+  stopRaptureRoutine,
+} from "@/lib/gooseRaptureEvents";
 
 export type GooseRole = "white" | "brown";
 
@@ -99,6 +105,7 @@ export function noteRecentOneliner(username: string, text: string) {
   while (recentOnelinerTrail.length > MAX_ONELINER_TRAIL) recentOnelinerTrail.shift();
   learnLexiconFromOneliner(clean, username);
   queueOnelinerForCloud(clean);
+  noteRaptureOnelinerIfMatch(username);
 }
 
 let sceneEra: GooseSceneEra = "intro";
@@ -949,6 +956,23 @@ function stopSchedulerIfEmpty() {
 // 0 forever for fresh sessions and the gate in `step()` would never open.
 const FIRST_CLUTCH_DELAY_MS = 90_000;
 
+let raptureWired = false;
+function ensureRaptureWired() {
+  if (raptureWired) return;
+  raptureWired = true;
+  configureRaptureSpeaker({
+    sayWhite: (text, durationMs) => {
+      const pair = getPair();
+      if (pair) pair[0].say(text, durationMs ?? 2400);
+    },
+    sayBrown: (text, durationMs) => {
+      const pair = getPair();
+      if (pair) pair[1].say(text, durationMs ?? 2400);
+    },
+    hasPair: () => getPair() !== null,
+  });
+}
+
 export function registerGoose(api: GooseAPI): () => void {
   const id = nextId++;
   geese.set(id, api);
@@ -956,9 +980,12 @@ export function registerGoose(api: GooseAPI): () => void {
     reproductionEarliestAt = Date.now() + FIRST_CLUTCH_DELAY_MS;
   }
   ensureScheduler();
+  ensureRaptureWired();
+  if (getPair()) startRaptureRoutine();
   return () => {
     geese.delete(id);
     stopSchedulerIfEmpty();
+    if (!getPair()) stopRaptureRoutine();
   };
 }
 
