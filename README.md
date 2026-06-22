@@ -14,6 +14,8 @@ This app combines live stream playback, Demovibes XML panels, visualizers, and a
 - Fullscreen cracktro mode with floating windows, scroller, info bar, geese, and boing ball
 - Browser-local goose learning with phrase memory + lexicon-based chatter
 - Optional scene eras that evolve cracktro visuals over long sessions (toggleable)
+- Goose social dialogue and scripted exchanges (Amiga/Atari banter, periodic routines, oneliner reactions)
+- Mobile screen wake lock so the display stays active while listening
 - Optional per-station now-playing metadata polling for Media Session metadata
 
 ## Tech stack
