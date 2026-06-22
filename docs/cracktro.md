@@ -21,6 +21,9 @@ Current scene includes:
 - optional flying white goose
 - optional flying brown goose
 - optional boing ball
+- goose platform banter (Amiga / Atari) on track change
+- periodic "Have you seen Rapture?" routine every 10 minutes
+- goose reaction when Rapture posts in oneliner
 - floating draggable panels for:
   - oneliner
   - online users

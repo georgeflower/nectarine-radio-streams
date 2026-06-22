@@ -14,6 +14,8 @@ This app combines live stream playback, Demovibes XML panels, visualizers, and a
 - Fullscreen cracktro mode with floating windows, scroller, info bar, geese, and boing ball
 - Browser-local goose learning with phrase memory + lexicon-based chatter
 - Optional scene eras that evolve cracktro visuals over long sessions (toggleable)
+- Goose social dialogue and scripted exchanges (Amiga/Atari banter, periodic routines, oneliner reactions)
+- Mobile screen wake lock so the display stays active while listening
 - Optional per-station now-playing metadata polling for Media Session metadata
 
 ## Tech stack
@@ -81,6 +83,9 @@ supabase/functions/
 - draggable panels (oneliner / online / queue / history)
 - flying geese + optional brown goose
 - boing ball
+- goose platform banter (Amiga / Atari) on track change
+- periodic "Have you seen Rapture?" routine every 10 minutes
+- goose reaction when Rapture posts in oneliner
 
 Most cracktro toggles persist in `localStorage`.
 
@@ -190,10 +195,10 @@ npm run test
 
 ## Future ideas
 
-- Add event-driven cracktro events tied to oneliner mood, BPM locks, and queue transitions
-- Wire the new lexicon design into goose chatter generation
-- Add optional scene “eras” that evolve visuals over long listening sessions
-- Add panel presets for streamers/recordings/mobile
+- Expand event-driven cracktro events (BPM-locked visuals, queue transitions)
+- Wire the lexicon design deeper into goose chatter generation
+- Add panel presets for streamers / recordings / mobile
+- Goose mood and energy tied to BPM confidence and session duration
 
 ## Credits / license
 
