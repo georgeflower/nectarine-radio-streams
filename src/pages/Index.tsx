@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import {
   AUTO_REFRESH_INTERVAL_MS,
   ENDPOINTS,
