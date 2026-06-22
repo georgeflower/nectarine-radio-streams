@@ -180,6 +180,7 @@ const Index = () => {
   const [cracktroOpen, setCracktroOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [seekCount, setSeekCount] = useState(0);
+  useWakeLock();
 
   useEffect(() => {
     try {
