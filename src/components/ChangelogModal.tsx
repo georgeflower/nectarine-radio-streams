@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.6.3";
+export const APP_VERSION = "0.6.4";
 
 interface ChangelogEntry {
   version: string;
