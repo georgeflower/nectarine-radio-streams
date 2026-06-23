@@ -66,7 +66,7 @@ const resolveArtworkUrl = (rawUrl: string | undefined, fallbackArtwork: string):
   }
 };
 
-const AudioPlayer = ({ streams, currentTrack, onAnalyserReady, onSeek }: Props) => {
+const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, onSeek }: Props) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -428,12 +428,23 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady, onSeek }: Props) 
   const mediaTitle = nowPlaying?.title || selectedStream?.name || NOW_PLAYING_FALLBACK_TITLE;
   const mediaArtist = nowPlaying?.artist || NOW_PLAYING_FALLBACK_ARTIST;
 
+  // Track song-artwork updates so the MediaSession effect re-runs when the
+  // screenshot/platform icon arrives.
+  const [songArtworkTick, setSongArtworkTick] = useState(0);
+  useEffect(() => {
+    if (!currentSongId) return;
+    requestSongArtwork(currentSongId);
+    const unsub = subscribeSongArtwork(() => setSongArtworkTick((n) => n + 1));
+    return () => unsub();
+  }, [currentSongId]);
+
   useEffect(() => {
     if (!("mediaSession" in navigator) || !("MediaMetadata" in window)) return;
     const mediaSession = navigator.mediaSession;
     const fallbackArtwork = new URL(FALLBACK_ARTWORK, window.location.origin).toString();
+    const songArtwork = getBestArtworkUrl(currentSongId);
     const artworkSrc = resolveArtworkUrl(
-      stationConfig?.artworkUrl || selectedStream?.artworkUrl,
+      songArtwork || stationConfig?.artworkUrl || selectedStream?.artworkUrl,
       fallbackArtwork,
     );
     const artworkType = inferArtworkType(artworkSrc);
@@ -448,7 +459,7 @@ const AudioPlayer = ({ streams, currentTrack, onAnalyserReady, onSeek }: Props) 
       })),
     });
     mediaSession.playbackState = playing ? "playing" : "paused";
-  }, [mediaArtist, mediaTitle, playing, selectedStream, stationConfig?.artworkUrl]);
+  }, [mediaArtist, mediaTitle, playing, selectedStream, stationConfig?.artworkUrl, currentSongId, songArtworkTick]);
 
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
