@@ -1,40 +1,74 @@
-# Fix top-corner buttons hidden behind iOS status bar
+## Goal
 
-## Problem
-On iPhone Safari (and PWA standalone) the system status bar / Dynamic Island overlays the top of the page, sitting on top of the Cracktro "Exit", scene-era badge, fullscreen toggle, and the centered settings bar. They become unreachable.
+When the app is added to the home screen on iOS/Android and audio is playing in the background, the OS lockscreen / notification widget currently shows a generic placeholder ("Your app will live here, Ask Lovable to build it"). Replace that artwork with the currently playing song's screenshot from scenestream.net, falling back to the platform symbol icon, falling back to the existing station artwork.
 
-`index.html` already declares `viewport-fit=cover` and `apple-mobile-web-app-status-bar-style=black-translucent`, so the page extends under the status bar — we just need to push the chrome down by `env(safe-area-inset-top)` (and respect left/right insets for the side buttons too).
+## How the data is sourced
 
-## Change
+scenestream.net does not expose screenshots through its XML API. The screenshot page `https://scenestream.net/demovibes/screenshot/{songId}/` is HTML and contains:
 
-Single file: `src/components/Cracktro.tsx`.
+- `<img class="screenshot" src="/static/media/screenshot/image/XXXXX.gif">` when a screenshot exists
+- `<img class="platform_icon" src="/static/media/platform/symbol/koek<name>.png">` for the song's platform (always present)
 
-For each absolutely-positioned top-edge control, replace the static `top-2` / `top-4` with an inline style that adds the safe-area inset, and add a small min offset so it still has breathing room when the inset is 0:
+Both URLs are publicly fetchable by mobile OS lockscreen art renderers, so once the URL is known the browser does not need to proxy the actual image.
 
-```tsx
-style={{
-  top: "calc(env(safe-area-inset-top, 0px) + 0.5rem)",
-  left: "calc(env(safe-area-inset-left, 0px) + 0.5rem)",
-}}
-```
+## Plan
 
-Apply to:
+### 1. New edge function `song-artwork`
 
-1. **Exit Cracktro button** (line ~893) — `top-2 left-2` → safe-area top + left.
-2. **Scene-era badge** (line ~903) — `top-2 left-20` → safe-area top, `left: calc(env(safe-area-inset-left,0px) + 5rem)`.
-3. **FPS counter** (line ~914) — `top-2 right-24` → safe-area top + right (5.5rem offset to clear fullscreen button).
-4. **Centered settings bar** (line ~925) — `top-2 left-1/2` → only top needs the inset; keep the `-translate-x-1/2` via `transform`.
-5. **Enter/Exit fullscreen button** (line ~1180) — `top-4 right-4` → safe-area top + right.
+`supabase/functions/song-artwork/index.ts`
 
-Tailwind class `top-2` / `top-4` / `left-*` / `right-*` is removed from those elements and replaced by the inline `style` so the calc wins (avoids Tailwind class specificity issues).
+- Accepts `?songId=<digits>`. Validates digits only.
+- Fetches `https://scenestream.net/demovibes/screenshot/{songId}/`.
+- Parses HTML with regex for `class="screenshot" src="(...)"` and `class="platform_icon" src="(...)"`.
+- Returns JSON:
+  ```json
+  { "screenshotUrl": "https://scenestream.net/static/media/screenshot/image/00065367.gif",
+    "platformIconUrl": "https://scenestream.net/static/media/platform/symbol/koeksid.png" }
+  ```
+  with `Cache-Control: public, max-age=3600` and full CORS headers. Either field can be missing.
+
+Deploy via the standard edge function deployment so it gets a public URL under `${VITE_SUPABASE_URL}/functions/v1/song-artwork`.
+
+### 2. `src/lib/songArtwork.ts` (new client module)
+
+Small in-memory + `localStorage` cache (1 day TTL) keyed by `songId`:
+
+- `getCachedSongArtwork(songId): { screenshotUrl?, platformIconUrl? } | undefined`
+- `requestSongArtwork(songId): void` — fires the edge-function fetch in the background, dedupes inflight, stores on success, notifies listeners.
+- `subscribeSongArtwork(fn): unsubscribe`
+
+`getBestArtworkUrl(songId)` helper returns `screenshotUrl ?? platformIconUrl ?? undefined`.
+
+### 3. Plumb song id + artwork into `AudioPlayer`
+
+In `src/pages/Index.tsx` (around line 449) pass `currentSongId={now?.songId}` to `<AudioPlayer />`.
+
+In `src/components/AudioPlayer.tsx`:
+
+- Add `currentSongId?: string` to `Props`.
+- Add a small hook that subscribes to `songArtwork` and triggers `requestSongArtwork(currentSongId)` whenever it changes.
+- In the existing `mediaSession.metadata` effect (around line 426), prefer:
+  1. song screenshot URL
+  2. platform icon URL
+  3. existing `stationConfig?.artworkUrl || selectedStream?.artworkUrl`
+  4. current `FALLBACK_ARTWORK` placeholder
+- Extend the effect's dependency array with the resolved artwork URL.
+- Use `inferArtworkType` on the new URL (already supports `.gif`/`.png`).
+
+No change to the on-screen UI — only the OS-level media metadata image changes.
+
+### 4. Test
+
+Add `src/test/songArtwork.test.ts` covering:
+
+- Cache hit returns immediately, no fetch.
+- `getBestArtworkUrl` prefers screenshot over platform icon.
+- Subscribers are notified after a resolved fetch (mock `fetch`).
+
+Existing `cracktroDefaults` and audio-related tests remain untouched.
 
 ## Out of scope
 
-- No change to bottom-edge UI (the screenshot shows the issue is only at the top, but if needed later, `env(safe-area-inset-bottom)` would apply the same way).
-- No viewport meta or PWA manifest changes (already correct).
-- No version bump / changelog update (the user asked only for the fix; I'll mention bumping it once they approve).
-
-## Verification
-
-- `cracktroDefaults.test.tsx` already exercises the Exit and fullscreen buttons by role — keep passing since `aria-label`/visibility classes are untouched.
-- Manual check on iPhone Safari: in fullscreen, Exit and fullscreen-toggle should sit below the time and Dynamic Island.
+- No new on-screen art in the cracktro itself (only OS lockscreen).
+- No version bump / changelog update (separate request).
+- No change to the static favicon / web manifest icon (that's a different surface from MediaSession artwork).
