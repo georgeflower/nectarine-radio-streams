@@ -890,9 +890,13 @@ const Cracktro = ({
         <button
           type="button"
           onClick={() => onExitRef.current?.()}
-          className={`absolute top-2 left-2 z-10 min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-opacity duration-500 ${
+          className={`absolute z-10 min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-opacity duration-500 ${
             showHintChrome ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
+          style={{
+            top: "calc(env(safe-area-inset-top, 0px) + 0.5rem)",
+            left: "calc(env(safe-area-inset-left, 0px) + 0.5rem)",
+          }}
           aria-label="Exit Cracktro"
           title="Exit Cracktro"
         >
@@ -900,9 +904,13 @@ const Cracktro = ({
         </button>
         {sceneErasOn && (
           <div
-            className={`absolute top-2 left-20 z-10 min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground transition-opacity duration-500 flex items-center ${
+            className={`absolute z-10 min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground transition-opacity duration-500 flex items-center ${
               showHintChrome ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
+            style={{
+              top: "calc(env(safe-area-inset-top, 0px) + 0.5rem)",
+              left: "calc(env(safe-area-inset-left, 0px) + 5rem)",
+            }}
             aria-label={`Scene Era: ${sceneEraConfig.label}`}
             title={`Scene Era: ${sceneEraConfig.label}`}
           >
@@ -911,7 +919,11 @@ const Cracktro = ({
         )}
         {fpsCounterOn && (
           <div
-            className="absolute top-2 right-24 z-10 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground"
+            className="absolute z-10 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground"
+            style={{
+              top: "calc(env(safe-area-inset-top, 0px) + 0.5rem)",
+              right: "calc(env(safe-area-inset-right, 0px) + 6rem)",
+            }}
             aria-live="polite"
           >
             FPS: {fps ?? "--"}{lowFpsDetected ? " · SLOW GPU" : ""}
@@ -922,9 +934,13 @@ const Cracktro = ({
             mouse movement, hides 2s after movement stops. Centered so it
             doesn't conflict with the EXIT/Era badges on the left. */}
         <div
-          className={`absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-sm border border-border/40 bg-background/20 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground/80 backdrop-blur-sm transition-opacity duration-500 ${
+          className={`absolute left-1/2 z-20 flex items-center gap-2 rounded-sm border border-border/40 bg-background/20 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground/80 backdrop-blur-sm transition-opacity duration-500 ${
             showAudioBar ? "opacity-60 hover:opacity-100" : "opacity-0 pointer-events-none"
           }`}
+          style={{
+            top: "calc(env(safe-area-inset-top, 0px) + 0.5rem)",
+            transform: "translateX(-50%)",
+          }}
           aria-label="Audio controls"
         >
           <button
@@ -1177,10 +1193,14 @@ const Cracktro = ({
               enterFullscreen();
             }
           }}
-          className={`absolute top-4 right-4 min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/80 text-foreground hover:bg-card hover:opacity-90 touch-manipulation transition-opacity duration-500 ${
+          className={`absolute min-h-11 px-3 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/80 text-foreground hover:bg-card hover:opacity-90 touch-manipulation transition-opacity duration-500 ${
             showHintChrome ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
-          style={{ zIndex: 10 }}
+          style={{
+            zIndex: 10,
+            top: "calc(env(safe-area-inset-top, 0px) + 1rem)",
+            right: "calc(env(safe-area-inset-right, 0px) + 1rem)",
+          }}
           aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
           title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         >
