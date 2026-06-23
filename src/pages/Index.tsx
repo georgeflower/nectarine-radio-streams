@@ -447,6 +447,7 @@ const Index = () => {
           <AudioPlayer
             streams={streams}
             currentTrack={now}
+            currentSongId={now?.songId}
             onAnalyserReady={setAnalyser}
             onSeek={() => setSeekCount((c) => c + 1)}
           />
