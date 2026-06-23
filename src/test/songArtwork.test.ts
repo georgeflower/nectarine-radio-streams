@@ -72,4 +72,26 @@ describe("songArtwork", () => {
     expect(getCachedSongArtwork(undefined)).toBeUndefined();
     expect(getBestArtworkUrl(null)).toBeUndefined();
   });
+
+  it("edge function wraps screenshot URLs via wsrv.nl PNG transform", async () => {
+    // Simulate what the edge function returns.
+    const original = "https://scenestream.net/static/media/screenshot/image/65367.gif";
+    const proxied =
+      `https://wsrv.nl/?url=${encodeURIComponent(
+        original.replace(/^https?:\/\//i, ""),
+      )}&output=png&n=-1&w=512&h=512&fit=contain&we`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ screenshotUrl: proxied }),
+      }),
+    );
+    requestSongArtwork("7777");
+    await new Promise((r) => setTimeout(r, 0));
+    const url = getBestArtworkUrl("7777") || "";
+    expect(url).toContain("wsrv.nl");
+    expect(url).toContain("output=png");
+    expect(url).toContain(encodeURIComponent("scenestream.net"));
+  });
 });
