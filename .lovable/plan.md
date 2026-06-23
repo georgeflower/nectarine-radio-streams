@@ -1,74 +1,53 @@
-## Goal
+## Problem
 
-When the app is added to the home screen on iOS/Android and audio is playing in the background, the OS lockscreen / notification widget currently shows a generic placeholder ("Your app will live here, Ask Lovable to build it"). Replace that artwork with the currently playing song's screenshot from scenestream.net, falling back to the platform symbol icon, falling back to the existing station artwork.
+The "Your app will live here / Ask Lovable to build it" image on the iOS lockscreen is `public/placeholder.svg` — the Lovable default — used as the MediaSession fallback in `AudioPlayer.tsx`. Even with the new `song-artwork` system, iOS still shows the placeholder because:
 
-## How the data is sourced
+1. The fallback points at the Lovable placeholder SVG.
+2. Screenshot URLs from scenestream are `.gif` — iOS Safari MediaSession does not render animated GIFs as artwork.
+3. iOS commits the first `MediaMetadata` it sees for a track and often ignores later updates, so the async fetch's result arrives too late.
 
-scenestream.net does not expose screenshots through its XML API. The screenshot page `https://scenestream.net/demovibes/screenshot/{songId}/` is HTML and contains:
+## Fix
 
-- `<img class="screenshot" src="/static/media/screenshot/image/XXXXX.gif">` when a screenshot exists
-- `<img class="platform_icon" src="/static/media/platform/symbol/koek<name>.png">` for the song's platform (always present)
-
-Both URLs are publicly fetchable by mobile OS lockscreen art renderers, so once the URL is known the browser does not need to proxy the actual image.
-
-## Plan
-
-### 1. New edge function `song-artwork`
-
-`supabase/functions/song-artwork/index.ts`
-
-- Accepts `?songId=<digits>`. Validates digits only.
-- Fetches `https://scenestream.net/demovibes/screenshot/{songId}/`.
-- Parses HTML with regex for `class="screenshot" src="(...)"` and `class="platform_icon" src="(...)"`.
-- Returns JSON:
-  ```json
-  { "screenshotUrl": "https://scenestream.net/static/media/screenshot/image/00065367.gif",
-    "platformIconUrl": "https://scenestream.net/static/media/platform/symbol/koeksid.png" }
-  ```
-  with `Cache-Control: public, max-age=3600` and full CORS headers. Either field can be missing.
-
-Deploy via the standard edge function deployment so it gets a public URL under `${VITE_SUPABASE_URL}/functions/v1/song-artwork`.
-
-### 2. `src/lib/songArtwork.ts` (new client module)
-
-Small in-memory + `localStorage` cache (1 day TTL) keyed by `songId`:
-
-- `getCachedSongArtwork(songId): { screenshotUrl?, platformIconUrl? } | undefined`
-- `requestSongArtwork(songId): void` — fires the edge-function fetch in the background, dedupes inflight, stores on success, notifies listeners.
-- `subscribeSongArtwork(fn): unsubscribe`
-
-`getBestArtworkUrl(songId)` helper returns `screenshotUrl ?? platformIconUrl ?? undefined`.
-
-### 3. Plumb song id + artwork into `AudioPlayer`
-
-In `src/pages/Index.tsx` (around line 449) pass `currentSongId={now?.songId}` to `<AudioPlayer />`.
+### 1. Replace the fallback artwork
 
 In `src/components/AudioPlayer.tsx`:
 
-- Add `currentSongId?: string` to `Props`.
-- Add a small hook that subscribes to `songArtwork` and triggers `requestSongArtwork(currentSongId)` whenever it changes.
-- In the existing `mediaSession.metadata` effect (around line 426), prefer:
-  1. song screenshot URL
-  2. platform icon URL
-  3. existing `stationConfig?.artworkUrl || selectedStream?.artworkUrl`
-  4. current `FALLBACK_ARTWORK` placeholder
-- Extend the effect's dependency array with the resolved artwork URL.
-- Use `inferArtworkType` on the new URL (already supports `.gif`/`.png`).
+- Change `FALLBACK_ARTWORK` from `/placeholder.svg` to `/apple-touch-icon.png?v=20260611a` (already in `public/`, 180×180 PNG, valid on iOS).
+- Pass an explicit `type: "image/png"` for the fallback in the `MediaMetadata.artwork` array.
 
-No change to the on-screen UI — only the OS-level media metadata image changes.
+### 2. Serve a PNG (not GIF) for song screenshots
 
-### 4. Test
+Update `supabase/functions/song-artwork/index.ts` to return a proxied PNG URL instead of the raw `.gif`:
 
-Add `src/test/songArtwork.test.ts` covering:
+- Add a second route on the same function: `?songId=…&img=1` streams the screenshot (or platform icon) as `image/png`, converting via `ImageScript` (Deno-native) or by re-encoding the first frame. If conversion isn't trivial in Deno, simply proxy the bytes through with `Content-Type: image/png` only when the upstream is already PNG (platform icons), and proxy GIFs as `image/gif` but also expose a `?frame=1` PNG snapshot using `https://wsrv.nl/?url=…&output=png&n=1` as a transformer.
+- JSON response now returns:
+  - `screenshotUrl`: `https://wsrv.nl/?url=<encoded scenestream gif>&output=png&n=1&w=512&h=512&fit=contain`
+  - `platformIconUrl`: original PNG (already PNG-safe), optionally also routed through `wsrv.nl` for consistent sizing.
 
-- Cache hit returns immediately, no fetch.
-- `getBestArtworkUrl` prefers screenshot over platform icon.
-- Subscribers are notified after a resolved fetch (mock `fetch`).
+`wsrv.nl` is a free public image proxy that already does GIF→PNG and is CORS-friendly; no new infra needed. (If preferred, the same can be done inside the edge function with a small WASM decoder, but `wsrv.nl` is simpler and proven.)
 
-Existing `cracktroDefaults` and audio-related tests remain untouched.
+### 3. Resolve artwork synchronously when possible
+
+In `src/lib/songArtwork.ts` and `AudioPlayer.tsx`:
+
+- When `currentSongId` changes and we have **no** cached entry, immediately set MediaSession metadata with just the fallback, then `await` the fetch (≤1 fetch per song) and re-set metadata with the resolved URL.
+- After the resolved URL is set, also call `mediaSession.metadata = mediaSession.metadata` reassignment trick (recreate `new MediaMetadata(...)`) — iOS sometimes requires a full reassignment to re-render the artwork.
+- Pre-fetch the next track's artwork as soon as `now.nextSongId` is known (if exposed by `nowPlaying`) so the cache is warm before the track flip.
+
+### 4. Quick test
+
+- Extend `src/test/songArtwork.test.ts` with one case asserting the returned `screenshotUrl` is routed through `wsrv.nl` (string contains `wsrv.nl` and the original gif URL is URL-encoded inside).
+- No UI test needed; the on-screen UI doesn't change.
 
 ## Out of scope
 
-- No new on-screen art in the cracktro itself (only OS lockscreen).
-- No version bump / changelog update (separate request).
-- No change to the static favicon / web manifest icon (that's a different surface from MediaSession artwork).
+- No on-screen UI changes.
+- No version bump or changelog entry (separate request).
+- `public/placeholder.svg` itself is left alone — only the MediaSession reference to it changes.
+
+## Files touched
+
+- `src/components/AudioPlayer.tsx` — new fallback URL + synchronous resolution path.
+- `src/lib/songArtwork.ts` — async `resolveOne` returns and exposes a promise; helper for pre-warm.
+- `supabase/functions/song-artwork/index.ts` — wrap screenshot URL with `wsrv.nl` PNG transform.
+- `src/test/songArtwork.test.ts` — assertion on transformed URL.

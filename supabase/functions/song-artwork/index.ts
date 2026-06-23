@@ -16,6 +16,13 @@ function absolutize(src: string): string {
   return `${BASE}/${src}`;
 }
 
+// Route an image URL through wsrv.nl so GIF screenshots are delivered as
+// static PNGs (iOS MediaSession will not render animated GIF artwork).
+function toPng(src: string, size = 512): string {
+  const u = src.replace(/^https?:\/\//i, "");
+  return `https://wsrv.nl/?url=${encodeURIComponent(u)}&output=png&n=-1&w=${size}&h=${size}&fit=contain&we`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -42,8 +49,11 @@ Deno.serve(async (req) => {
       html.match(/<img[^>]+class=["']platform_icon["'][^>]+src=["']([^"']+)["']/i) ||
       html.match(/<img[^>]+src=["']([^"']+)["'][^>]+class=["']platform_icon["']/i);
 
-    const screenshotUrl = screenshotMatch ? absolutize(screenshotMatch[1]) : undefined;
-    const platformIconUrl = platformMatch ? absolutize(platformMatch[1]) : undefined;
+    const rawScreenshot = screenshotMatch ? absolutize(screenshotMatch[1]) : undefined;
+    const rawPlatform = platformMatch ? absolutize(platformMatch[1]) : undefined;
+    // Always return PNG-encoded URLs so iOS MediaSession can render them.
+    const screenshotUrl = rawScreenshot ? toPng(rawScreenshot, 512) : undefined;
+    const platformIconUrl = rawPlatform ? toPng(rawPlatform, 512) : undefined;
 
     return new Response(
       JSON.stringify({ songId, screenshotUrl, platformIconUrl }),
