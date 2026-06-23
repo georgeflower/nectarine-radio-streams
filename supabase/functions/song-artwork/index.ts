@@ -49,8 +49,11 @@ Deno.serve(async (req) => {
       html.match(/<img[^>]+class=["']platform_icon["'][^>]+src=["']([^"']+)["']/i) ||
       html.match(/<img[^>]+src=["']([^"']+)["'][^>]+class=["']platform_icon["']/i);
 
-    const screenshotUrl = screenshotMatch ? absolutize(screenshotMatch[1]) : undefined;
-    const platformIconUrl = platformMatch ? absolutize(platformMatch[1]) : undefined;
+    const rawScreenshot = screenshotMatch ? absolutize(screenshotMatch[1]) : undefined;
+    const rawPlatform = platformMatch ? absolutize(platformMatch[1]) : undefined;
+    // Always return PNG-encoded URLs so iOS MediaSession can render them.
+    const screenshotUrl = rawScreenshot ? toPng(rawScreenshot, 512) : undefined;
+    const platformIconUrl = rawPlatform ? toPng(rawPlatform, 512) : undefined;
 
     return new Response(
       JSON.stringify({ songId, screenshotUrl, platformIconUrl }),
