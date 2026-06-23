@@ -16,6 +16,13 @@ function absolutize(src: string): string {
   return `${BASE}/${src}`;
 }
 
+// Route an image URL through wsrv.nl so GIF screenshots are delivered as
+// static PNGs (iOS MediaSession will not render animated GIF artwork).
+function toPng(src: string, size = 512): string {
+  const u = src.replace(/^https?:\/\//i, "");
+  return `https://wsrv.nl/?url=${encodeURIComponent(u)}&output=png&n=-1&w=${size}&h=${size}&fit=contain&we`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });

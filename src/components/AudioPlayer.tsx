@@ -44,7 +44,7 @@ type StationNowPlayingConfig = {
 };
 
 const DEFAULT_NOW_PLAYING_REFRESH_MS = 20_000;
-const FALLBACK_ARTWORK = "/placeholder.svg";
+const FALLBACK_ARTWORK = "/apple-touch-icon.png?v=20260611a";
 const MEDIA_ARTWORK_SIZES = [96, 192, 256, 384, 512];
 
 const inferArtworkType = (url: string): string => {
