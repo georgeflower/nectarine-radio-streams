@@ -12,10 +12,16 @@ import {
 } from "@/lib/nowPlaying";
 import { attachBufferedStream, isMseAudioSupported, type BufferedStreamHandle } from "@/lib/bufferedStream";
 import { setAudioController, setAudioControlState, setPlayerTime } from "@/lib/cracktroUi";
+import {
+  getBestArtworkUrl,
+  requestSongArtwork,
+  subscribeSongArtwork,
+} from "@/lib/songArtwork";
 
 type Props = {
   streams: StreamSource[];
   currentTrack?: { artist: string; song: string } | null;
+  currentSongId?: string;
   onAnalyserReady?: (analyser: AnalyserNode) => void;
   onSeek?: () => void;
 };
