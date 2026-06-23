@@ -1,60 +1,40 @@
-## Goal
+# Fix top-corner buttons hidden behind iOS status bar
 
-Add scripted goose exchanges for Amiga/Atari tracks, a periodic "Have you seen Rapture?" routine, and a reaction when user **Rapture** posts in the oneliner.
+## Problem
+On iPhone Safari (and PWA standalone) the system status bar / Dynamic Island overlays the top of the page, sitting on top of the Cracktro "Exit", scene-era badge, fullscreen toggle, and the centered settings bar. They become unreachable.
 
-## Roles
+`index.html` already declares `viewport-fit=cover` and `apple-mobile-web-app-status-bar-style=black-translucent`, so the page extends under the status bar — we just need to push the chrome down by `env(safe-area-inset-top)` (and respect left/right insets for the side buttons too).
 
-- **1st goose** = `white` variant (from `getPair()`).
-- **2nd goose** = `brown` variant.
+## Change
 
-## 1. Amiga / Atari track exchange
+Single file: `src/components/Cracktro.tsx`.
 
-Trigger when `nowPlaying` changes and the entity-cache platform is Amiga or Atari (case-insensitive match on `platformName`, like the existing skin detection in `Cracktro.tsx:413`).
+For each absolutely-positioned top-edge control, replace the static `top-2` / `top-4` with an inline style that adds the safe-area inset, and add a small min offset so it still has breathing room when the inset is 0:
 
-- Amiga track → white: `"AMIGAAAAAA!"`, then ~1.4 s later brown: `"ATARIIIII!"`.
-- Atari track → brown: `"ATARIIIII!"`, then ~1.4 s later white: `"AMIGAAAAAA!"`.
-- Skip-every-second rule: track the last platform that fired this exchange. If the same platform fires twice in a row, swallow the 2nd; the 3rd fires again. Counter resets when the other platform plays.
-- Fires once per track (dedupe on `title|artist|platform`, similar to existing `lastChatterKeyRef` in `Cracktro.tsx:319`).
-- Runs in parallel with the existing rating chatter (offset its delay so they don't collide).
+```tsx
+style={{
+  top: "calc(env(safe-area-inset-top, 0px) + 0.5rem)",
+  left: "calc(env(safe-area-inset-left, 0px) + 0.5rem)",
+}}
+```
 
-## 2. Periodic "Have you seen Rapture?" routine
+Apply to:
 
-Every **10 minutes** while both geese are registered (`getPair()` non-null), play:
+1. **Exit Cracktro button** (line ~893) — `top-2 left-2` → safe-area top + left.
+2. **Scene-era badge** (line ~903) — `top-2 left-20` → safe-area top, `left: calc(env(safe-area-inset-left,0px) + 5rem)`.
+3. **FPS counter** (line ~914) — `top-2 right-24` → safe-area top + right (5.5rem offset to clear fullscreen button).
+4. **Centered settings bar** (line ~925) — `top-2 left-1/2` → only top needs the inset; keep the `-translate-x-1/2` via `transform`.
+5. **Enter/Exit fullscreen button** (line ~1180) — `top-4 right-4` → safe-area top + right.
 
-1. white: `"Have you seen Rapture?"`
-2. ~1.6 s later brown: `"No :("`
-3. ~1.6 s later white: `"keep looking!"`
-
-Scheduled via a `setInterval` started on first goose registration and cleared when pair is empty. Skip a cycle if the Rapture-oneliner reaction (below) fired within the last 2 minutes, to avoid collision.
-
-## 3. Rapture oneliner reaction
-
-Hook into the existing oneliner ingestion (`noteRecentOneliner` path used by `FlyingGoose.tsx:195`). When `username` matches `/^rapture$/i`:
-
-- white: `"Rapture! <3"`
-- brown (≈0.8 s later): `"Daddy!"`
-- white (≈0.8 s later): `"Mommy!"`
-- Start a 60-minute cooldown. Further Rapture oneliners during the cooldown do nothing.
-
-The 10-minute routine in section 2 is suppressed for the same 60-minute window so the geese don't immediately ask "Have you seen Rapture?" right after he spoke.
-
-## Files to change
-
-- **New** `src/lib/gooseRaptureEvents.ts` — owns the platform-exchange state machine, the 10-min interval, the Rapture-oneliner cooldown, and a small helper `notePlatformChange(platform)` plus `noteRaptureOnelinerIfMatch(username)`. Uses `getPair()` / `sayFromAnyGoose`-style speaker selection by re-exporting tiny helpers from `gooseSocial.ts` or by adding `sayFromVariant(variant, text, durationMs)` to `gooseSocial.ts`.
-- **Edit** `src/lib/gooseSocial.ts` — export `sayFromVariant(variant: GooseRole, text, durationMs)` (thin wrapper over `getPair()`); call `startRaptureRoutine()` from `registerGoose` and `stopRaptureRoutineIfEmpty()` from the unregister path (mirrors `ensureScheduler` / `stopSchedulerIfEmpty`). Inside `noteRecentOneliner`, call `noteRaptureOnelinerIfMatch(username)`.
-- **Edit** `src/components/Cracktro.tsx` — in the existing now-playing effect (around line 319), also call `notePlatformChange(platform, { title, artist })` so the Amiga/Atari exchange runs once per track.
-
-## Tests
-
-Add `src/test/gooseRaptureEvents.test.ts` with fake timers:
-
-- Amiga track → white then brown lines in order.
-- Two Amiga tracks in a row → 2nd is skipped; 3rd fires again.
-- Atari after Amiga resets the per-platform skip counter.
-- 10-min interval emits the 3-line "Rapture?" exchange.
-- Rapture oneliner triggers the 3-line scream and suppresses the next 10-min cycle and subsequent Rapture oneliners for 60 min.
+Tailwind class `top-2` / `top-4` / `left-*` / `right-*` is removed from those elements and replaced by the inline `style` so the calc wins (avoids Tailwind class specificity issues).
 
 ## Out of scope
 
-- No UI changes, no visualizer changes, no changes to existing rating chatter wording.
-- No persistence across reloads for the cooldowns (in-memory like the rest of `gooseSocial`).
+- No change to bottom-edge UI (the screenshot shows the issue is only at the top, but if needed later, `env(safe-area-inset-bottom)` would apply the same way).
+- No viewport meta or PWA manifest changes (already correct).
+- No version bump / changelog update (the user asked only for the fix; I'll mention bumping it once they approve).
+
+## Verification
+
+- `cracktroDefaults.test.tsx` already exercises the Exit and fullscreen buttons by role — keep passing since `aria-label`/visibility classes are untouched.
+- Manual check on iPhone Safari: in fullscreen, Exit and fullscreen-toggle should sit below the time and Dynamic Island.
