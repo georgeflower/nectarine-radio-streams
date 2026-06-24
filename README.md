@@ -162,6 +162,14 @@ npm run lint
 - forwards `Range` for streaming/seek behavior
 - exposes relevant response headers for browser playback
 
+### `song-artwork`
+
+- file: `supabase/functions/song-artwork/index.ts`
+- scrapes `scenestream.net/demovibes/song/{songId}/` for the platform icon
+- follows a screenshot link (`/demovibes/screenshot/{id}/`) if present — screenshot IDs are independent of song IDs
+- returns both URLs proxied through `wsrv.nl` as static PNGs so iOS MediaSession can render them
+- client-side cache in `localStorage` with 24-hour TTL
+
 ## Optional per-station now-playing metadata
 
 If stream XML includes station metadata, add optional fields on `<stream>`:
