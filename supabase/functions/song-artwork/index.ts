@@ -1,6 +1,9 @@
-// Scrapes scenestream.net screenshot page for a song to extract
-// the song's screenshot URL and/or its platform-icon URL.
+// Scrapes scenestream.net for a song's screenshot URL and platform-icon URL.
 // Used to populate the OS lockscreen / notification artwork via MediaSession.
+//
+// Two-step lookup: the song page (/demovibes/song/{songId}/) contains a link
+// to its screenshot page (/demovibes/screenshot/{screenshotId}/) — the IDs do
+// NOT match. We follow that link to grab the actual screenshot image.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,6 +26,25 @@ function toPng(src: string, size = 512): string {
   return `https://wsrv.nl/?url=${encodeURIComponent(u)}&output=png&n=-1&w=${size}&h=${size}&fit=contain&we`;
 }
 
+function findPlatformIcon(html: string): string | undefined {
+  const m =
+    html.match(/<img[^>]+class=["']platform_icon["'][^>]+src=["']([^"']+)["']/i) ||
+    html.match(/<img[^>]+src=["']([^"']+)["'][^>]+class=["']platform_icon["']/i);
+  return m ? absolutize(m[1]) : undefined;
+}
+
+function findScreenshotImg(html: string): string | undefined {
+  const m =
+    html.match(/<img[^>]+class=["']screenshot["'][^>]+src=["']([^"']+)["']/i) ||
+    html.match(/<img[^>]+src=["']([^"']+)["'][^>]+class=["']screenshot["']/i);
+  return m ? absolutize(m[1]) : undefined;
+}
+
+function findScreenshotId(html: string): string | undefined {
+  const m = html.match(/\/demovibes\/screenshot\/(\d+)\//);
+  return m ? m[1] : undefined;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,26 +59,35 @@ Deno.serve(async (req) => {
       });
     }
 
-    const upstream = `${BASE}/demovibes/screenshot/${songId}/`;
-    const resp = await fetch(upstream, { headers: { Accept: "text/html,*/*" } });
-    const html = await resp.text();
+    // 1. Fetch the song page.
+    const songResp = await fetch(`${BASE}/demovibes/song/${songId}/`, {
+      headers: { Accept: "text/html,*/*" },
+    });
+    const songHtml = await songResp.text();
 
-    const screenshotMatch =
-      html.match(/<img[^>]+class=["']screenshot["'][^>]+src=["']([^"']+)["']/i) ||
-      html.match(/<img[^>]+src=["']([^"']+)["'][^>]+class=["']screenshot["']/i);
+    const rawPlatform = findPlatformIcon(songHtml);
+    const screenshotId = findScreenshotId(songHtml);
 
-    const platformMatch =
-      html.match(/<img[^>]+class=["']platform_icon["'][^>]+src=["']([^"']+)["']/i) ||
-      html.match(/<img[^>]+src=["']([^"']+)["'][^>]+class=["']platform_icon["']/i);
+    // 2. If the song has a screenshot link, follow it to get the image.
+    let rawScreenshot: string | undefined;
+    if (screenshotId) {
+      try {
+        const ssResp = await fetch(
+          `${BASE}/demovibes/screenshot/${screenshotId}/`,
+          { headers: { Accept: "text/html,*/*" } },
+        );
+        const ssHtml = await ssResp.text();
+        rawScreenshot = findScreenshotImg(ssHtml);
+      } catch {
+        /* ignore — fall back to platform icon */
+      }
+    }
 
-    const rawScreenshot = screenshotMatch ? absolutize(screenshotMatch[1]) : undefined;
-    const rawPlatform = platformMatch ? absolutize(platformMatch[1]) : undefined;
-    // Always return PNG-encoded URLs so iOS MediaSession can render them.
     const screenshotUrl = rawScreenshot ? toPng(rawScreenshot, 512) : undefined;
     const platformIconUrl = rawPlatform ? toPng(rawPlatform, 512) : undefined;
 
     return new Response(
-      JSON.stringify({ songId, screenshotUrl, platformIconUrl }),
+      JSON.stringify({ songId, screenshotId, screenshotUrl, platformIconUrl }),
       {
         status: 200,
         headers: {
