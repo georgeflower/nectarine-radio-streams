@@ -16,6 +16,7 @@ This app combines live stream playback, Demovibes XML panels, visualizers, and a
 - Optional scene eras that evolve cracktro visuals over long sessions (toggleable)
 - Goose social dialogue and scripted exchanges (Amiga/Atari banter, periodic routines, oneliner reactions)
 - Mobile screen wake lock so the display stays active while listening
+- OS lockscreen artwork (iOS / Android) via MediaSession — song screenshots with platform-icon fallback
 - Optional per-station now-playing metadata polling for Media Session metadata
 
 ## Tech stack
@@ -53,6 +54,7 @@ src/
 supabase/functions/
   xml-proxy/index.ts
   audio-proxy/index.ts
+  song-artwork/index.ts
 ```
 
 ## How it works
@@ -159,6 +161,14 @@ npm run lint
 - proxies stream audio from an allowlisted host set
 - forwards `Range` for streaming/seek behavior
 - exposes relevant response headers for browser playback
+
+### `song-artwork`
+
+- file: `supabase/functions/song-artwork/index.ts`
+- scrapes `scenestream.net/demovibes/song/{songId}/` for the platform icon
+- follows a screenshot link (`/demovibes/screenshot/{id}/`) if present — screenshot IDs are independent of song IDs
+- returns both URLs proxied through `wsrv.nl` as static PNGs so iOS MediaSession can render them
+- client-side cache in `localStorage` with 24-hour TTL
 
 ## Optional per-station now-playing metadata
 

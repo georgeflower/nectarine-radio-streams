@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.6.4";
+export const APP_VERSION = "0.6.5";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,15 @@ interface ChangelogEntry {
 }
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.6.5",
+    date: "2026-06-24",
+    changes: [
+      "Lockscreen artwork on iOS / Android via MediaSession API",
+      "Two-step screenshot resolution: song page -> screenshot page (IDs no longer assumed equal)",
+      "GIF screenshots proxied through wsrv.nl as PNG for iOS compatibility",
+    ],
+  },
   {
     version: "0.6.4",
     date: "2026-06-22",
