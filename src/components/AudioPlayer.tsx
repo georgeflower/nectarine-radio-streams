@@ -66,6 +66,22 @@ const resolveArtworkUrl = (rawUrl: string | undefined, fallbackArtwork: string):
   }
 };
 
+// For wsrv.nl URLs, rewrite w/h query params so each MediaSession artwork
+// entry actually resolves to an image of the advertised size. Car head units
+// (CarPlay especially) pick the closest match and reject mismatched dimensions.
+const sizedArtworkUrl = (url: string, size: number): string => {
+  if (!url.includes("wsrv.nl")) return url;
+  try {
+    const u = new URL(url);
+    u.searchParams.set("w", String(size));
+    u.searchParams.set("h", String(size));
+    return u.toString();
+  } catch {
+    return url;
+  }
+};
+
+
 const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, onSeek }: Props) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -438,28 +454,47 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     return () => unsub();
   }, [currentSongId]);
 
+  const lastMetaKeyRef = useRef<string>("");
   useEffect(() => {
     if (!("mediaSession" in navigator) || !("MediaMetadata" in window)) return;
     const mediaSession = navigator.mediaSession;
     const fallbackArtwork = new URL(FALLBACK_ARTWORK, window.location.origin).toString();
     const songArtwork = getBestArtworkUrl(currentSongId);
-    const artworkSrc = resolveArtworkUrl(
+    const primarySrc = resolveArtworkUrl(
       songArtwork || stationConfig?.artworkUrl || selectedStream?.artworkUrl,
       fallbackArtwork,
     );
-    const artworkType = inferArtworkType(artworkSrc);
-    mediaSession.metadata = new MediaMetadata({
-      title: mediaTitle,
-      artist: mediaArtist,
-      album: selectedStream?.name || NOW_PLAYING_FALLBACK_ARTIST,
-      artwork: MEDIA_ARTWORK_SIZES.map((size) => ({
-        src: artworkSrc,
-        sizes: `${size}x${size}`,
-        type: artworkType,
-      })),
-    });
+    const isWsrv = primarySrc.includes("wsrv.nl");
+    // Force PNG MIME for wsrv-served artwork and the local app icon (both are
+    // PNG). For station artwork URLs we don't control, sniff from the URL.
+    const primaryType =
+      isWsrv || primarySrc === fallbackArtwork ? "image/png" : inferArtworkType(primarySrc);
+
+    const artwork: MediaImage[] = MEDIA_ARTWORK_SIZES.map((size) => ({
+      src: sizedArtworkUrl(primarySrc, size),
+      sizes: `${size}x${size}`,
+      type: primaryType,
+    }));
+    // Always advertise the local app icon as a secondary entry so car head
+    // units (CarPlay / Android Auto) have a guaranteed-reachable fallback if
+    // the primary URL fails to load.
+    if (primarySrc !== fallbackArtwork) {
+      artwork.push({ src: fallbackArtwork, sizes: "512x512", type: "image/png" });
+    }
+
+    const metaKey = `${mediaTitle}|${mediaArtist}|${selectedStream?.name ?? ""}|${primarySrc}`;
+    if (metaKey !== lastMetaKeyRef.current) {
+      lastMetaKeyRef.current = metaKey;
+      mediaSession.metadata = new MediaMetadata({
+        title: mediaTitle,
+        artist: mediaArtist,
+        album: selectedStream?.name || NOW_PLAYING_FALLBACK_ARTIST,
+        artwork,
+      });
+    }
     mediaSession.playbackState = playing ? "playing" : "paused";
   }, [mediaArtist, mediaTitle, playing, selectedStream, stationConfig?.artworkUrl, currentSongId, songArtworkTick]);
+
 
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
