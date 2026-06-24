@@ -10,6 +10,14 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.6.6",
+    date: "2026-06-24",
+    changes: [
+      "MediaSession artwork fallback now uses the app icon when no song screenshot is available",
+      "Removed platform-icon fallback from lockscreen artwork",
+    ],
+  },
+  {
     version: "0.6.5",
     date: "2026-06-24",
     changes: [
