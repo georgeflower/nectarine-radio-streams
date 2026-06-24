@@ -66,6 +66,22 @@ const resolveArtworkUrl = (rawUrl: string | undefined, fallbackArtwork: string):
   }
 };
 
+// For wsrv.nl URLs, rewrite w/h query params so each MediaSession artwork
+// entry actually resolves to an image of the advertised size. Car head units
+// (CarPlay especially) pick the closest match and reject mismatched dimensions.
+const sizedArtworkUrl = (url: string, size: number): string => {
+  if (!url.includes("wsrv.nl")) return url;
+  try {
+    const u = new URL(url);
+    u.searchParams.set("w", String(size));
+    u.searchParams.set("h", String(size));
+    return u.toString();
+  } catch {
+    return url;
+  }
+};
+
+
 const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, onSeek }: Props) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
