@@ -1,4 +1,4 @@
-// Scrapes scenestream.net for a song's screenshot URL and platform-icon URL.
+// Scrapes scenestream.net for a song's screenshot URL.
 // Used to populate the OS lockscreen / notification artwork via MediaSession.
 //
 // Two-step lookup: the song page (/demovibes/song/{songId}/) contains a link
@@ -24,13 +24,6 @@ function absolutize(src: string): string {
 function toPng(src: string, size = 512): string {
   const u = src.replace(/^https?:\/\//i, "");
   return `https://wsrv.nl/?url=${encodeURIComponent(u)}&output=png&n=-1&w=${size}&h=${size}&fit=contain&we`;
-}
-
-function findPlatformIcon(html: string): string | undefined {
-  const m =
-    html.match(/<img[^>]+class=["']platform_icon["'][^>]+src=["']([^"']+)["']/i) ||
-    html.match(/<img[^>]+src=["']([^"']+)["'][^>]+class=["']platform_icon["']/i);
-  return m ? absolutize(m[1]) : undefined;
 }
 
 function findScreenshotImg(html: string): string | undefined {
@@ -65,7 +58,6 @@ Deno.serve(async (req) => {
     });
     const songHtml = await songResp.text();
 
-    const rawPlatform = findPlatformIcon(songHtml);
     const screenshotId = findScreenshotId(songHtml);
 
     // 2. If the song has a screenshot link, follow it to get the image.
@@ -79,18 +71,14 @@ Deno.serve(async (req) => {
         const ssHtml = await ssResp.text();
         rawScreenshot = findScreenshotImg(ssHtml);
       } catch {
-        /* ignore — fall back to platform icon */
+        /* ignore — no screenshot available */
       }
     }
 
     const screenshotUrl = rawScreenshot ? toPng(rawScreenshot, 512) : undefined;
-    // Fall back to the site favicon when the song page has no platform icon.
-    const platformIconUrl = rawPlatform
-      ? toPng(rawPlatform, 512)
-      : toPng(`${BASE}/favicon.ico`, 512);
 
     return new Response(
-      JSON.stringify({ songId, screenshotId, screenshotUrl, platformIconUrl }),
+      JSON.stringify({ songId, screenshotId, screenshotUrl }),
       {
         status: 200,
         headers: {
