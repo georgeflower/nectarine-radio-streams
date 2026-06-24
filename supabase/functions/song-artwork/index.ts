@@ -84,7 +84,10 @@ Deno.serve(async (req) => {
     }
 
     const screenshotUrl = rawScreenshot ? toPng(rawScreenshot, 512) : undefined;
-    const platformIconUrl = rawPlatform ? toPng(rawPlatform, 512) : undefined;
+    // Fall back to the site favicon when the song page has no platform icon.
+    const platformIconUrl = rawPlatform
+      ? toPng(rawPlatform, 512)
+      : toPng(`${BASE}/favicon.ico`, 512);
 
     return new Response(
       JSON.stringify({ songId, screenshotId, screenshotUrl, platformIconUrl }),
