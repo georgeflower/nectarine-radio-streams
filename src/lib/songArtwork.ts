@@ -1,6 +1,7 @@
-// Resolves a song's screenshot / platform-icon URL via the `song-artwork`
-// edge function and caches results in memory + localStorage. Used to populate
-// the OS lockscreen / notification artwork (navigator.mediaSession).
+// Resolves a song's screenshot URL via the `song-artwork` edge function and
+// caches results in memory + localStorage. Used to populate the OS lockscreen /
+// notification artwork (navigator.mediaSession). Falls back to the app icon
+// when no screenshot is available.
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const ENDPOINT = `${SUPABASE_URL}/functions/v1/song-artwork`;
@@ -9,7 +10,6 @@ const TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface SongArtwork {
   screenshotUrl?: string;
-  platformIconUrl?: string;
 }
 
 type Entry = { info: SongArtwork; fetchedAt: number };
@@ -59,8 +59,7 @@ export function getCachedSongArtwork(songId: string | undefined | null): SongArt
 
 export function getBestArtworkUrl(songId: string | undefined | null): string | undefined {
   const info = getCachedSongArtwork(songId);
-  if (!info) return undefined;
-  return info.screenshotUrl || info.platformIconUrl || undefined;
+  return info?.screenshotUrl;
 }
 
 async function resolveOne(songId: string): Promise<SongArtwork> {
@@ -74,7 +73,6 @@ async function resolveOne(songId: string): Promise<SongArtwork> {
       const json = (await r.json()) as SongArtwork;
       const info: SongArtwork = {
         screenshotUrl: json.screenshotUrl,
-        platformIconUrl: json.platformIconUrl,
       };
       memCache[songId] = { info, fetchedAt: Date.now() };
       persist();
