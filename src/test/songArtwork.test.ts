@@ -21,7 +21,6 @@ describe("songArtwork", () => {
       ok: true,
       json: async () => ({
         screenshotUrl: "https://scenestream.net/static/media/screenshot/image/1.gif",
-        platformIconUrl: "https://scenestream.net/static/media/platform/symbol/koeksid.png",
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -39,19 +38,17 @@ describe("songArtwork", () => {
     expect(getBestArtworkUrl("123")).toContain("1.gif");
   });
 
-  it("getBestArtworkUrl falls back to platform icon when no screenshot", async () => {
+  it("getBestArtworkUrl returns undefined when no screenshot", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({
-          platformIconUrl: "https://scenestream.net/static/media/platform/symbol/koekym.png",
-        }),
+        json: async () => ({}),
       }),
     );
     requestSongArtwork("999");
     await new Promise((r) => setTimeout(r, 0));
-    expect(getBestArtworkUrl("999")).toContain("koekym.png");
+    expect(getBestArtworkUrl("999")).toBeUndefined();
   });
 
   it("cache hit skips fetch", async () => {
