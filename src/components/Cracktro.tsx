@@ -1184,7 +1184,7 @@ const Cracktro = ({
           aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
           title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         >
-          {isFullscreen ? "Window mode ⤓" : "Enter ⤢"}
+          {isFullscreen ? "Window mode ⤓" : "Fullscreen ⤢"}
         </button>
 
         {!settingsExpanded && (
