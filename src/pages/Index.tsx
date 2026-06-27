@@ -429,9 +429,10 @@ const Index = () => {
               type="button"
               onClick={() => setCracktroOpen(true)}
               className="min-h-11 px-3 py-2 uppercase text-xs tracking-widest rounded-sm border border-primary/60 bg-card/60 text-primary hover:bg-primary hover:text-primary-foreground transition-colors touch-manipulation shrink-0"
-              title="Fullscreen cracktro with sinus scroller"
+              title="Open cracktro scroller mode in a window"
             >
-              ▶ Fullscreen
+              ▶ Scroller Mode
+
             </button>
             <button
               onClick={refreshAll}
