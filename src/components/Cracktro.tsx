@@ -361,30 +361,9 @@ const Cracktro = ({
       });
   }, []);
 
-  // Auto-request fullscreen on mount. If it fails (or the user exits), we stay
-  // in the normal in-browser layout that fills the viewport.
+  // Default to windowed (in-page) mode. User can toggle fullscreen from the
+  // chrome button. We still track browser fullscreen state and clean up on unmount.
   useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const req =
-      (
-        el as HTMLElement & {
-          webkitRequestFullscreen?: () => Promise<void>;
-        }
-      ).requestFullscreen ??
-      (
-        el as HTMLElement & {
-          webkitRequestFullscreen?: () => Promise<void>;
-        }
-      ).webkitRequestFullscreen;
-    Promise.resolve(req?.call(el))
-      .then(() => {
-        setIsFullscreen(Boolean(document.fullscreenElement));
-      })
-      .catch(() => {
-        setIsFullscreen(false);
-      });
-
     const onFsChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
     };
@@ -396,6 +375,7 @@ const Cracktro = ({
       }
     };
   }, []);
+
 
   // Esc only acts when not in browser fullscreen (the browser handles that
   // case itself).
