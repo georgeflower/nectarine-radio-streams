@@ -1393,6 +1393,8 @@ const Cracktro = ({
             >
               {sceneErasOn ? "ON" : "OFF"}
             </button>
+            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Last.fm</span>
+            <LastfmButton compact />
           </div>
 
           {/* Row: floating panel toggles */}
