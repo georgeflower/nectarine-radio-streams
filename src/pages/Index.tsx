@@ -194,6 +194,7 @@ const Index = () => {
 
   useEffect(() => {
     void hydrateCloudLexiconOnce();
+    void handleLastfmCallback();
   }, []);
 
 
