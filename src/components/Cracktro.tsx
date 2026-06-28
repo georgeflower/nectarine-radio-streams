@@ -32,6 +32,7 @@ import {
 } from "@/lib/cracktroUi";
 import { clearRoster } from "@/lib/gooseFamilyRoster";
 import Flag from "./Flag";
+import LastfmButton from "./LastfmButton";
 
 type OnlineUser = { name: string; flag: string };
 
