@@ -32,6 +32,8 @@ import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 import { hydrateCloudLexiconOnce } from "@/lib/gooseLexiconCloud";
+import LastfmButton from "@/components/LastfmButton";
+import { handleLastfmCallback } from "@/lib/lastfm";
 
 function SongRating({ songId }: { songId: string }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
@@ -192,6 +194,7 @@ const Index = () => {
 
   useEffect(() => {
     void hydrateCloudLexiconOnce();
+    void handleLastfmCallback();
   }, []);
 
 
@@ -434,6 +437,7 @@ const Index = () => {
               ▶ Scroller Mode
 
             </button>
+            <LastfmButton />
             <button
               onClick={refreshAll}
               className="min-h-11 px-3 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity touch-manipulation shrink-0"

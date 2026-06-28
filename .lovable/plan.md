@@ -1,63 +1,44 @@
-# Last.fm Scrobbling
+# Last.fm Scrobbling Integration
 
-Add per-user Last.fm login + now-playing + scrobble for the currently streaming track. Auth and scrobble requests must be signed with the API secret, so signing happens in edge functions; the resulting session key is stored locally in the browser (one user per device, no DB needed).
+You shared the API key and shared secret. I'll store them as backend secrets (`LASTFM_API_KEY`, `LASTFM_API_SECRET`) — never exposed to the browser — and build the integration around them.
 
-## Prerequisites (user action)
+## Auth flow (Last.fm Web Auth)
 
-1. Create a Last.fm API account: https://www.last.fm/api/account/create
-   - Callback URL: the app's published URL (e.g. `https://demoscene-radio-compact.lovable.app/`) — the auth flow returns the user to wherever the login was started.
-2. After approval, I will request two secrets via `add_secret`:
-   - `LASTFM_API_KEY`
-   - `LASTFM_API_SECRET`
+1. User clicks **Connect Last.fm** (in the main page header and in the Cracktro settings panel).
+2. We redirect to `https://www.last.fm/api/auth/?api_key=…&cb=<app-url>`.
+3. Last.fm redirects back to the app with `?token=…`.
+4. `Index.tsx` detects the token, calls our `lastfm-auth` edge function which signs `auth.getSession` with the shared secret and returns the session key + username.
+5. Session key + username are stored in `localStorage` (`lastfm.session`). The shared secret stays server-side.
 
-## Auth flow (Last.fm web auth)
+## Scrobbling rules (per Last.fm spec)
 
-```text
-[Login button] -> window.location = https://www.last.fm/api/auth/?api_key=KEY&cb=<current url>
-   user approves on last.fm
--> redirect back with ?token=XYZ in URL
--> frontend detects ?token, calls edge fn `lastfm-auth` { token }
--> edge fn signs auth.getSession, returns { sessionKey, username }
--> frontend stores { sessionKey, username } in localStorage("lastfm-session")
--> frontend strips ?token from URL
-```
+- Fire **`track.updateNowPlaying`** when a track starts playing.
+- Fire **`track.scrobble`** when the track has played for ≥ 240 seconds **or** ≥ 50% of its duration, whichever comes first, and the track is longer than 30 seconds.
+- Only one scrobble per track instance; reset on track change.
+- Both calls go through a `lastfm-scrobble` edge function that signs the request with the shared secret.
 
-## Scrobble flow
+## Files to add / change
 
-Hook into `AudioPlayer.tsx` track changes (artist + title already resolved via `nowPlaying.ts` / MediaSession code).
+**New edge functions** (CORS enabled, no JWT required):
+- `supabase/functions/lastfm-auth/index.ts` — exchanges `token` → session key via signed `auth.getSession`.
+- `supabase/functions/lastfm-scrobble/index.ts` — accepts `{ session, artist, track, action: "nowplaying" | "scrobble", timestamp?, duration? }` and signs the request.
 
-Per Last.fm rules:
-- Call `track.updateNowPlaying` immediately when a new track starts.
-- Call `track.scrobble` once the track has played for >= 240s OR >= 50% of its duration (whichever comes first), and only if the track is > 30s long. For unknown-duration streams (Nectarine radio), use a 60-second minimum listen time before scrobbling.
-- Dedupe so the same artist+title isn't scrobbled twice in a row.
+**New client files:**
+- `src/lib/lastfm.ts` — session storage, `useLastfm()` hook (`session`, `username`, `login()`, `logout()`, `handleCallback()`), helpers `sendNowPlaying()` / `sendScrobble()`.
+- `src/components/LastfmButton.tsx` — Connect / Connected-as-`<user>` (with logout) button styled to match the existing UI.
 
-Both calls go through edge function `lastfm-scrobble` with `{ sessionKey, method: "nowplaying" | "scrobble", artist, title, timestamp? }`. The edge function signs the request with `LASTFM_API_SECRET` and POSTs to `https://ws.audioscrobbler.com/2.0/`.
+**Edits:**
+- `src/pages/Index.tsx` — mount `LastfmButton` in the header; on mount, if `?token=` is in the URL, call `handleCallback()` and clean the URL.
+- `src/components/Cracktro.tsx` — add `LastfmButton` to the settings/controls panel.
+- `src/components/AudioPlayer.tsx` — when `currentTrack` changes and we have a Last.fm session: send Now Playing immediately; start a timer that scrobbles once the 50%/240s threshold is met. Clear timer on track change/stop.
 
-## UI
+## Technical notes
 
-- **Main page (`src/pages/Index.tsx`)**: Add a small Last.fm chip near the existing controls — "Connect Last.fm" when logged out, "Scrobbling as <username> (logout)" when logged in.
-- **Cracktro settings**: Add the same control to the existing settings panel in `Cracktro.tsx`.
-- A shared `useLastfm()` hook in `src/lib/lastfm.ts` owns the localStorage session, exposes `{ session, login(), logout(), scrobble(track), nowPlaying(track) }`, and triggers a re-render across components via a tiny store (same pattern as `cracktroUi.ts`).
-- On mount, `Index.tsx` checks `?token=` and if present calls the edge function to exchange it, then `history.replaceState` to clean the URL.
+- Last.fm signature: concatenate sorted `key+value` params (excluding `format` and `callback`), append shared secret, MD5 hex. The edge function does this with Deno's `crypto.subtle` + a tiny MD5 helper (Last.fm requires MD5 specifically).
+- Artist/track parsing reuses the existing `currentTrack` metadata (`artist`, `title`) already normalized in `AudioPlayer.tsx`.
+- No DB tables — session lives in `localStorage` only.
+- Callback URL registered with Last.fm: `https://demoscene-radio-compact.lovable.app` (already set).
 
-## Files to add
+## Out of scope
 
-- `supabase/functions/lastfm-auth/index.ts` — signed `auth.getSession`, returns `{ sessionKey, username }`.
-- `supabase/functions/lastfm-scrobble/index.ts` — signed `track.updateNowPlaying` and `track.scrobble`.
-- `src/lib/lastfm.ts` — client store, hook, and helpers (md5 not needed client-side; signing is server-side).
-- `src/components/LastfmButton.tsx` — login/logout chip reused in both places.
-- `src/test/lastfm.test.ts` — unit tests for listen-threshold logic and dedupe.
-
-## Files to edit
-
-- `src/pages/Index.tsx` — mount `<LastfmButton/>`, handle `?token=` callback once.
-- `src/components/Cracktro.tsx` — mount `<LastfmButton/>` in the settings overlay.
-- `src/components/AudioPlayer.tsx` — when the resolved (artist, title) changes, call `nowPlaying()`; start a listen timer and call `scrobble()` when the threshold is met.
-- `src/components/ChangelogModal.tsx` + `package.json` — bump to v0.6.7 with a Last.fm entry.
-- `README.md` / `docs/architecture.md` — note the new edge functions and auth flow.
-
-## Notes / non-goals
-
-- No database table — session lives in `localStorage` per browser; logout just clears it.
-- The API key is sent to the browser only via the redirect URL constructed by the edge function (or as a `VITE_` non-secret if you prefer). I'll keep it server-side: a new `lastfm-auth?action=login-url` GET returns the redirect URL, so the API key never ships in the client bundle.
-- No retry queue for offline scrobbles in this iteration; failed scrobbles are logged to the console only.
+- No "love track" button, no scrobble history UI, no multi-account support — can add later if you want them.

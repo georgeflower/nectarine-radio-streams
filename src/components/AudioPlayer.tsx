@@ -17,6 +17,7 @@ import {
   requestSongArtwork,
   subscribeSongArtwork,
 } from "@/lib/songArtwork";
+import { sendNowPlaying, sendScrobble, getLastfmSession } from "@/lib/lastfm";
 
 type Props = {
   streams: StreamSource[];
@@ -195,6 +196,49 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       });
     }
   }, [currentTrack, selectedStream?.name]);
+
+  // Last.fm scrobbling: nowPlaying immediately, scrobble at 50% or 240s.
+  const scrobbleStateRef = useRef<{
+    songId?: string;
+    startedAt: number;
+    scrobbled: boolean;
+    artist: string;
+    track: string;
+  } | null>(null);
+  useEffect(() => {
+    if (!getLastfmSession()) return;
+    const artist = normalizeNowPlayingValue(currentTrack?.artist);
+    const track = normalizeNowPlayingValue(currentTrack?.song);
+    if (!artist || !track) return;
+    const key = currentSongId || `${artist}::${track}`;
+    if (scrobbleStateRef.current?.songId === key) return;
+    scrobbleStateRef.current = {
+      songId: key,
+      startedAt: Math.floor(Date.now() / 1000),
+      scrobbled: false,
+      artist,
+      track,
+    };
+    void sendNowPlaying(artist, track);
+  }, [currentTrack, currentSongId]);
+
+  useEffect(() => {
+    if (!playing) return;
+    const id = window.setInterval(() => {
+      const s = scrobbleStateRef.current;
+      if (!s || s.scrobbled) return;
+      if (!getLastfmSession()) return;
+      const a = audioRef.current;
+      const played = Math.floor(Date.now() / 1000) - s.startedAt;
+      const dur = a && isFinite(a.duration) && a.duration > 30 ? a.duration : 0;
+      const threshold = dur > 0 ? Math.min(240, dur / 2) : 240;
+      if (played >= threshold) {
+        s.scrobbled = true;
+        void sendScrobble(s.artist, s.track, s.startedAt, dur || undefined);
+      }
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [playing]);
 
   const ensureAudioGraph = useCallback(() => {
     const a = audioRef.current;
