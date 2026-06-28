@@ -1,4 +1,4 @@
-import { useLastfm, sendNowPlaying } from "@/lib/lastfm";
+import { useLastfm } from "@/lib/lastfm";
 
 type Props = {
   /** Smaller pill style for the Cracktro settings row. */
@@ -44,8 +44,5 @@ const LastfmButton = ({ compact }: Props) => {
     </button>
   );
 };
-
-// silence unused warning if tree-shaken
-void sendNowPlaying;
 
 export default LastfmButton;
