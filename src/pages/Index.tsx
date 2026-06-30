@@ -178,7 +178,7 @@ const Index = () => {
   });
   const inFlight = useRef(false);
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
-  const [bpmDebugOpen, setBpmDebugOpen] = useState(false);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [seekCount, setSeekCount] = useState(0);
