@@ -995,7 +995,6 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       <audio
         ref={audioRef}
         preload="none"
-        crossOrigin="anonymous"
         onPlay={() => {
           setPlaying(true);
           setReconnecting(false);
