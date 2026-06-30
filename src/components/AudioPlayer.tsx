@@ -40,10 +40,17 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const proxiedUrl = (url: string, cacheBust = false) =>
   `${SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(url)}${cacheBust ? `&t=${Date.now()}` : ""}`;
 
+const isMixedContentUrl = (url: string): boolean => {
+  if (typeof window === "undefined") return false;
+  return window.location.protocol === "https:" && /^http:\/\//i.test(url);
+};
+
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 2000, 4000];
 const FAILOVER_COOLDOWN_MS = 60_000;
 const BUFFER_POLL_MS = 2000;
+const MOBILE_SOFT_RESUME_COOLDOWN_MS = 3000;
+const PROGRESS_EPSILON_SEC = 0.2;
 
 // Mobile devices: route audio as plain HTML5 media (no Web Audio, no MSE) so
 // iOS/Android keep playing while the app is backgrounded or the screen is off.
@@ -61,6 +68,15 @@ const isMobileDevice = (): boolean => {
   return false;
 };
 const IS_MOBILE = isMobileDevice();
+
+const playbackUrl = (url: string, cacheBust = false): string => {
+  // Mobile background playback is most reliable when the browser owns the
+  // original live stream directly. The Supabase proxy is still required on
+  // desktop for CORS/WebAudio/MSE, and on mobile only if HTTPS mixed-content
+  // rules would block an http:// stream.
+  if (IS_MOBILE && !isMixedContentUrl(url)) return url;
+  return proxiedUrl(url, cacheBust);
+};
 
 type StationNowPlayingConfig = {
   nowPlayingUrl: string;
@@ -119,7 +135,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     () =>
       streams
         .filter((s) => /^https?:\/\//i.test(s.url))
-        .sort((a, b) => (Number(b.bitrate) || 0) - (Number(a.bitrate) || 0)),
+        .sort((a, b) => {
+          if (IS_MOBILE) {
+            const aNeedsProxy = isMixedContentUrl(a.url);
+            const bNeedsProxy = isMixedContentUrl(b.url);
+            if (aNeedsProxy !== bNeedsProxy) return aNeedsProxy ? 1 : -1;
+          }
+          return (Number(b.bitrate) || 0) - (Number(a.bitrate) || 0);
+        }),
     [streams],
   );
 
@@ -142,6 +165,9 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const loadingRef = useRef(false);
   const lastLoadAtRef = useRef(0);
   const currentTargetRef = useRef<string | null>(null);
+  const lastProgressAtRef = useRef(Date.now());
+  const lastMediaTimeRef = useRef(0);
+  const lastSoftResumeAtRef = useRef(0);
   const INITIAL_BUFFER_GRACE_MS = 8000;
 
   // Auto-pick first playable stream when list arrives or selection becomes invalid
@@ -174,6 +200,24 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     };
   }, []);
 
+  const markPlaybackAlive = useCallback((audio: HTMLAudioElement | null = audioRef.current) => {
+    const t = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : lastMediaTimeRef.current;
+    lastMediaTimeRef.current = Math.max(0, t || 0);
+    lastProgressAtRef.current = Date.now();
+    if (IS_MOBILE) setReconnecting(false);
+  }, []);
+
+  const notePlaybackProgress = useCallback((audio: HTMLAudioElement | null = audioRef.current) => {
+    if (!audio) return;
+    const t = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    const previous = lastMediaTimeRef.current;
+    if (t > previous + PROGRESS_EPSILON_SEC || t < previous - 2) {
+      lastMediaTimeRef.current = Math.max(0, t);
+      lastProgressAtRef.current = Date.now();
+      if (IS_MOBILE) setReconnecting(false);
+    }
+  }, []);
+
   // Background-resume watchdog: when the tab becomes visible again,
   // when the device wakes (pageshow), or when the network returns,
   // kick playback back to life if we should be playing but the
@@ -188,6 +232,35 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       if (stallTimerRef.current !== null) {
         window.clearTimeout(stallTimerRef.current);
         stallTimerRef.current = null;
+      }
+      if (IS_MOBILE) {
+        notePlaybackProgress(a);
+        const now = Date.now();
+        const stallTimeoutMs = getStallTimeoutMs();
+        const sinceProgress = now - lastProgressAtRef.current;
+        if (sinceProgress < stallTimeoutMs) {
+          setReconnecting(false);
+          if (a.paused && now - lastSoftResumeAtRef.current > MOBILE_SOFT_RESUME_COOLDOWN_MS) {
+            lastSoftResumeAtRef.current = now;
+            reportResume("mobile-soft-resume");
+            a.play().then(() => markPlaybackAlive(a)).catch(() => {});
+          }
+          return;
+        }
+        if (a.paused && a.readyState >= 2) {
+          lastSoftResumeAtRef.current = now;
+          reportResume("mobile-paused-resume");
+          a.play().then(() => markPlaybackAlive(a)).catch(() => {
+            if (Date.now() - lastProgressAtRef.current > getStallTimeoutMs()) {
+              reportReconnect(`${reason}-mobile-playfail`);
+              attemptRecoveryRef.current?.();
+            }
+          });
+          return;
+        }
+        reportReconnect(`${reason}-mobile-stall-timeout`);
+        attemptRecoveryRef.current?.();
+        return;
       }
       const sinceLoad = Date.now() - lastLoadAtRef.current;
       if (!a.paused && a.readyState >= 2) {
@@ -234,7 +307,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       window.removeEventListener("pageshow", onPageshow);
       window.removeEventListener("online", onOnline);
     };
-  }, []);
+  }, [markPlaybackAlive, notePlaybackProgress]);
 
 
   // Poll buffered-ahead while playing for UX visibility
@@ -321,10 +394,11 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       const s = scrobbleStateRef.current;
       if (!s || s.scrobbled) return;
       if (!getLastfmSession()) return;
-      const a = audioRef.current;
       const played = Math.floor(Date.now() / 1000) - s.startedAt;
-      const dur = a && isFinite(a.duration) && a.duration > 30 ? a.duration : 0;
-      const threshold = dur > 0 ? Math.min(240, dur / 2) : 240;
+      // Nectarine is a live stream; browser-reported finite durations during
+      // reconnects are proxy/chunk artifacts, not song lengths.
+      const dur = 0;
+      const threshold = 240;
       if (played >= threshold) {
         s.scrobbled = true;
         void sendScrobble(s.artist, s.track, s.startedAt, dur || undefined);
@@ -383,15 +457,26 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       const a = audioRef.current;
       if (!a) return;
       ensureAudioGraph();
-      a.crossOrigin = "anonymous";
       a.preload = "auto";
       a.setAttribute("playsinline", "");
-      const target = proxiedUrl(url, cacheBust);
+      const target = playbackUrl(url, cacheBust);
+      const isDirectMobileStream = IS_MOBILE && target === url;
+      if (isDirectMobileStream) {
+        // Direct mobile streams must not use CORS mode; many Icecast mirrors do
+        // not send CORS headers, but the native media stack can still play them.
+        a.removeAttribute("crossorigin");
+      } else {
+        a.crossOrigin = "anonymous";
+      }
 
       // If we're already pointed at this exact target and the element is
       // healthy, don't tear down the MSE pipeline — just (re)kick play().
       if (!cacheBust && currentTargetRef.current === target && a.readyState >= 2) {
-        try { await a.play(); } catch { /* ignore */ }
+        try {
+          await a.play();
+          reportResume("same-src-play");
+          markPlaybackAlive(a);
+        } catch { /* ignore */ }
         return;
       }
 
@@ -421,6 +506,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       }
       try {
         await a.play();
+        markPlaybackAlive(a);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const name = err instanceof Error ? err.name : "";
@@ -434,7 +520,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         loadingRef.current = false;
       }
     },
-    [ensureAudioGraph],
+    [ensureAudioGraph, markPlaybackAlive],
   );
 
   const playSelected = useCallback(async () => {
@@ -474,16 +560,49 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     clearTimers();
     const currentUrl = selectedUrl;
     if (!currentUrl) return;
+    const a = audioRef.current;
+    if (IS_MOBILE && a) {
+      notePlaybackProgress(a);
+      const now = Date.now();
+      const sinceProgress = now - lastProgressAtRef.current;
+      if (sinceProgress < getStallTimeoutMs()) {
+        setReconnecting(false);
+        setError(null);
+        if (a.paused && now - lastSoftResumeAtRef.current > MOBILE_SOFT_RESUME_COOLDOWN_MS) {
+          lastSoftResumeAtRef.current = now;
+          reportResume("mobile-soft-resume");
+          a.play().then(() => markPlaybackAlive(a)).catch(() => {});
+        }
+        return;
+      }
+      if (a.paused && a.readyState >= 2 && now - lastSoftResumeAtRef.current > MOBILE_SOFT_RESUME_COOLDOWN_MS) {
+        lastSoftResumeAtRef.current = now;
+        reportResume("mobile-paused-resume");
+        a.play().then(() => markPlaybackAlive(a)).catch(() => {});
+        return;
+      }
+    }
     reportReconnect(`retry#${retryCountRef.current + 1}`);
 
     if (retryCountRef.current < MAX_RETRIES) {
       const delay = RETRY_DELAYS_MS[retryCountRef.current] ?? 4000;
+      const shouldCacheBust = !IS_MOBILE || retryCountRef.current > 0;
       retryCountRef.current += 1;
       setReconnecting(true);
       setError(null);
       retryTimerRef.current = window.setTimeout(() => {
-        playUrl(currentUrl, true).catch(() => attemptRecovery());
+        playUrl(currentUrl, shouldCacheBust).catch(() => attemptRecovery());
       }, delay);
+      return;
+    }
+
+    if (IS_MOBILE) {
+      retryCountRef.current = 0;
+      setReconnecting(false);
+      setError(null);
+      retryTimerRef.current = window.setTimeout(() => {
+        if (shouldPlayRef.current) attemptRecovery();
+      }, Math.max(10_000, getStallTimeoutMs()));
       return;
     }
 
@@ -502,8 +621,48 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     retryTimerRef.current = window.setTimeout(() => {
       playUrl(nextUrl, true).catch(() => attemptRecovery());
     }, 500);
-  }, [clearTimers, pickNextStream, playUrl, selectedUrl]);
+  }, [clearTimers, markPlaybackAlive, notePlaybackProgress, pickNextStream, playUrl, selectedUrl]);
   useEffect(() => { attemptRecoveryRef.current = attemptRecovery; }, [attemptRecovery]);
+
+  const scheduleStallCheck = useCallback((eventName: "waiting" | "stalled") => {
+    if (!shouldPlayRef.current) return;
+    if (loadingRef.current) return;
+    if (Date.now() - lastLoadAtRef.current < INITIAL_BUFFER_GRACE_MS) return;
+    const a = audioRef.current;
+    if (IS_MOBILE) {
+      if (typeof document !== "undefined" && document.hidden) return;
+      notePlaybackProgress(a);
+      const sinceProgress = Date.now() - lastProgressAtRef.current;
+      const remaining = getStallTimeoutMs() - sinceProgress;
+      if (remaining > 0) {
+        setReconnecting(false);
+        if (stallTimerRef.current !== null) return;
+        if (typeof document !== "undefined" && document.hidden) return;
+        stallTimerRef.current = window.setTimeout(() => {
+          stallTimerRef.current = null;
+          const audio = audioRef.current;
+          notePlaybackProgress(audio);
+          if (shouldPlayRef.current && Date.now() - lastProgressAtRef.current >= getStallTimeoutMs()) {
+            reportStall();
+            reportReconnect(`mobile-${eventName}-timeout`);
+            attemptRecovery();
+          }
+        }, Math.max(1000, remaining));
+        return;
+      }
+      reportStall();
+      reportReconnect(`mobile-${eventName}-timeout`);
+      attemptRecovery();
+      return;
+    }
+    reportStall();
+    if (stallTimerRef.current !== null) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    stallTimerRef.current = window.setTimeout(() => {
+      stallTimerRef.current = null;
+      if (shouldPlayRef.current) attemptRecovery();
+    }, getStallTimeoutMs());
+  }, [attemptRecovery, notePlaybackProgress]);
 
   const pausePlayback = useCallback(() => {
     shouldPlayRef.current = false;
@@ -674,6 +833,11 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       });
     }
     mediaSession.playbackState = playing ? "playing" : "paused";
+    try {
+      mediaSession.setPositionState?.();
+    } catch {
+      // Some browsers do not support clearing MediaSession position state.
+    }
   }, [mediaArtist, mediaTitle, playing, selectedStream, stationConfig?.artworkUrl, currentSongId, songArtworkTick]);
 
 
@@ -831,10 +995,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       <audio
         ref={audioRef}
         preload="none"
-        crossOrigin="anonymous"
         onPlay={() => {
           setPlaying(true);
           setReconnecting(false);
+          markPlaybackAlive();
           retryCountRef.current = 0;
           if (stallTimerRef.current !== null) {
             window.clearTimeout(stallTimerRef.current);
@@ -856,30 +1020,13 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           }
         }}
         onWaiting={() => {
-          if (!shouldPlayRef.current) return;
-          if (loadingRef.current) return;
-          if (Date.now() - lastLoadAtRef.current < INITIAL_BUFFER_GRACE_MS) return;
-          reportStall();
-          if (stallTimerRef.current !== null) return;
-          if (typeof document !== "undefined" && document.hidden) return;
-          stallTimerRef.current = window.setTimeout(() => {
-            stallTimerRef.current = null;
-            if (shouldPlayRef.current) attemptRecovery();
-          }, getStallTimeoutMs());
+          scheduleStallCheck("waiting");
         }}
         onStalled={() => {
-          if (!shouldPlayRef.current) return;
-          if (loadingRef.current) return;
-          if (Date.now() - lastLoadAtRef.current < INITIAL_BUFFER_GRACE_MS) return;
-          reportStall();
-          if (stallTimerRef.current !== null) return;
-          if (typeof document !== "undefined" && document.hidden) return;
-          stallTimerRef.current = window.setTimeout(() => {
-            stallTimerRef.current = null;
-            if (shouldPlayRef.current) attemptRecovery();
-          }, getStallTimeoutMs());
+          scheduleStallCheck("stalled");
         }}
         onPlaying={() => {
+          markPlaybackAlive();
           if (stallTimerRef.current !== null) {
             window.clearTimeout(stallTimerRef.current);
             stallTimerRef.current = null;
@@ -890,11 +1037,12 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }}
         onTimeUpdate={(e) => {
           const el = e.currentTarget;
-          setPlayerTime(el.currentTime || 0, Number.isFinite(el.duration) ? el.duration : 0);
+          notePlaybackProgress(el);
+          setPlayerTime(el.currentTime || 0, 0);
         }}
         onDurationChange={(e) => {
           const el = e.currentTarget;
-          setPlayerTime(el.currentTime || 0, Number.isFinite(el.duration) ? el.duration : 0);
+          setPlayerTime(el.currentTime || 0, 0);
         }}
       />
     </div>
