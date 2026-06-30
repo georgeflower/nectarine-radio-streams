@@ -181,7 +181,7 @@ const Cracktro = ({
   const [fps, setFps] = useState<number | null>(null);
   const [lowFpsDetected, setLowFpsDetected] = useState(false);
   const [panelsOn, setPanelsOn] = useState<Record<PanelId, boolean>>(() => {
-    const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: true, history: false, roster: false };
+    const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: true, history: false, roster: false, diag: false };
     try {
       const raw = localStorage.getItem(STORAGE_PANELS);
       if (raw) {
