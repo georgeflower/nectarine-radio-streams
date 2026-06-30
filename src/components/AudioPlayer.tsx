@@ -437,6 +437,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     clearTimers();
     const currentUrl = selectedUrl;
     if (!currentUrl) return;
+    reportReconnect(`retry#${retryCountRef.current + 1}`);
 
     if (retryCountRef.current < MAX_RETRIES) {
       const delay = RETRY_DELAYS_MS[retryCountRef.current] ?? 4000;
