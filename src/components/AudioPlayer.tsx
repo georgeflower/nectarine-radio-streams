@@ -490,6 +490,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     a.pause();
     a.removeAttribute("src");
     a.load();
+    reportPlaybackMode("idle");
   }, [clearTimers]);
 
   const toggle = useCallback(async () => {
