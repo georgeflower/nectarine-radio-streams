@@ -310,26 +310,7 @@ const Index = () => {
   const trackKey = now
     ? `${now.artist ?? ""}||${now.song ?? ""}||${now.playstart ?? ""}||${seekCount}`
     : `seek-${seekCount}`;
-  const {
-    bpm,
-    beatIndex,
-    beatCount,
-    status: bpmStatus,
-    beatTimes,
-    windowMs,
-    lastComputeAt,
-    lastBass,
-    period,
-    phaseErrorMs,
-    confidence,
-  } = useBpm(analyser, true, trackKey);
   void tick;
-
-  // Publish BPM to the lightweight shared store so non-React renderers
-  // (e.g. the parked BoingBall) can sync small animations to the beat.
-  useEffect(() => {
-    if (bpm > 0) setBpm(bpm);
-  }, [bpm]);
 
   return (
     <div className="crt min-h-screen relative overflow-x-hidden">
