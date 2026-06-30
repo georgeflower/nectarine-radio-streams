@@ -7,6 +7,7 @@ import GooseFamily from "./GooseFamily";
 import GooseDebugOverlay from "./GooseDebugOverlay";
 import BoingBall from "./BoingBall";
 import ChangelogModal, { APP_VERSION } from "./ChangelogModal";
+import PlaybackDiagnostics from "./PlaybackDiagnostics";
 
 import RosterWindow from "./RosterWindow";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
