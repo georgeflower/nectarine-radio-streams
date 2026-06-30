@@ -85,13 +85,14 @@ const LOW_FPS_THRESHOLD = 28;
 const LOW_FPS_SUSTAINED_MS = 12_000;
 const FPS_HUD_UPDATE_INTERVAL_MS = 250;
 
-type PanelId = "oneliner" | "online" | "queue" | "history" | "roster";
+type PanelId = "oneliner" | "online" | "queue" | "history" | "roster" | "diag";
 const PANELS: { id: PanelId; label: string }[] = [
   { id: "oneliner", label: "Oneliner" },
   { id: "online", label: "Online" },
   { id: "queue", label: "Up Next" },
   { id: "history", label: "Recent" },
   { id: "roster", label: "Geese" },
+  { id: "diag", label: "Diag" },
 ];
 const STORAGE_PANELS = "cracktro-panels-on";
 
