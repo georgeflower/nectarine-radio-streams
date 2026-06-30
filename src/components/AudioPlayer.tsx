@@ -818,6 +818,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }}
         onWaiting={() => {
           if (!shouldPlayRef.current) return;
+          reportStall();
           if (stallTimerRef.current !== null) return;
           if (typeof document !== "undefined" && document.hidden) return;
           stallTimerRef.current = window.setTimeout(() => {
@@ -827,6 +828,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }}
         onStalled={() => {
           if (!shouldPlayRef.current) return;
+          reportStall();
           if (stallTimerRef.current !== null) return;
           if (typeof document !== "undefined" && document.hidden) return;
           stallTimerRef.current = window.setTimeout(() => {
