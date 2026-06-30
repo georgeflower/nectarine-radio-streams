@@ -1,44 +1,52 @@
-# Last.fm Scrobbling Integration
+## Problem
 
-You shared the API key and shared secret. I'll store them as backend secrets (`LASTFM_API_KEY`, `LASTFM_API_SECRET`) — never exposed to the browser — and build the integration around them.
+Playback dies in the background on mobile — fast on iOS (~6–10 min), occasionally on Android (~30 min). Returning to the tab resumes it. Two design choices in `AudioPlayer.tsx` cause this:
 
-## Auth flow (Last.fm Web Auth)
+1. **Web Audio routing of the `<audio>` element.** `ensureAudioGraph()` calls `ctx.createMediaElementSource(audio)` and connects through an `AnalyserNode` to `ctx.destination`. On iOS Safari this reclassifies the stream as Web Audio output, which the OS does **not** treat as background-eligible media. When the tab/app goes to background, the `AudioContext` is suspended by the OS and audio stops within minutes. This matches the 6–10 minute iOS symptom exactly.
+2. **MSE buffered stream (`attachBufferedStream`).** When MSE is supported (Android Chrome), we feed the `<audio>` element from `SourceBuffer`s driven by `fetch()` + JS timers. Background tabs throttle timers and fetch, so the buffer drains and playback halts — matches the “sometimes after ~30 min on Android” symptom.
 
-1. User clicks **Connect Last.fm** (in the main page header and in the Cracktro settings panel).
-2. We redirect to `https://www.last.fm/api/auth/?api_key=…&cb=<app-url>`.
-3. Last.fm redirects back to the app with `?token=…`.
-4. `Index.tsx` detects the token, calls our `lastfm-auth` edge function which signs `auth.getSession` with the shared secret and returns the session key + username.
-5. Session key + username are stored in `localStorage` (`lastfm.session`). The shared secret stays server-side.
+Both paths also lack a visibility/`pageshow`/MediaSession watchdog that re-kicks playback when the device returns.
 
-## Scrobbling rules (per Last.fm spec)
+## Fix
 
-- Fire **`track.updateNowPlaying`** when a track starts playing.
-- Fire **`track.scrobble`** when the track has played for ≥ 240 seconds **or** ≥ 50% of its duration, whichever comes first, and the track is longer than 30 seconds.
-- Only one scrobble per track instance; reset on track change.
-- Both calls go through a `lastfm-scrobble` edge function that signs the request with the shared secret.
+Make background playback the default and only enable the “fancy” pipeline when the page is actually visible.
 
-## Files to add / change
+### 1. Decouple Web Audio analyser from background playback (`src/components/AudioPlayer.tsx`)
+- Do not create the `MediaElementSource`/Analyser graph until a visualizer actually needs it. Gate `ensureAudioGraph()` behind a new prop `enableAnalyser` (default `false`) and only set it to `true` from `Index.tsx` / `Cracktro.tsx` when a visualizer is mounted.
+- Once `MediaElementSource` exists, the element is permanently routed through Web Audio (cannot be undone). So when analyser is enabled, additionally:
+  - `audio.setAttribute("playsinline", "")` and ensure `controls` are not set.
+  - Add a `visibilitychange` listener: when `document.hidden`, call `audioCtx.suspend()` is **wrong** (kills audio). Instead, do **not** suspend; keep the context running. On `pagehide`/`hidden` start a short watchdog (see step 3).
+- Provide a "background-safe" mode: when `enableAnalyser` is false, never call `createMediaElementSource`, so the element plays as plain HTML5 media → iOS keeps it alive in lockscreen/background indefinitely.
 
-**New edge functions** (CORS enabled, no JWT required):
-- `supabase/functions/lastfm-auth/index.ts` — exchanges `token` → session key via signed `auth.getSession`.
-- `supabase/functions/lastfm-scrobble/index.ts` — accepts `{ session, artist, track, action: "nowplaying" | "scrobble", timestamp?, duration? }` and signs the request.
+### 2. Disable MSE buffered stream on mobile / when hidden
+- In `playUrl`, only use `attachBufferedStream` when `!isMobile() && document.visibilityState === "visible"`. For mobile or background, set `audio.src = proxiedUrl(url)` directly so the browser's native media stack handles buffering (it keeps running in the background).
+- Add `isMobile()` helper (UA + coarse pointer check).
+- Tear down any existing buffered stream before switching modes.
 
-**New client files:**
-- `src/lib/lastfm.ts` — session storage, `useLastfm()` hook (`session`, `username`, `login()`, `logout()`, `handleCallback()`), helpers `sendNowPlaying()` / `sendScrobble()`.
-- `src/components/LastfmButton.tsx` — Connect / Connected-as-`<user>` (with logout) button styled to match the existing UI.
+### 3. Background watchdog + auto-resume
+- Add listeners for `visibilitychange`, `pageshow`, and `online`. When the page becomes visible again and `shouldPlayRef.current` is true but `audio.paused` or `audio.readyState < 2`, call `attemptRecovery()` to reload the stream with a cache-bust.
+- Also wire `navigator.mediaSession.setActionHandler("play", …)` already exists — additionally call `mediaSession.playbackState = "playing"` aggressively after successful `onPlaying` so lockscreen controls stay valid for longer on iOS.
+- Increase `STALL_TIMEOUT_MS` handling so background stalls don't fire false errors; pause the stall timer while `document.hidden` and restart on visibility.
 
-**Edits:**
-- `src/pages/Index.tsx` — mount `LastfmButton` in the header; on mount, if `?token=` is in the URL, call `handleCallback()` and clean the URL.
-- `src/components/Cracktro.tsx` — add `LastfmButton` to the settings/controls panel.
-- `src/components/AudioPlayer.tsx` — when `currentTrack` changes and we have a Last.fm session: send Now Playing immediately; start a timer that scrobbles once the 50%/240s threshold is met. Clear timer on track change/stop.
+### 4. Keep wake lock behaviour
+- `useWakeLock` only holds the screen on; it doesn't help background audio. Leave it untouched.
 
-## Technical notes
+## Files touched
 
-- Last.fm signature: concatenate sorted `key+value` params (excluding `format` and `callback`), append shared secret, MD5 hex. The edge function does this with Deno's `crypto.subtle` + a tiny MD5 helper (Last.fm requires MD5 specifically).
-- Artist/track parsing reuses the existing `currentTrack` metadata (`artist`, `title`) already normalized in `AudioPlayer.tsx`.
-- No DB tables — session lives in `localStorage` only.
-- Callback URL registered with Last.fm: `https://demoscene-radio-compact.lovable.app` (already set).
+- `src/components/AudioPlayer.tsx` — new `enableAnalyser` prop, gate Web Audio + MSE, add visibility/pageshow watchdog, pause stall timer while hidden.
+- `src/pages/Index.tsx` — pass `enableAnalyser={visualizerVisible}` (true when a visualizer panel is shown).
+- `src/components/Cracktro.tsx` — pass `enableAnalyser` true (cracktro always uses visualizer) — confirm the existing analyser flow still works.
+- (Optional) small `isMobile()` helper in `src/lib/utils.ts`.
 
-## Out of scope
+## Notes / trade-offs
 
-- No "love track" button, no scrobble history UI, no multi-account support — can add later if you want them.
+- On mobile, when a visualizer is on screen and the user backgrounds the app, iOS may still kill audio after a few minutes — this is unavoidable while Web Audio is in the chain. Mitigation: visualizers stay off by default on mobile, or we add a “Background audio (disables visualizer)” toggle.
+- Direct `<audio>` playback loses the in-app buffer indicator (`bufferedAhead`) for the MSE path on mobile; that's acceptable for background reliability.
+- No backend changes; `audio-proxy` is unchanged.
+
+## Verification
+
+- Foreground desktop: visualizer + BPM still react, scrobble still fires.
+- Mobile foreground: audio plays, lockscreen metadata + artwork still appear.
+- Mobile background (screen off / app switched): audio continues for >30 min on both iOS and Android.
+- Returning to foreground after a network drop: watchdog re-kicks within a few seconds without user tap.

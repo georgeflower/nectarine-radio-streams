@@ -37,6 +37,23 @@ const STALL_TIMEOUT_MS = 30_000;
 const FAILOVER_COOLDOWN_MS = 60_000;
 const BUFFER_POLL_MS = 2000;
 
+// Mobile devices: route audio as plain HTML5 media (no Web Audio, no MSE) so
+// iOS/Android keep playing while the app is backgrounded or the screen is off.
+// Web Audio routing (createMediaElementSource) re-classifies playback as Web
+// Audio and is killed by the OS within minutes when hidden. MSE-fed audio
+// drains because background fetch/timers are throttled.
+const isMobileDevice = (): boolean => {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/Android|iPhone|iPad|iPod|Mobile|Silk|Opera Mini|IEMobile/i.test(ua)) return true;
+  // iPadOS reports as Mac; detect via touch.
+  if (/Macintosh/i.test(ua) && typeof document !== "undefined" && "ontouchend" in document) {
+    return true;
+  }
+  return false;
+};
+const IS_MOBILE = isMobileDevice();
+
 type StationNowPlayingConfig = {
   nowPlayingUrl: string;
   nowPlayingFormat?: string;
@@ -113,6 +130,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const retryTimerRef = useRef<number | null>(null);
   const stallTimerRef = useRef<number | null>(null);
   const failedStreamsRef = useRef<Map<string, number>>(new Map());
+  const attemptRecoveryRef = useRef<(() => void) | null>(null);
 
   // Auto-pick first playable stream when list arrives or selection becomes invalid
   useEffect(() => {
@@ -143,6 +161,44 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       }
     };
   }, []);
+
+  // Background-resume watchdog: when the tab becomes visible again,
+  // when the device wakes (pageshow), or when the network returns,
+  // kick playback back to life if we should be playing but the
+  // <audio> element has stalled or been paused by the OS.
+  useEffect(() => {
+    const wake = () => {
+      if (!shouldPlayRef.current) return;
+      const a = audioRef.current;
+      if (!a) return;
+      // Cancel a stall timer that fired while we were hidden — the OS
+      // pauses background timers so it's unreliable.
+      if (stallTimerRef.current !== null) {
+        window.clearTimeout(stallTimerRef.current);
+        stallTimerRef.current = null;
+      }
+      if (a.paused || a.readyState < 2) {
+        attemptRecoveryRef.current?.();
+      } else {
+        // Element thinks it's playing — nudge it.
+        a.play().catch(() => attemptRecoveryRef.current?.());
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") wake();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pageshow", wake);
+    window.addEventListener("online", wake);
+    window.addEventListener("focus", wake);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pageshow", wake);
+      window.removeEventListener("online", wake);
+      window.removeEventListener("focus", wake);
+    };
+  }, []);
+
 
   // Poll buffered-ahead while playing for UX visibility
   useEffect(() => {
@@ -241,6 +297,11 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   }, [playing]);
 
   const ensureAudioGraph = useCallback(() => {
+    // On mobile we intentionally skip Web Audio routing — once an
+    // <audio> element is connected via createMediaElementSource() it
+    // becomes Web Audio output, which iOS/Android suspend in the
+    // background. Plain HTML5 media keeps playing on the lockscreen.
+    if (IS_MOBILE) return;
     const a = audioRef.current;
     if (!a) return;
     if (!audioCtxRef.current) {
@@ -287,6 +348,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       ensureAudioGraph();
       a.crossOrigin = "anonymous";
       a.preload = "auto";
+      a.setAttribute("playsinline", "");
       const target = proxiedUrl(url, cacheBust);
 
       // Tear down any prior buffered stream before switching
@@ -295,7 +357,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         bufferedStreamRef.current = null;
       }
 
-      if (isMseAudioSupported()) {
+      // MSE-fed playback is throttled when the tab is hidden and not
+      // supported well on iOS. Use native <audio> src on mobile so the
+      // browser's media stack handles background buffering.
+      const canUseMse =
+        !IS_MOBILE &&
+        isMseAudioSupported() &&
+        (typeof document === "undefined" || document.visibilityState === "visible");
+      if (canUseMse) {
         bufferedStreamRef.current = attachBufferedStream(a, target, { targetBufferSec: 30 });
       } else {
         if (a.src !== target) a.src = target;
@@ -370,6 +439,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       playUrl(nextUrl, true).catch(() => attemptRecovery());
     }, 500);
   }, [clearTimers, pickNextStream, playUrl, selectedUrl]);
+  useEffect(() => { attemptRecoveryRef.current = attemptRecovery; }, [attemptRecovery]);
 
   const pausePlayback = useCallback(() => {
     shouldPlayRef.current = false;
@@ -721,6 +791,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         onWaiting={() => {
           if (!shouldPlayRef.current) return;
           if (stallTimerRef.current !== null) return;
+          if (typeof document !== "undefined" && document.hidden) return;
           stallTimerRef.current = window.setTimeout(() => {
             stallTimerRef.current = null;
             if (shouldPlayRef.current) attemptRecovery();
@@ -729,6 +800,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         onStalled={() => {
           if (!shouldPlayRef.current) return;
           if (stallTimerRef.current !== null) return;
+          if (typeof document !== "undefined" && document.hidden) return;
           stallTimerRef.current = window.setTimeout(() => {
             stallTimerRef.current = null;
             if (shouldPlayRef.current) attemptRecovery();
