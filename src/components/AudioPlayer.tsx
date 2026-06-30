@@ -390,8 +390,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         (typeof document === "undefined" || document.visibilityState === "visible");
       if (canUseMse) {
         bufferedStreamRef.current = attachBufferedStream(a, target, { targetBufferSec: 30 });
+        reportPlaybackMode("mse");
       } else {
         if (a.src !== target) a.src = target;
+        reportPlaybackMode(IS_MOBILE ? "bypass" : "webaudio");
       }
       await a.play();
     },
