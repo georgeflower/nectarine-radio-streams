@@ -388,11 +388,22 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       a.setAttribute("playsinline", "");
       const target = proxiedUrl(url, cacheBust);
 
+      // If we're already pointed at this exact target and the element is
+      // healthy, don't tear down the MSE pipeline — just (re)kick play().
+      if (!cacheBust && currentTargetRef.current === target && a.readyState >= 2) {
+        try { await a.play(); } catch { /* ignore */ }
+        return;
+      }
+
       // Tear down any prior buffered stream before switching
       if (bufferedStreamRef.current) {
         bufferedStreamRef.current.cleanup();
         bufferedStreamRef.current = null;
       }
+
+      currentTargetRef.current = target;
+      loadingRef.current = true;
+      lastLoadAtRef.current = Date.now();
 
       // MSE-fed playback is throttled when the tab is hidden and not
       // supported well on iOS. Use native <audio> src on mobile so the
@@ -408,7 +419,20 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         if (a.src !== target) a.src = target;
         reportPlaybackMode(IS_MOBILE ? "bypass" : "webaudio");
       }
-      await a.play();
+      try {
+        await a.play();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const name = err instanceof Error ? err.name : "";
+        if (name === "AbortError" || /interrupted by/i.test(msg)) {
+          // Benign — superseded by a newer load/play call.
+          return;
+        }
+        throw err;
+      } finally {
+        lastLoadAtRef.current = Date.now();
+        loadingRef.current = false;
+      }
     },
     [ensureAudioGraph],
   );
