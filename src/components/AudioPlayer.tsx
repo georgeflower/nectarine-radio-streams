@@ -175,35 +175,51 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   // kick playback back to life if we should be playing but the
   // <audio> element has stalled or been paused by the OS.
   useEffect(() => {
-    const wake = () => {
+    let pending: number | null = null;
+    const doWake = (reason: string) => {
       if (!shouldPlayRef.current) return;
       const a = audioRef.current;
       if (!a) return;
-      // Cancel a stall timer that fired while we were hidden — the OS
-      // pauses background timers so it's unreliable.
       if (stallTimerRef.current !== null) {
         window.clearTimeout(stallTimerRef.current);
         stallTimerRef.current = null;
       }
       if (a.paused || a.readyState < 2) {
+        reportReconnect(reason);
         attemptRecoveryRef.current?.();
       } else {
-        // Element thinks it's playing — nudge it.
-        a.play().catch(() => attemptRecoveryRef.current?.());
+        reportResume(reason);
+        a.play().catch(() => {
+          reportReconnect(`${reason}-playfail`);
+          attemptRecoveryRef.current?.();
+        });
       }
     };
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") wake();
+    const schedule = (reason: string) => {
+      if (pending !== null) window.clearTimeout(pending);
+      const delay = getVisibilityResumeDelayMs();
+      pending = window.setTimeout(() => {
+        pending = null;
+        doWake(reason);
+      }, delay);
     };
+    const onVisibility = () => {
+      reportVisibility(document.visibilityState);
+      if (document.visibilityState === "visible") schedule("visibility");
+    };
+    const onPageshow = () => schedule("pageshow");
+    const onOnline = () => schedule("online");
+    const onFocus = () => schedule("focus");
     document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("pageshow", wake);
-    window.addEventListener("online", wake);
-    window.addEventListener("focus", wake);
+    window.addEventListener("pageshow", onPageshow);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("focus", onFocus);
     return () => {
+      if (pending !== null) window.clearTimeout(pending);
       document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("pageshow", wake);
-      window.removeEventListener("online", wake);
-      window.removeEventListener("focus", wake);
+      window.removeEventListener("pageshow", onPageshow);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("focus", onFocus);
     };
   }, []);
 
