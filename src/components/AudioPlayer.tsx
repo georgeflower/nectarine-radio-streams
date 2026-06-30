@@ -42,7 +42,6 @@ const proxiedUrl = (url: string, cacheBust = false) =>
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 2000, 4000];
-const STALL_TIMEOUT_MS = 30_000;
 const FAILOVER_COOLDOWN_MS = 60_000;
 const BUFFER_POLL_MS = 2000;
 
