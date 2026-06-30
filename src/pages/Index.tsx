@@ -420,6 +420,15 @@ const Index = () => {
             </button>
             <LastfmButton />
             <button
+              type="button"
+              onClick={() => setDiagnosticsOpen((v) => !v)}
+              className="min-h-11 px-3 py-2 uppercase text-xs tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card transition-colors touch-manipulation shrink-0"
+              title="Toggle playback diagnostics overlay"
+              aria-pressed={diagnosticsOpen}
+            >
+              Diagnostics
+            </button>
+            <button
               onClick={refreshAll}
               className="min-h-11 px-3 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity touch-manipulation shrink-0"
               style={{ boxShadow: "var(--glow-primary)" }}
