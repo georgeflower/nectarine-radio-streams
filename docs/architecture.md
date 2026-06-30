@@ -33,9 +33,11 @@
 4. `AudioPlayer` handles:
    - retry delays and max retries
    - failover to other playable streams
-   - optional MSE buffering via `src/lib/bufferedStream.ts`
-   - AudioContext/AnalyserNode hookup for visualizers + BPM
+   - optional MSE buffering via `src/lib/bufferedStream.ts` (desktop only — disabled on mobile so the OS media stack handles background buffering)
+   - AudioContext/AnalyserNode hookup for visualizers + BPM (desktop only — skipped on mobile so iOS/Android keep playing when backgrounded)
+   - background-resume watchdog on `visibilitychange` / `pageshow` / `online` / `focus`
    - Media Session metadata updates and optional station now-playing polling
+   - Last.fm now-playing + scrobble (50% or 240s threshold) when a session is connected
 
 ## Visualizer, BPM, and beat overlay
 

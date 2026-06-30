@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.6.6";
+export const APP_VERSION = "0.6.7";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,19 @@ interface ChangelogEntry {
 }
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.6.7",
+    date: "2026-06-30",
+    changes: [
+      "Last.fm scrobbling: connect/disconnect from main page and Cracktro settings; now-playing + scrobble at 50% / 240s",
+      "Mobile background playback fixed: skip Web Audio routing and MSE on phones so iOS/Android keep playing when backgrounded",
+      "Auto-resume watchdog re-kicks playback on visibility / pageshow / network-online / focus",
+      "Stall timer paused while tab is hidden to avoid false reconnect storms",
+      "Allow up to 200% pinch zoom on mobile; Cracktro defaults to windowed mode with 'Fullscreen ⤢' toggle",
+      "Renamed launch button to 'Scroller Mode'",
+      "Security: bumped @supabase/supabase-js and react-router-dom; removed unused recharts / lodash transitives",
+    ],
+  },
   {
     version: "0.6.6",
     date: "2026-06-24",
