@@ -334,6 +334,7 @@ const Index = () => {
         />
       )}
       {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
+      {diagnosticsOpen && <PlaybackDiagnostics onClose={() => setDiagnosticsOpen(false)} />}
       <main
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"
         style={{
