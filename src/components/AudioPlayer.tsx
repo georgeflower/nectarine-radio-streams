@@ -803,7 +803,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           stallTimerRef.current = window.setTimeout(() => {
             stallTimerRef.current = null;
             if (shouldPlayRef.current) attemptRecovery();
-          }, STALL_TIMEOUT_MS);
+          }, getStallTimeoutMs());
         }}
         onStalled={() => {
           if (!shouldPlayRef.current) return;
@@ -812,7 +812,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           stallTimerRef.current = window.setTimeout(() => {
             stallTimerRef.current = null;
             if (shouldPlayRef.current) attemptRecovery();
-          }, STALL_TIMEOUT_MS);
+          }, getStallTimeoutMs());
         }}
         onPlaying={() => {
           if (stallTimerRef.current !== null) {
