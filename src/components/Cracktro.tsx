@@ -1166,6 +1166,10 @@ const Cracktro = ({
           />
         )}
 
+        {panelsOn.diag && (
+          <PlaybackDiagnostics onClose={() => togglePanel("diag")} />
+        )}
+
 
         <button
           type="button"
