@@ -40,6 +40,11 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const proxiedUrl = (url: string, cacheBust = false) =>
   `${SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(url)}${cacheBust ? `&t=${Date.now()}` : ""}`;
 
+const isMixedContentUrl = (url: string): boolean => {
+  if (typeof window === "undefined") return false;
+  return window.location.protocol === "https:" && /^http:\/\//i.test(url);
+};
+
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 2000, 4000];
 const FAILOVER_COOLDOWN_MS = 60_000;
@@ -63,6 +68,15 @@ const isMobileDevice = (): boolean => {
   return false;
 };
 const IS_MOBILE = isMobileDevice();
+
+const playbackUrl = (url: string, cacheBust = false): string => {
+  // Mobile background playback is most reliable when the browser owns the
+  // original live stream directly. The Supabase proxy is still required on
+  // desktop for CORS/WebAudio/MSE, and on mobile only if HTTPS mixed-content
+  // rules would block an http:// stream.
+  if (IS_MOBILE && !isMixedContentUrl(url)) return url;
+  return proxiedUrl(url, cacheBust);
+};
 
 type StationNowPlayingConfig = {
   nowPlayingUrl: string;
@@ -438,7 +452,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       a.crossOrigin = "anonymous";
       a.preload = "auto";
       a.setAttribute("playsinline", "");
-      const target = proxiedUrl(url, cacheBust);
+      const target = playbackUrl(url, cacheBust);
 
       // If we're already pointed at this exact target and the element is
       // healthy, don't tear down the MSE pipeline — just (re)kick play().
