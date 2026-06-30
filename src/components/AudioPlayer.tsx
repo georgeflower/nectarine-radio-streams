@@ -37,6 +37,23 @@ const STALL_TIMEOUT_MS = 30_000;
 const FAILOVER_COOLDOWN_MS = 60_000;
 const BUFFER_POLL_MS = 2000;
 
+// Mobile devices: route audio as plain HTML5 media (no Web Audio, no MSE) so
+// iOS/Android keep playing while the app is backgrounded or the screen is off.
+// Web Audio routing (createMediaElementSource) re-classifies playback as Web
+// Audio and is killed by the OS within minutes when hidden. MSE-fed audio
+// drains because background fetch/timers are throttled.
+const isMobileDevice = (): boolean => {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/Android|iPhone|iPad|iPod|Mobile|Silk|Opera Mini|IEMobile/i.test(ua)) return true;
+  // iPadOS reports as Mac; detect via touch.
+  if (/Macintosh/i.test(ua) && typeof document !== "undefined" && "ontouchend" in document) {
+    return true;
+  }
+  return false;
+};
+const IS_MOBILE = isMobileDevice();
+
 type StationNowPlayingConfig = {
   nowPlayingUrl: string;
   nowPlayingFormat?: string;
