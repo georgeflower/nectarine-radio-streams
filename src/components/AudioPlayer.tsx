@@ -258,6 +258,11 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   }, [playing]);
 
   const ensureAudioGraph = useCallback(() => {
+    // On mobile we intentionally skip Web Audio routing — once an
+    // <audio> element is connected via createMediaElementSource() it
+    // becomes Web Audio output, which iOS/Android suspend in the
+    // background. Plain HTML5 media keeps playing on the lockscreen.
+    if (IS_MOBILE) return;
     const a = audioRef.current;
     if (!a) return;
     if (!audioCtxRef.current) {
@@ -304,6 +309,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       ensureAudioGraph();
       a.crossOrigin = "anonymous";
       a.preload = "auto";
+      a.setAttribute("playsinline", "");
       const target = proxiedUrl(url, cacheBust);
 
       // Tear down any prior buffered stream before switching
@@ -312,7 +318,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         bufferedStreamRef.current = null;
       }
 
-      if (isMseAudioSupported()) {
+      // MSE-fed playback is throttled when the tab is hidden and not
+      // supported well on iOS. Use native <audio> src on mobile so the
+      // browser's media stack handles background buffering.
+      const canUseMse =
+        !IS_MOBILE &&
+        isMseAudioSupported() &&
+        (typeof document === "undefined" || document.visibilityState === "visible");
+      if (canUseMse) {
         bufferedStreamRef.current = attachBufferedStream(a, target, { targetBufferSec: 30 });
       } else {
         if (a.src !== target) a.src = target;
