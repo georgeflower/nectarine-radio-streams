@@ -18,6 +18,15 @@ import {
   subscribeSongArtwork,
 } from "@/lib/songArtwork";
 import { sendNowPlaying, sendScrobble, getLastfmSession } from "@/lib/lastfm";
+import {
+  getStallTimeoutMs,
+  getVisibilityResumeDelayMs,
+  reportPlaybackMode,
+  reportReconnect,
+  reportResume,
+  reportStall,
+  reportVisibility,
+} from "@/lib/playbackWatchdog";
 
 type Props = {
   streams: StreamSource[];
