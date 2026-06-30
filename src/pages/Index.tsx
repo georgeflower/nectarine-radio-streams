@@ -22,9 +22,9 @@ import {
   type StreamSource,
 } from "@/lib/nectarine";
 import AudioPlayer from "@/components/AudioPlayer";
-import Visualizer, { useAudioLevel, useBpm, type VisualizerStyle } from "@/components/Visualizer";
+import Visualizer, { useAudioLevel, type VisualizerStyle } from "@/components/Visualizer";
 import BeatOverlay from "@/components/BeatOverlay";
-import { setBpm } from "@/lib/gooseBeat";
+import PlaybackDiagnostics from "@/components/PlaybackDiagnostics";
 import Cracktro from "@/components/Cracktro";
 import ChangelogModal, { APP_VERSION } from "@/components/ChangelogModal";
 import Flag from "@/components/Flag";
