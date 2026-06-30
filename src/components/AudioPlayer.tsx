@@ -439,6 +439,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       playUrl(nextUrl, true).catch(() => attemptRecovery());
     }, 500);
   }, [clearTimers, pickNextStream, playUrl, selectedUrl]);
+  useEffect(() => { attemptRecoveryRef.current = attemptRecovery; }, [attemptRecovery]);
 
   const pausePlayback = useCallback(() => {
     shouldPlayRef.current = false;
