@@ -564,7 +564,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }
       }
     },
-    [clearTimers, playUrl, playing],
+    [clearTimers, playUrl, playing, selectedUrl],
   );
 
   const switchTrack = useCallback(
