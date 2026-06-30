@@ -457,10 +457,17 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       const a = audioRef.current;
       if (!a) return;
       ensureAudioGraph();
-      a.crossOrigin = "anonymous";
       a.preload = "auto";
       a.setAttribute("playsinline", "");
       const target = playbackUrl(url, cacheBust);
+      const isDirectMobileStream = IS_MOBILE && target === url;
+      if (isDirectMobileStream) {
+        // Direct mobile streams must not use CORS mode; many Icecast mirrors do
+        // not send CORS headers, but the native media stack can still play them.
+        a.removeAttribute("crossorigin");
+      } else {
+        a.crossOrigin = "anonymous";
+      }
 
       // If we're already pointed at this exact target and the element is
       // healthy, don't tear down the MSE pipeline — just (re)kick play().
