@@ -182,21 +182,33 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     let pending: number | null = null;
     const doWake = (reason: string) => {
       if (!shouldPlayRef.current) return;
+      if (loadingRef.current) return;
       const a = audioRef.current;
       if (!a) return;
       if (stallTimerRef.current !== null) {
         window.clearTimeout(stallTimerRef.current);
         stallTimerRef.current = null;
       }
-      if (a.paused || a.readyState < 2) {
-        reportReconnect(reason);
-        attemptRecoveryRef.current?.();
-      } else {
+      const sinceLoad = Date.now() - lastLoadAtRef.current;
+      if (!a.paused && a.readyState >= 2) {
+        reportResume(reason);
+        return;
+      }
+      if (a.paused && a.readyState >= 2) {
         reportResume(reason);
         a.play().catch(() => {
-          reportReconnect(`${reason}-playfail`);
-          attemptRecoveryRef.current?.();
+          if (sinceLoad > getStallTimeoutMs()) {
+            reportReconnect(`${reason}-playfail`);
+            attemptRecoveryRef.current?.();
+          }
         });
+        return;
+      }
+      // readyState < 2: only escalate to a full reconnect if we're well past
+      // the stall window. MSE start-up can briefly drop readyState.
+      if (sinceLoad > getStallTimeoutMs()) {
+        reportReconnect(reason);
+        attemptRecoveryRef.current?.();
       }
     };
     const schedule = (reason: string) => {
@@ -213,17 +225,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     };
     const onPageshow = () => schedule("pageshow");
     const onOnline = () => schedule("online");
-    const onFocus = () => schedule("focus");
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pageshow", onPageshow);
     window.addEventListener("online", onOnline);
-    window.addEventListener("focus", onFocus);
     return () => {
       if (pending !== null) window.clearTimeout(pending);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pageshow", onPageshow);
       window.removeEventListener("online", onOnline);
-      window.removeEventListener("focus", onFocus);
     };
   }, []);
 
