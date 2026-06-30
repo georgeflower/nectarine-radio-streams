@@ -161,6 +161,44 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     };
   }, []);
 
+  // Background-resume watchdog: when the tab becomes visible again,
+  // when the device wakes (pageshow), or when the network returns,
+  // kick playback back to life if we should be playing but the
+  // <audio> element has stalled or been paused by the OS.
+  useEffect(() => {
+    const wake = () => {
+      if (!shouldPlayRef.current) return;
+      const a = audioRef.current;
+      if (!a) return;
+      // Cancel a stall timer that fired while we were hidden — the OS
+      // pauses background timers so it's unreliable.
+      if (stallTimerRef.current !== null) {
+        window.clearTimeout(stallTimerRef.current);
+        stallTimerRef.current = null;
+      }
+      if (a.paused || a.readyState < 2) {
+        attemptRecoveryRef.current?.();
+      } else {
+        // Element thinks it's playing — nudge it.
+        a.play().catch(() => attemptRecoveryRef.current?.());
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") wake();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pageshow", wake);
+    window.addEventListener("online", wake);
+    window.addEventListener("focus", wake);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pageshow", wake);
+      window.removeEventListener("online", wake);
+      window.removeEventListener("focus", wake);
+    };
+  }, []);
+
+
   // Poll buffered-ahead while playing for UX visibility
   useEffect(() => {
     if (!playing || reconnecting || error) {
