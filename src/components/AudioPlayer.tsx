@@ -139,6 +139,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const stallTimerRef = useRef<number | null>(null);
   const failedStreamsRef = useRef<Map<string, number>>(new Map());
   const attemptRecoveryRef = useRef<(() => void) | null>(null);
+  const loadingRef = useRef(false);
+  const lastLoadAtRef = useRef(0);
+  const currentTargetRef = useRef<string | null>(null);
+  const INITIAL_BUFFER_GRACE_MS = 8000;
 
   // Auto-pick first playable stream when list arrives or selection becomes invalid
   useEffect(() => {
@@ -178,21 +182,33 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     let pending: number | null = null;
     const doWake = (reason: string) => {
       if (!shouldPlayRef.current) return;
+      if (loadingRef.current) return;
       const a = audioRef.current;
       if (!a) return;
       if (stallTimerRef.current !== null) {
         window.clearTimeout(stallTimerRef.current);
         stallTimerRef.current = null;
       }
-      if (a.paused || a.readyState < 2) {
-        reportReconnect(reason);
-        attemptRecoveryRef.current?.();
-      } else {
+      const sinceLoad = Date.now() - lastLoadAtRef.current;
+      if (!a.paused && a.readyState >= 2) {
+        reportResume(reason);
+        return;
+      }
+      if (a.paused && a.readyState >= 2) {
         reportResume(reason);
         a.play().catch(() => {
-          reportReconnect(`${reason}-playfail`);
-          attemptRecoveryRef.current?.();
+          if (sinceLoad > getStallTimeoutMs()) {
+            reportReconnect(`${reason}-playfail`);
+            attemptRecoveryRef.current?.();
+          }
         });
+        return;
+      }
+      // readyState < 2: only escalate to a full reconnect if we're well past
+      // the stall window. MSE start-up can briefly drop readyState.
+      if (sinceLoad > getStallTimeoutMs()) {
+        reportReconnect(reason);
+        attemptRecoveryRef.current?.();
       }
     };
     const schedule = (reason: string) => {
@@ -209,17 +225,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     };
     const onPageshow = () => schedule("pageshow");
     const onOnline = () => schedule("online");
-    const onFocus = () => schedule("focus");
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pageshow", onPageshow);
     window.addEventListener("online", onOnline);
-    window.addEventListener("focus", onFocus);
     return () => {
       if (pending !== null) window.clearTimeout(pending);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pageshow", onPageshow);
       window.removeEventListener("online", onOnline);
-      window.removeEventListener("focus", onFocus);
     };
   }, []);
 
@@ -375,11 +388,22 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       a.setAttribute("playsinline", "");
       const target = proxiedUrl(url, cacheBust);
 
+      // If we're already pointed at this exact target and the element is
+      // healthy, don't tear down the MSE pipeline — just (re)kick play().
+      if (!cacheBust && currentTargetRef.current === target && a.readyState >= 2) {
+        try { await a.play(); } catch { /* ignore */ }
+        return;
+      }
+
       // Tear down any prior buffered stream before switching
       if (bufferedStreamRef.current) {
         bufferedStreamRef.current.cleanup();
         bufferedStreamRef.current = null;
       }
+
+      currentTargetRef.current = target;
+      loadingRef.current = true;
+      lastLoadAtRef.current = Date.now();
 
       // MSE-fed playback is throttled when the tab is hidden and not
       // supported well on iOS. Use native <audio> src on mobile so the
@@ -395,7 +419,20 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         if (a.src !== target) a.src = target;
         reportPlaybackMode(IS_MOBILE ? "bypass" : "webaudio");
       }
-      await a.play();
+      try {
+        await a.play();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const name = err instanceof Error ? err.name : "";
+        if (name === "AbortError" || /interrupted by/i.test(msg)) {
+          // Benign — superseded by a newer load/play call.
+          return;
+        }
+        throw err;
+      } finally {
+        lastLoadAtRef.current = Date.now();
+        loadingRef.current = false;
+      }
     },
     [ensureAudioGraph],
   );
@@ -504,6 +541,8 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   // Switch stream while playing
   const handleSelect = useCallback(
     async (url: string, autoplay = playing) => {
+      // No-op if user re-picks the active stream and it's already playing.
+      if (url === selectedUrl && autoplay && playing && !loadingRef.current) return;
       clearTimers();
       retryCountRef.current = 0;
       setSelectedUrl(url);
@@ -525,7 +564,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }
       }
     },
-    [clearTimers, playUrl, playing],
+    [clearTimers, playUrl, playing, selectedUrl],
   );
 
   const switchTrack = useCallback(
@@ -818,6 +857,8 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }}
         onWaiting={() => {
           if (!shouldPlayRef.current) return;
+          if (loadingRef.current) return;
+          if (Date.now() - lastLoadAtRef.current < INITIAL_BUFFER_GRACE_MS) return;
           reportStall();
           if (stallTimerRef.current !== null) return;
           if (typeof document !== "undefined" && document.hidden) return;
@@ -828,6 +869,8 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }}
         onStalled={() => {
           if (!shouldPlayRef.current) return;
+          if (loadingRef.current) return;
+          if (Date.now() - lastLoadAtRef.current < INITIAL_BUFFER_GRACE_MS) return;
           reportStall();
           if (stallTimerRef.current !== null) return;
           if (typeof document !== "undefined" && document.hidden) return;
