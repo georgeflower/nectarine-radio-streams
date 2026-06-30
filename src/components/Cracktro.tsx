@@ -7,6 +7,7 @@ import GooseFamily from "./GooseFamily";
 import GooseDebugOverlay from "./GooseDebugOverlay";
 import BoingBall from "./BoingBall";
 import ChangelogModal, { APP_VERSION } from "./ChangelogModal";
+import PlaybackDiagnostics from "./PlaybackDiagnostics";
 
 import RosterWindow from "./RosterWindow";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
@@ -85,13 +86,14 @@ const LOW_FPS_THRESHOLD = 28;
 const LOW_FPS_SUSTAINED_MS = 12_000;
 const FPS_HUD_UPDATE_INTERVAL_MS = 250;
 
-type PanelId = "oneliner" | "online" | "queue" | "history" | "roster";
+type PanelId = "oneliner" | "online" | "queue" | "history" | "roster" | "diag";
 const PANELS: { id: PanelId; label: string }[] = [
   { id: "oneliner", label: "Oneliner" },
   { id: "online", label: "Online" },
   { id: "queue", label: "Up Next" },
   { id: "history", label: "Recent" },
   { id: "roster", label: "Geese" },
+  { id: "diag", label: "Diag" },
 ];
 const STORAGE_PANELS = "cracktro-panels-on";
 
@@ -180,7 +182,7 @@ const Cracktro = ({
   const [fps, setFps] = useState<number | null>(null);
   const [lowFpsDetected, setLowFpsDetected] = useState(false);
   const [panelsOn, setPanelsOn] = useState<Record<PanelId, boolean>>(() => {
-    const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: true, history: false, roster: false };
+    const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: true, history: false, roster: false, diag: false };
     try {
       const raw = localStorage.getItem(STORAGE_PANELS);
       if (raw) {
@@ -1162,6 +1164,10 @@ const Cracktro = ({
             defaultY={120}
             onClose={() => togglePanel("roster")}
           />
+        )}
+
+        {panelsOn.diag && (
+          <PlaybackDiagnostics onClose={() => togglePanel("diag")} />
         )}
 
 

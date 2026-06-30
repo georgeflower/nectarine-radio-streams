@@ -18,6 +18,15 @@ import {
   subscribeSongArtwork,
 } from "@/lib/songArtwork";
 import { sendNowPlaying, sendScrobble, getLastfmSession } from "@/lib/lastfm";
+import {
+  getStallTimeoutMs,
+  getVisibilityResumeDelayMs,
+  reportPlaybackMode,
+  reportReconnect,
+  reportResume,
+  reportStall,
+  reportVisibility,
+} from "@/lib/playbackWatchdog";
 
 type Props = {
   streams: StreamSource[];
@@ -33,7 +42,6 @@ const proxiedUrl = (url: string, cacheBust = false) =>
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 2000, 4000];
-const STALL_TIMEOUT_MS = 30_000;
 const FAILOVER_COOLDOWN_MS = 60_000;
 const BUFFER_POLL_MS = 2000;
 
@@ -167,35 +175,51 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   // kick playback back to life if we should be playing but the
   // <audio> element has stalled or been paused by the OS.
   useEffect(() => {
-    const wake = () => {
+    let pending: number | null = null;
+    const doWake = (reason: string) => {
       if (!shouldPlayRef.current) return;
       const a = audioRef.current;
       if (!a) return;
-      // Cancel a stall timer that fired while we were hidden — the OS
-      // pauses background timers so it's unreliable.
       if (stallTimerRef.current !== null) {
         window.clearTimeout(stallTimerRef.current);
         stallTimerRef.current = null;
       }
       if (a.paused || a.readyState < 2) {
+        reportReconnect(reason);
         attemptRecoveryRef.current?.();
       } else {
-        // Element thinks it's playing — nudge it.
-        a.play().catch(() => attemptRecoveryRef.current?.());
+        reportResume(reason);
+        a.play().catch(() => {
+          reportReconnect(`${reason}-playfail`);
+          attemptRecoveryRef.current?.();
+        });
       }
     };
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") wake();
+    const schedule = (reason: string) => {
+      if (pending !== null) window.clearTimeout(pending);
+      const delay = getVisibilityResumeDelayMs();
+      pending = window.setTimeout(() => {
+        pending = null;
+        doWake(reason);
+      }, delay);
     };
+    const onVisibility = () => {
+      reportVisibility(document.visibilityState);
+      if (document.visibilityState === "visible") schedule("visibility");
+    };
+    const onPageshow = () => schedule("pageshow");
+    const onOnline = () => schedule("online");
+    const onFocus = () => schedule("focus");
     document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("pageshow", wake);
-    window.addEventListener("online", wake);
-    window.addEventListener("focus", wake);
+    window.addEventListener("pageshow", onPageshow);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("focus", onFocus);
     return () => {
+      if (pending !== null) window.clearTimeout(pending);
       document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("pageshow", wake);
-      window.removeEventListener("online", wake);
-      window.removeEventListener("focus", wake);
+      window.removeEventListener("pageshow", onPageshow);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("focus", onFocus);
     };
   }, []);
 
@@ -366,8 +390,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         (typeof document === "undefined" || document.visibilityState === "visible");
       if (canUseMse) {
         bufferedStreamRef.current = attachBufferedStream(a, target, { targetBufferSec: 30 });
+        reportPlaybackMode("mse");
       } else {
         if (a.src !== target) a.src = target;
+        reportPlaybackMode(IS_MOBILE ? "bypass" : "webaudio");
       }
       await a.play();
     },
@@ -411,6 +437,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     clearTimers();
     const currentUrl = selectedUrl;
     if (!currentUrl) return;
+    reportReconnect(`retry#${retryCountRef.current + 1}`);
 
     if (retryCountRef.current < MAX_RETRIES) {
       const delay = RETRY_DELAYS_MS[retryCountRef.current] ?? 4000;
@@ -463,6 +490,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     a.pause();
     a.removeAttribute("src");
     a.load();
+    reportPlaybackMode("idle");
   }, [clearTimers]);
 
   const toggle = useCallback(async () => {
@@ -790,21 +818,23 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }}
         onWaiting={() => {
           if (!shouldPlayRef.current) return;
+          reportStall();
           if (stallTimerRef.current !== null) return;
           if (typeof document !== "undefined" && document.hidden) return;
           stallTimerRef.current = window.setTimeout(() => {
             stallTimerRef.current = null;
             if (shouldPlayRef.current) attemptRecovery();
-          }, STALL_TIMEOUT_MS);
+          }, getStallTimeoutMs());
         }}
         onStalled={() => {
           if (!shouldPlayRef.current) return;
+          reportStall();
           if (stallTimerRef.current !== null) return;
           if (typeof document !== "undefined" && document.hidden) return;
           stallTimerRef.current = window.setTimeout(() => {
             stallTimerRef.current = null;
             if (shouldPlayRef.current) attemptRecovery();
-          }, STALL_TIMEOUT_MS);
+          }, getStallTimeoutMs());
         }}
         onPlaying={() => {
           if (stallTimerRef.current !== null) {
