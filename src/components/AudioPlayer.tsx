@@ -443,7 +443,11 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       // If we're already pointed at this exact target and the element is
       // healthy, don't tear down the MSE pipeline — just (re)kick play().
       if (!cacheBust && currentTargetRef.current === target && a.readyState >= 2) {
-        try { await a.play(); } catch { /* ignore */ }
+        try {
+          await a.play();
+          reportResume("same-src-play");
+          markPlaybackAlive(a);
+        } catch { /* ignore */ }
         return;
       }
 
@@ -553,11 +557,12 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
 
     if (retryCountRef.current < MAX_RETRIES) {
       const delay = RETRY_DELAYS_MS[retryCountRef.current] ?? 4000;
+      const shouldCacheBust = !IS_MOBILE || retryCountRef.current > 0;
       retryCountRef.current += 1;
       setReconnecting(true);
       setError(null);
       retryTimerRef.current = window.setTimeout(() => {
-        playUrl(currentUrl, true).catch(() => attemptRecovery());
+        playUrl(currentUrl, shouldCacheBust).catch(() => attemptRecovery());
       }, delay);
       return;
     }
@@ -596,6 +601,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     if (Date.now() - lastLoadAtRef.current < INITIAL_BUFFER_GRACE_MS) return;
     const a = audioRef.current;
     if (IS_MOBILE) {
+      if (typeof document !== "undefined" && document.hidden) return;
       notePlaybackProgress(a);
       const sinceProgress = Date.now() - lastProgressAtRef.current;
       const remaining = getStallTimeoutMs() - sinceProgress;
