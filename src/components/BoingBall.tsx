@@ -7,7 +7,10 @@ import {
   setBallPos,
   subscribeFamilyEvents,
 } from "@/lib/gooseSocial";
-import { getQuarterPeriodMs } from "@/lib/gooseBeat";
+
+// Default "quarter note" period used for the gentle shelf-bounce idle. The
+// BPM detector that used to drive this was removed; 500 ms ≈ 120 BPM.
+const SHELF_HOP_PERIOD_MS = 500;
 
 /**
  * Classic Amiga "Boing" ball — checkered sphere bouncing across the screen.
@@ -446,7 +449,7 @@ const BoingBall = () => {
         spin += 2.4 * dt;
         if (parkT >= 1) parkMode = "parked";
       } else if (parkMode === "parked") {
-        const quarter = getQuarterPeriodMs();
+        const quarter = SHELF_HOP_PERIOD_MS;
         // Half-sine "hop" on each quarter-note (4/4 time). Small amplitude so
         // it reads as gentle bouncing on the shelf.
         const phase = (now % quarter) / quarter;

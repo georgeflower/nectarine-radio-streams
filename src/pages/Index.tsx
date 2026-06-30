@@ -22,9 +22,9 @@ import {
   type StreamSource,
 } from "@/lib/nectarine";
 import AudioPlayer from "@/components/AudioPlayer";
-import Visualizer, { useAudioLevel, useBpm, type VisualizerStyle } from "@/components/Visualizer";
+import Visualizer, { useAudioLevel, type VisualizerStyle } from "@/components/Visualizer";
 import BeatOverlay from "@/components/BeatOverlay";
-import { setBpm } from "@/lib/gooseBeat";
+import PlaybackDiagnostics from "@/components/PlaybackDiagnostics";
 import Cracktro from "@/components/Cracktro";
 import ChangelogModal, { APP_VERSION } from "@/components/ChangelogModal";
 import Flag from "@/components/Flag";
@@ -178,7 +178,7 @@ const Index = () => {
   });
   const inFlight = useRef(false);
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
-  const [bpmDebugOpen, setBpmDebugOpen] = useState(false);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [seekCount, setSeekCount] = useState(0);
@@ -310,26 +310,7 @@ const Index = () => {
   const trackKey = now
     ? `${now.artist ?? ""}||${now.song ?? ""}||${now.playstart ?? ""}||${seekCount}`
     : `seek-${seekCount}`;
-  const {
-    bpm,
-    beatIndex,
-    beatCount,
-    status: bpmStatus,
-    beatTimes,
-    windowMs,
-    lastComputeAt,
-    lastBass,
-    period,
-    phaseErrorMs,
-    confidence,
-  } = useBpm(analyser, true, trackKey);
   void tick;
-
-  // Publish BPM to the lightweight shared store so non-React renderers
-  // (e.g. the parked BoingBall) can sync small animations to the beat.
-  useEffect(() => {
-    if (bpm > 0) setBpm(bpm);
-  }, [bpm]);
 
   return (
     <div className="crt min-h-screen relative overflow-x-hidden">
@@ -353,6 +334,7 @@ const Index = () => {
         />
       )}
       {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
+      {diagnosticsOpen && <PlaybackDiagnostics onClose={() => setDiagnosticsOpen(false)} />}
       <main
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"
         style={{
@@ -439,6 +421,15 @@ const Index = () => {
             </button>
             <LastfmButton />
             <button
+              type="button"
+              onClick={() => setDiagnosticsOpen((v) => !v)}
+              className="min-h-11 px-3 py-2 uppercase text-xs tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card transition-colors touch-manipulation shrink-0"
+              title="Toggle playback diagnostics overlay"
+              aria-pressed={diagnosticsOpen}
+            >
+              Diagnostics
+            </button>
+            <button
               onClick={refreshAll}
               className="min-h-11 px-3 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity touch-manipulation shrink-0"
               style={{ boxShadow: "var(--glow-primary)" }}
@@ -508,124 +499,6 @@ const Index = () => {
                     <p className="text-sm">
                       Time Left: <span className="text-foreground">{timeLeft}</span>
                     </p>
-                    <div className="mt-3 flex items-center gap-3 flex-wrap">
-                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">BPM</span>
-                      <span
-                        className="neon-accent font-bold tabular-nums text-sm min-w-[2.5ch] inline-block"
-                        title="Detected tempo from bass kicks"
-                      >
-                        {bpm > 0 ? bpm : "--"}
-                      </span>
-                      <div
-                        className="flex items-center gap-1"
-                        role="img"
-                        aria-label={`Beat grid, step ${beatIndex + 1} of 4`}
-                      >
-                        {[0, 1, 2, 3].map((i) => {
-                          const active = bpm > 0 && i === beatIndex;
-                          return (
-                            <span
-                              key={i}
-                              className="block rounded-sm border border-border transition-all duration-75"
-                              style={{
-                                width: "0.85rem",
-                                height: "0.85rem",
-                                background: active ? "hsl(var(--primary))" : "hsl(var(--muted) / 0.4)",
-                                boxShadow: active ? `0 0 ${6 + audioLevel * 16}px hsl(var(--primary) / 0.9)` : "none",
-                                transform: active ? "scale(1.15)" : "scale(1)",
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
-                      {(() => {
-                        const dot =
-                          bpmStatus === "locked"
-                            ? "hsl(var(--primary))"
-                            : bpmStatus === "detecting"
-                              ? "#facc15"
-                              : bpmStatus === "listening"
-                                ? "#38bdf8"
-                                : bpmStatus === "silent"
-                                  ? "hsl(var(--muted-foreground))"
-                                  : "#ef4444";
-                        const label =
-                          bpmStatus === "locked"
-                            ? `locked (${bpm})`
-                            : bpmStatus === "detecting"
-                              ? "detecting…"
-                              : bpmStatus === "listening"
-                                ? "listening…"
-                                : bpmStatus === "silent"
-                                  ? "silent (no audio energy)"
-                                  : "no audio";
-                        return (
-                          <span
-                            className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground"
-                            title={`BPM status: ${label}`}
-                          >
-                            <span
-                              style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: "50%",
-                                background: dot,
-                                boxShadow: `0 0 6px ${dot}`,
-                              }}
-                            />
-                            {label}
-                          </span>
-                        );
-                      })()}
-                      <button
-                        type="button"
-                        onClick={() => setBpmDebugOpen((v) => !v)}
-                        className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
-                        aria-expanded={bpmDebugOpen}
-                      >
-                        {bpmDebugOpen ? "hide debug" : "debug"}
-                      </button>
-                    </div>
-                    {bpmDebugOpen && (
-                      <div className="mt-2 p-2 border border-border rounded bg-muted/20 text-[11px] font-mono leading-snug">
-                        <div>
-                          status: <span className="text-foreground">{bpmStatus}</span>
-                        </div>
-                        <div>
-                          bpm: <span className="text-foreground">{bpm || "--"}</span> · period:{" "}
-                          <span className="text-foreground">{Math.round(period)}ms</span>
-                        </div>
-                        <div>
-                          confidence: <span className="text-foreground">{confidence.toFixed(2)}</span> · phase err:{" "}
-                          <span className="text-foreground">
-                            {phaseErrorMs >= 0 ? "+" : ""}
-                            {Math.round(phaseErrorMs)}ms
-                          </span>
-                        </div>
-                        <div>
-                          window: <span className="text-foreground">{Math.round(windowMs / 1000)}s</span>
-                        </div>
-                        <div>
-                          metronome ticks in window: <span className="text-foreground">{beatTimes.length}</span> (total{" "}
-                          {beatCount})
-                        </div>
-                        <div>
-                          last bass envelope: <span className="text-foreground">{lastBass.toFixed(3)}</span>
-                        </div>
-                        <div>
-                          last compute:{" "}
-                          <span className="text-foreground">
-                            {lastComputeAt ? `${Math.round((performance.now() - lastComputeAt) / 1000)}s ago` : "—"}
-                          </span>
-                        </div>
-                        <div className="mt-1">beat timestamps (ms, relative to now):</div>
-                        <div className="text-foreground break-all">
-                          {beatTimes.length === 0
-                            ? "—"
-                            : beatTimes.map((t) => `-${Math.round(performance.now() - t)}`).join(", ")}
-                        </div>
-                      </div>
-                    )}
                   </>
                 ) : (
                   <p className="text-muted-foreground text-sm">No track info yet…</p>
