@@ -139,6 +139,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const stallTimerRef = useRef<number | null>(null);
   const failedStreamsRef = useRef<Map<string, number>>(new Map());
   const attemptRecoveryRef = useRef<(() => void) | null>(null);
+  const loadingRef = useRef(false);
+  const lastLoadAtRef = useRef(0);
+  const currentTargetRef = useRef<string | null>(null);
+  const INITIAL_BUFFER_GRACE_MS = 8000;
 
   // Auto-pick first playable stream when list arrives or selection becomes invalid
   useEffect(() => {
