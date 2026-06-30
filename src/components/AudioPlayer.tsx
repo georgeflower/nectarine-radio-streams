@@ -394,10 +394,11 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       const s = scrobbleStateRef.current;
       if (!s || s.scrobbled) return;
       if (!getLastfmSession()) return;
-      const a = audioRef.current;
       const played = Math.floor(Date.now() / 1000) - s.startedAt;
-      const dur = a && isFinite(a.duration) && a.duration > 30 ? a.duration : 0;
-      const threshold = dur > 0 ? Math.min(240, dur / 2) : 240;
+      // Nectarine is a live stream; browser-reported finite durations during
+      // reconnects are proxy/chunk artifacts, not song lengths.
+      const dur = 0;
+      const threshold = 240;
       if (played >= threshold) {
         s.scrobbled = true;
         void sendScrobble(s.artist, s.track, s.startedAt, dur || undefined);
@@ -825,6 +826,11 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       });
     }
     mediaSession.playbackState = playing ? "playing" : "paused";
+    try {
+      mediaSession.setPositionState?.();
+    } catch {
+      // Some browsers do not support clearing MediaSession position state.
+    }
   }, [mediaArtist, mediaTitle, playing, selectedStream, stationConfig?.artworkUrl, currentSongId, songArtworkTick]);
 
 
