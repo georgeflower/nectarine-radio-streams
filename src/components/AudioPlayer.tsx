@@ -130,6 +130,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const retryTimerRef = useRef<number | null>(null);
   const stallTimerRef = useRef<number | null>(null);
   const failedStreamsRef = useRef<Map<string, number>>(new Map());
+  const attemptRecoveryRef = useRef<(() => void) | null>(null);
 
   // Auto-pick first playable stream when list arrives or selection becomes invalid
   useEffect(() => {
