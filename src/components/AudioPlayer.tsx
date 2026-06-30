@@ -541,6 +541,8 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   // Switch stream while playing
   const handleSelect = useCallback(
     async (url: string, autoplay = playing) => {
+      // No-op if user re-picks the active stream and it's already playing.
+      if (url === selectedUrl && autoplay && playing && !loadingRef.current) return;
       clearTimers();
       retryCountRef.current = 0;
       setSelectedUrl(url);
