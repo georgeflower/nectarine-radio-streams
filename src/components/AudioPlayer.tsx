@@ -857,6 +857,8 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }}
         onWaiting={() => {
           if (!shouldPlayRef.current) return;
+          if (loadingRef.current) return;
+          if (Date.now() - lastLoadAtRef.current < INITIAL_BUFFER_GRACE_MS) return;
           reportStall();
           if (stallTimerRef.current !== null) return;
           if (typeof document !== "undefined" && document.hidden) return;
@@ -867,6 +869,8 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }}
         onStalled={() => {
           if (!shouldPlayRef.current) return;
+          if (loadingRef.current) return;
+          if (Date.now() - lastLoadAtRef.current < INITIAL_BUFFER_GRACE_MS) return;
           reportStall();
           if (stallTimerRef.current !== null) return;
           if (typeof document !== "undefined" && document.hidden) return;
