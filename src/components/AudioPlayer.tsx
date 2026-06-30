@@ -135,7 +135,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     () =>
       streams
         .filter((s) => /^https?:\/\//i.test(s.url))
-        .sort((a, b) => (Number(b.bitrate) || 0) - (Number(a.bitrate) || 0)),
+        .sort((a, b) => {
+          if (IS_MOBILE) {
+            const aNeedsProxy = isMixedContentUrl(a.url);
+            const bNeedsProxy = isMixedContentUrl(b.url);
+            if (aNeedsProxy !== bNeedsProxy) return aNeedsProxy ? 1 : -1;
+          }
+          return (Number(b.bitrate) || 0) - (Number(a.bitrate) || 0);
+        }),
     [streams],
   );
 
