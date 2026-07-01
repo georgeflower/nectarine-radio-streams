@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.6.7";
+export const APP_VERSION = "0.6.8";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,16 @@ interface ChangelogEntry {
 }
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.6.8",
+    date: "2026-07-01",
+    changes: [
+      "Main menu decluttered: Scanlines, Visualizer style, Diagnostics and Last.fm moved into a ⚙ Settings popover",
+      "Font size A−/A+ now scales only the main content; header buttons stay fixed size",
+      "Cracktro settings bar reorganized into Visuals · Geese · Panels · More sections with vertical dividers",
+      "Removed Scene Eras feature and all related state / persistence / UI",
+    ],
+  },
   {
     version: "0.6.7",
     date: "2026-06-30",
