@@ -33,6 +33,7 @@ import { renderBBCode } from "@/lib/bbcode";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 import { hydrateCloudLexiconOnce } from "@/lib/gooseLexiconCloud";
 import LastfmButton from "@/components/LastfmButton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { handleLastfmCallback } from "@/lib/lastfm";
 
 function SongRating({ songId }: { songId: string }) {
