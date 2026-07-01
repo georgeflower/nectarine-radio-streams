@@ -99,7 +99,7 @@ Most cracktro toggles persist in `localStorage`.
 
 `src/lib/gooseLearnedLexicon.ts` extends this idea to a token/category/mood lexicon system without AI, and goose chatter uses lexicon output as a short-form fallback before static lines.
 
-`src/lib/gooseSceneEra.ts` defines optional long-session scene eras. Era progression is browser-local and approximated from cracktro-open listening time when the feature is enabled.
+
 
 ## Setup
 
