@@ -1064,6 +1064,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         ref={audioRef}
         preload="none"
         onPlay={() => {
+          logPlayback("info", "media", "onPlay", snapshot());
           setPlaying(true);
           setReconnecting(false);
           markPlaybackAlive();
@@ -1073,12 +1074,22 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
             stallTimerRef.current = null;
           }
         }}
-        onPause={() => setPlaying(false)}
+        onPause={() => {
+          logPlayback("info", "media", "onPause", snapshot());
+          setPlaying(false);
+        }}
         onEnded={() => {
+          logPlayback("warn", "media", "onEnded", snapshot());
           setPlaying(false);
           if (shouldPlayRef.current) attemptRecovery();
         }}
-        onError={() => {
+        onError={(e) => {
+          const el = e.currentTarget;
+          const mediaErr = el.error;
+          logPlayback("error", "media", "onError", snapshot({
+            code: mediaErr?.code,
+            message: mediaErr?.message,
+          }));
           setPlaying(false);
           setLoading(false);
           if (shouldPlayRef.current) {
@@ -1088,12 +1099,15 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           }
         }}
         onWaiting={() => {
+          logPlayback("warn", "media", "onWaiting", snapshot());
           scheduleStallCheck("waiting");
         }}
         onStalled={() => {
+          logPlayback("warn", "media", "onStalled", snapshot());
           scheduleStallCheck("stalled");
         }}
         onPlaying={() => {
+          logPlayback("info", "media", "onPlaying", snapshot());
           markPlaybackAlive();
           if (stallTimerRef.current !== null) {
             window.clearTimeout(stallTimerRef.current);
