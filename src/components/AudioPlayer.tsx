@@ -497,26 +497,25 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       a.setAttribute("playsinline", "");
       const target = playbackUrl(url, cacheBust);
       const isDirectMobileStream = IS_MOBILE && target === url;
+      logPlayback("info", "playUrl", "enter", snapshot({ url, cacheBust, target, isDirectMobileStream }));
       if (isDirectMobileStream) {
-        // Direct mobile streams must not use CORS mode; many Icecast mirrors do
-        // not send CORS headers, but the native media stack can still play them.
         a.removeAttribute("crossorigin");
       } else {
         a.crossOrigin = "anonymous";
       }
 
-      // If we're already pointed at this exact target and the element is
-      // healthy, don't tear down the MSE pipeline — just (re)kick play().
       if (!cacheBust && currentTargetRef.current === target && a.readyState >= 2) {
         try {
           await a.play();
           reportResume("same-src-play");
+          logPlayback("info", "playUrl", "same-src fast-path play() ok");
           markPlaybackAlive(a);
-        } catch { /* ignore */ }
+        } catch (e) {
+          logPlayback("warn", "playUrl", "same-src play() rejected", { err: String(e) });
+        }
         return;
       }
 
-      // Tear down any prior buffered stream before switching
       if (bufferedStreamRef.current) {
         bufferedStreamRef.current.cleanup();
         bufferedStreamRef.current = null;
@@ -526,9 +525,6 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       loadingRef.current = true;
       lastLoadAtRef.current = Date.now();
 
-      // MSE-fed playback is throttled when the tab is hidden and not
-      // supported well on iOS. Use native <audio> src on mobile so the
-      // browser's media stack handles background buffering.
       const canUseMse =
         !IS_MOBILE &&
         isMseAudioSupported() &&
@@ -536,27 +532,31 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       if (canUseMse) {
         bufferedStreamRef.current = attachBufferedStream(a, target, { targetBufferSec: 30 });
         reportPlaybackMode("mse");
+        logPlayback("info", "playUrl", "mode=mse (attached buffered stream)");
       } else {
         if (a.src !== target) a.src = target;
         reportPlaybackMode(IS_MOBILE ? "bypass" : "webaudio");
+        logPlayback("info", "playUrl", `mode=${IS_MOBILE ? "bypass" : "webaudio"} (a.src set)`);
       }
       try {
         await a.play();
+        logPlayback("info", "playUrl", "play() resolved");
         markPlaybackAlive(a);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const name = err instanceof Error ? err.name : "";
         if (name === "AbortError" || /interrupted by/i.test(msg)) {
-          // Benign — superseded by a newer load/play call.
+          logPlayback("info", "playUrl", "play() aborted (superseded)", { name, msg });
           return;
         }
+        logPlayback("error", "playUrl", "play() failed", { name, msg });
         throw err;
       } finally {
         lastLoadAtRef.current = Date.now();
         loadingRef.current = false;
       }
     },
-    [ensureAudioGraph, markPlaybackAlive],
+    [ensureAudioGraph, markPlaybackAlive, snapshot],
   );
 
   const playSelected = useCallback(async () => {
