@@ -12,6 +12,8 @@ This app combines live stream playback, Demovibes XML panels, visualizers, and a
 - Infamous OneLiner + online users panels
 - Multiple visualizer styles and beat overlay
 - Fullscreen cracktro mode with floating windows, scroller, info bar, geese, and boing ball
+- Cracktro settings organized into Visuals · Geese · Panels · More sections
+- Main-page ⚙ Settings popover for scanlines, visualizer style, diagnostics and Last.fm
 - Browser-local goose learning with phrase memory + lexicon-based chatter
 - Optional scene eras that evolve cracktro visuals over long sessions (toggleable)
 - Goose social dialogue and scripted exchanges (Amiga/Atari banter, periodic routines, oneliner reactions)
