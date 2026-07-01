@@ -498,77 +498,8 @@ const Cracktro = ({
       /* ignore */
     }
   }, []);
-  const [sceneErasOn, setSceneErasOn] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(STORAGE_SCENE_ERAS) === "1";
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_SCENE_ERAS, sceneErasOn ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [sceneErasOn]);
-  const [listeningMs, setListeningMs] = useState<number>(() => {
-    try {
-      const raw = Number(localStorage.getItem(STORAGE_SCENE_ERA_LISTEN_MS));
-      return Number.isFinite(raw) ? Math.max(0, raw) : 0;
-    } catch {
-      return 0;
-    }
-  });
-  const listeningMsRef = useRef(listeningMs);
-  const lastEraTickAtRef = useRef<number | null>(null);
-  const lastPersistedMinuteRef = useRef(Math.floor(listeningMs / 60_000));
-  useEffect(() => {
-    listeningMsRef.current = listeningMs;
-  }, [listeningMs]);
-  useEffect(() => {
-    const minuteBucket = Math.floor(listeningMs / 60_000);
-    if (minuteBucket === lastPersistedMinuteRef.current) return;
-    lastPersistedMinuteRef.current = minuteBucket;
-    try {
-      localStorage.setItem(STORAGE_SCENE_ERA_LISTEN_MS, String(Math.floor(listeningMs)));
-    } catch {
-      /* ignore */
-    }
-  }, [listeningMs]);
-  // Persist once per minute during runtime plus one final write on unmount.
-  useEffect(
-    () => () => {
-      try {
-        localStorage.setItem(STORAGE_SCENE_ERA_LISTEN_MS, String(Math.floor(listeningMsRef.current)));
-      } catch {
-        /* ignore */
-      }
-    },
-    [],
-  );
-  useEffect(() => {
-    if (!sceneErasOn) return;
-    lastEraTickAtRef.current = Date.now();
-    const interval = window.setInterval(() => {
-      // Approximation: listening time advances while cracktro view stays open.
-      const now = Date.now();
-      const prev = lastEraTickAtRef.current ?? now;
-      lastEraTickAtRef.current = now;
-      const deltaMs = Math.min(60_000, Math.max(5_000, now - prev));
-      setListeningMs((v) => v + deltaMs);
-    }, 15_000);
-    return () => {
-      lastEraTickAtRef.current = null;
-      window.clearInterval(interval);
-    };
-  }, [sceneErasOn]);
-  const sceneEra = sceneErasOn ? getSceneEraFromListeningMs(listeningMs) : "intro";
-  const sceneEraConfig = getSceneEraConfig(sceneEra);
-  useEffect(() => {
-    setGooseSceneEra(sceneEra);
-    return () => setGooseSceneEra("intro");
-  }, [sceneEra]);
+  // Scene Eras feature removed.
+  const sceneEraConfig = { scrollerSpeed: 1, infoBarOpacity: 0.9 };
   useEffect(() => {
     setGoosePerformanceState({ lowFps: lowFpsDetected });
     return () => setGoosePerformanceState({ lowFps: false });
@@ -578,13 +509,8 @@ const Cracktro = ({
     setFps(null);
     setLowFpsDetected(false);
   }, [scrollOn]);
-  const effectiveStyle = useMemo<VisualizerStyle>(() => {
-    if (style !== "off") return style;
-    if (sceneEra === "warmed") return "starfield";
-    if (sceneEra === "party") return "rings";
-    if (sceneEra === "veteran") return "particles";
-    return "tunnel";
-  }, [sceneEra, style]);
+  const effectiveStyle = style === "off" ? "tunnel" : style;
+
 
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
   useEffect(() => {
