@@ -219,6 +219,27 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     }
   }, []);
 
+  const snapshot = useCallback((extra?: Record<string, unknown>): Record<string, unknown> => {
+    const a = audioRef.current;
+    const now = Date.now();
+    return {
+      url: selectedUrl,
+      target: currentTargetRef.current,
+      currentTime: a ? Number(a.currentTime?.toFixed?.(2)) : null,
+      readyState: a?.readyState ?? null,
+      networkState: a?.networkState ?? null,
+      paused: a?.paused ?? null,
+      hidden: typeof document !== "undefined" ? document.hidden : null,
+      sinceProgressMs: now - lastProgressAtRef.current,
+      sinceLoadMs: now - lastLoadAtRef.current,
+      retryCount: retryCountRef.current,
+      shouldPlay: shouldPlayRef.current,
+      loading: loadingRef.current,
+      ...extra,
+    };
+  }, [selectedUrl]);
+
+
   // Background-resume watchdog: when the tab becomes visible again,
   // when the device wakes (pageshow), or when the network returns,
   // kick playback back to life if we should be playing but the
