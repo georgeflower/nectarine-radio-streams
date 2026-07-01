@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.6.8";
+export const APP_VERSION = "0.6.9";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,18 @@ interface ChangelogEntry {
 }
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.6.9",
+    date: "2026-07-01",
+    changes: [
+      "Detailed reconnect logging: 100-entry ring buffer with platform-tagged timestamps for every stall, resume, and recovery attempt",
+      "Robust mobile stall detection using actual media clock progress instead of timer heuristics",
+      "Soft resume on mobile: same-source play() call avoids full reconnect storms on brief stalls",
+      "Forced MediaSession setPositionState to clear bogus 6:42 duration displays on live streams",
+      "Prioritized HTTPS stream sources on mobile to reduce proxy-induced disconnects",
+      "AudioPlayer stabilized: deduplicated playUrl calls, swallowed benign AbortErrors, 8-second MSE buffering grace on desktop",
+    ],
+  },
   {
     version: "0.6.8",
     date: "2026-07-01",
