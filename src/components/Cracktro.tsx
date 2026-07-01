@@ -14,8 +14,7 @@ import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/li
 import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl, formatDuration, computeTimeLeft } from "@/lib/nectarine";
 import { StageProvider } from "@/lib/stage";
 import { renderBBCode } from "@/lib/bbcode";
-import { getSceneEraConfig, getSceneEraFromListeningMs } from "@/lib/gooseSceneEra";
-import { sayFromAnyGoose, setGoosePerformanceState, setGooseSceneEra, setProcreationEnabled } from "@/lib/gooseSocial";
+import { sayFromAnyGoose, setGoosePerformanceState, setProcreationEnabled } from "@/lib/gooseSocial";
 import { notePlatformChange } from "@/lib/gooseRaptureEvents";
 import { pickRatingLine } from "@/lib/gooseSongChatter";
 import {
