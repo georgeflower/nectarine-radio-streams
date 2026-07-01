@@ -810,21 +810,6 @@ const Cracktro = ({
         >
           EXIT
         </button>
-        {sceneErasOn && (
-          <div
-            className={`absolute z-10 min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground transition-opacity duration-500 flex items-center ${
-              showHintChrome ? "opacity-100" : "opacity-0 pointer-events-none"
-            }`}
-            style={{
-              top: "calc(env(safe-area-inset-top, 0px) + 0.5rem)",
-              left: "calc(env(safe-area-inset-left, 0px) + 5rem)",
-            }}
-            aria-label={`Scene Era: ${sceneEraConfig.label}`}
-            title={`Scene Era: ${sceneEraConfig.label}`}
-          >
-            Era: {sceneEraConfig.label}
-          </div>
-        )}
         {fpsCounterOn && (
           <div
             className="absolute z-10 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground"
