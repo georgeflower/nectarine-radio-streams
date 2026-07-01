@@ -247,8 +247,9 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   useEffect(() => {
     let pending: number | null = null;
     const doWake = (reason: string) => {
-      if (!shouldPlayRef.current) return;
-      if (loadingRef.current) return;
+      logPlayback("info", "wake", `doWake(${reason})`, snapshot());
+      if (!shouldPlayRef.current) { logPlayback("info", "wake", "skip: shouldPlay=false"); return; }
+      if (loadingRef.current) { logPlayback("info", "wake", "skip: loading"); return; }
       const a = audioRef.current;
       if (!a) return;
       if (stallTimerRef.current !== null) {
@@ -265,14 +266,21 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           if (a.paused && now - lastSoftResumeAtRef.current > MOBILE_SOFT_RESUME_COOLDOWN_MS) {
             lastSoftResumeAtRef.current = now;
             reportResume("mobile-soft-resume");
-            a.play().then(() => markPlaybackAlive(a)).catch(() => {});
+            logPlayback("info", "wake", "mobile-soft-resume", snapshot({ reason }));
+            a.play().then(() => markPlaybackAlive(a)).catch((e) => {
+              logPlayback("warn", "wake", "mobile-soft-resume play() rejected", { err: String(e) });
+            });
+          } else {
+            logPlayback("info", "wake", "mobile: recent progress, no-op", { sinceProgress });
           }
           return;
         }
         if (a.paused && a.readyState >= 2) {
           lastSoftResumeAtRef.current = now;
           reportResume("mobile-paused-resume");
-          a.play().then(() => markPlaybackAlive(a)).catch(() => {
+          logPlayback("warn", "wake", "mobile-paused-resume (past stall window)", snapshot({ reason }));
+          a.play().then(() => markPlaybackAlive(a)).catch((e) => {
+            logPlayback("error", "wake", "mobile-paused-resume play() failed", { err: String(e) });
             if (Date.now() - lastProgressAtRef.current > getStallTimeoutMs()) {
               reportReconnect(`${reason}-mobile-playfail`);
               attemptRecoveryRef.current?.();
@@ -280,6 +288,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           });
           return;
         }
+        logPlayback("warn", "wake", "mobile-stall-timeout → recovery", snapshot({ reason }));
         reportReconnect(`${reason}-mobile-stall-timeout`);
         attemptRecoveryRef.current?.();
         return;
@@ -287,11 +296,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       const sinceLoad = Date.now() - lastLoadAtRef.current;
       if (!a.paused && a.readyState >= 2) {
         reportResume(reason);
+        logPlayback("info", "wake", "desktop: already playing, no-op");
         return;
       }
       if (a.paused && a.readyState >= 2) {
         reportResume(reason);
-        a.play().catch(() => {
+        logPlayback("info", "wake", "desktop-paused-resume", snapshot({ reason }));
+        a.play().catch((e) => {
+          logPlayback("warn", "wake", "desktop play() rejected", { err: String(e) });
           if (sinceLoad > getStallTimeoutMs()) {
             reportReconnect(`${reason}-playfail`);
             attemptRecoveryRef.current?.();
@@ -299,11 +311,12 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         });
         return;
       }
-      // readyState < 2: only escalate to a full reconnect if we're well past
-      // the stall window. MSE start-up can briefly drop readyState.
       if (sinceLoad > getStallTimeoutMs()) {
+        logPlayback("warn", "wake", "desktop-stall-timeout → recovery", snapshot({ reason }));
         reportReconnect(reason);
         attemptRecoveryRef.current?.();
+      } else {
+        logPlayback("info", "wake", "desktop: still within initial buffer window", { sinceLoad });
       }
     };
     const schedule = (reason: string) => {
@@ -316,10 +329,11 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     };
     const onVisibility = () => {
       reportVisibility(document.visibilityState);
+      logPlayback("info", "visibility", `state=${document.visibilityState}`);
       if (document.visibilityState === "visible") schedule("visibility");
     };
-    const onPageshow = () => schedule("pageshow");
-    const onOnline = () => schedule("online");
+    const onPageshow = () => { logPlayback("info", "pageshow", "event"); schedule("pageshow"); };
+    const onOnline = () => { logPlayback("info", "online", "event"); schedule("online"); };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pageshow", onPageshow);
     window.addEventListener("online", onOnline);
@@ -329,7 +343,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       window.removeEventListener("pageshow", onPageshow);
       window.removeEventListener("online", onOnline);
     };
-  }, [markPlaybackAlive, notePlaybackProgress]);
+  }, [markPlaybackAlive, notePlaybackProgress, snapshot]);
 
 
   // Poll buffered-ahead while playing for UX visibility
