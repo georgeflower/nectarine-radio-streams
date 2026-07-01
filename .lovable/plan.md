@@ -1,33 +1,41 @@
-## Plan
+## Plan: detailed reconnect logging in AudioPlayer
 
-Fix the mobile streaming regression in `src/components/AudioPlayer.tsx` only.
+Add focused, structured console logging inside `src/components/AudioPlayer.tsx` (and a small helper in `src/lib/playbackWatchdog.ts`) so every reconnect/stall/resume on iOS and Android is traceable. No behavior changes — logging only.
 
-### 1. Stop recovery from rebuilding healthy mobile audio
-- Treat mobile direct `<audio>` playback as the primary stable path.
-- Do not call full reconnect/reload on every `waiting`, `stalled`, `pageshow`, or `visibility` event.
-- Only reconnect if playback is expected, the element is truly not advancing for longer than the configured stall threshold, and there is no usable buffered/playing state.
+### 1. Logger helper (in `playbackWatchdog.ts`)
 
-### 2. Add playback-progress stall detection
-- Track the last time `currentTime` advanced.
-- On mobile, use that timestamp as the main watchdog signal instead of relying on Safari/Chrome `waiting` events, which can fire during normal background buffering.
-- If the audio is still advancing or recently advanced, clear reconnect UI and avoid switching/reloading streams.
+- Add `logPlayback(category, message, data?)` that:
+  - Prefixes entries with `[AudioPlayer]` + platform (`ios`/`android`/`desktop`) + ISO timestamp.
+  - Uses `console.info` for resume/visibility, `console.warn` for stalls/reconnects, `console.error` for failures.
+  - Includes a monotonically increasing event id so consecutive entries can be correlated on mobile remote debuggers.
+- Add a small ring buffer (last 100 entries) exposed via `getPlaybackLog()` so the existing diagnostics panel could surface it later (no UI change in this plan).
 
-### 3. Prevent the bogus 6:42 live-stream timer
-- Live radio streams sometimes expose a finite `audio.duration` after a reconnect/proxy restart, even though it is not a real song length.
-- Stop publishing finite HTML audio duration to the cracktro info box for live stream playback.
-- Keep publishing elapsed playback time, but send duration as `0`/unknown unless a real track duration is explicitly available elsewhere.
+### 2. AudioPlayer event logging
 
-### 4. Make mobile reconnect less destructive
-- For mobile recovery, first try `audio.play()` on the same source without cache-busting or resetting `src`.
-- Only if that fails/stays stalled past the threshold should it rebuild the stream URL.
-- Avoid failover to a different stream on transient mobile background stalls.
+Instrument every code path that can drop or restart the stream. Each log includes a snapshot: `{ url, target, currentTime, readyState, paused, hidden, sinceProgressMs, sinceLoadMs, retryCount, mode }`.
 
-### 5. Diagnostics stay useful
-- Continue reporting resume/reconnect/stall events.
-- Add more precise diagnostic event reasons such as `mobile-soft-resume`, `mobile-stall-timeout`, and `same-src-play` so the diagnostics overlay shows what happened.
+- **playUrl**
+  - Log on entry: requested url, cacheBust flag, chosen target, chosen mode (`mse` / `bypass` / `webaudio`), same-src fast-path hits.
+  - Log resolved `play()` success and any non-AbortError failure.
+- **attemptRecovery**
+  - Log entry reason, current retry count, mobile soft-resume branch taken, mobile paused-resume branch, escalation to full reload, failover to next stream, "All streams unavailable".
+- **scheduleStallCheck**
+  - Log triggering event (`waiting`/`stalled`), whether it was suppressed by the initial-buffer grace, mobile progress check result, timer scheduling vs immediate recovery.
+- **Background watchdog (`doWake`)**
+  - Log the wake reason (`visibility` / `pageshow` / `online`), whether it short-circuited (recent progress), soft-resume path, paused-resume path, and stall-timeout escalation.
+- **Audio element events**
+  - `onError`: log `audio.error.code` + message, network state, ready state.
+  - `onWaiting` / `onStalled` / `onPlaying` / `onPause` / `onEnded`: one-line log each.
+  - `onPlay`: log resolved mode + currentTime.
+- **Visibility / pageshow / online listeners**: log raw transitions before scheduling.
+
+### 3. Make logging cheap & toggleable
+
+- Gate verbose logs behind `localStorage.getItem("playback-debug") === "1"` OR the diagnostics panel being mounted (already implies the user wants visibility). Default ON for now so the user immediately sees the data on iOS/Android; document the toggle in a single-line comment.
+- Never log secrets or full headers. URLs are already non-sensitive (public streams + proxy endpoint).
 
 ### Acceptance
-- On iPhone/Android, short `waiting`/background hiccups do not show `Reconnecting…` unless playback has actually stopped advancing past the configured timeout.
-- The stream does not restart every few minutes on Android.
-- After any reconnect, the cracktro info box no longer shows a fake countdown like `6:42`; live duration remains unknown until proper song metadata changes.
-- Desktop MSE behavior from the previous fix remains unchanged.
+
+- On iOS and Android remote consoles, every reconnect cycle prints an ordered trace: trigger event → decision branch → action taken → outcome.
+- No change to playback behavior, UI, or timers.
+- Desktop logs remain quiet unless an actual stall/reconnect happens (info-level events for resume/visibility are throttled to one line each).
