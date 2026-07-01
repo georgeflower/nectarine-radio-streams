@@ -129,6 +129,60 @@ const updateDiag = (patch: Partial<WatchdogDiagnostics>) => {
 };
 
 export const reportPlaybackMode = (mode: PlaybackMode) => updateDiag({ playbackMode: mode, lastEvent: `mode:${mode}` });
+
+// --- Playback logging ------------------------------------------------------
+// Structured, platform-tagged console logging for the AudioPlayer's
+// reconnect/stall/resume paths. Enabled by default; disable at runtime with
+// `localStorage.setItem("playback-debug", "0")`.
+
+export type PlaybackLogLevel = "info" | "warn" | "error";
+export type PlaybackLogEntry = {
+  id: number;
+  ts: number;
+  level: PlaybackLogLevel;
+  platform: Platform;
+  category: string;
+  message: string;
+  data?: Record<string, unknown>;
+};
+
+const LOG_RING_MAX = 100;
+const logRing: PlaybackLogEntry[] = [];
+let logSeq = 0;
+
+const debugEnabled = (): boolean => {
+  try {
+    return localStorage.getItem("playback-debug") !== "0";
+  } catch {
+    return true;
+  }
+};
+
+export const getPlaybackLog = (): PlaybackLogEntry[] => logRing.slice();
+
+export const logPlayback = (
+  level: PlaybackLogLevel,
+  category: string,
+  message: string,
+  data?: Record<string, unknown>,
+) => {
+  if (!debugEnabled()) return;
+  const entry: PlaybackLogEntry = {
+    id: ++logSeq,
+    ts: Date.now(),
+    level,
+    platform: diag.platform,
+    category,
+    message,
+    data,
+  };
+  logRing.push(entry);
+  if (logRing.length > LOG_RING_MAX) logRing.shift();
+  const prefix = `[AudioPlayer#${entry.id} ${entry.platform} ${new Date(entry.ts).toISOString()}] ${category}:`;
+  const fn = level === "error" ? console.error : level === "warn" ? console.warn : console.info;
+  if (data !== undefined) fn(prefix, message, data);
+  else fn(prefix, message);
+};
 export const reportResume = (reason: string) => updateDiag({
   lastResumeAt: Date.now(),
   resumeCount: diag.resumeCount + 1,
