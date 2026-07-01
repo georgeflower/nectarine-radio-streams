@@ -592,7 +592,8 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   );
 
   const attemptRecovery = useCallback(() => {
-    if (!shouldPlayRef.current) return;
+    logPlayback("warn", "recovery", "attemptRecovery()", snapshot());
+    if (!shouldPlayRef.current) { logPlayback("info", "recovery", "skip: shouldPlay=false"); return; }
     clearTimers();
     const currentUrl = selectedUrl;
     if (!currentUrl) return;
@@ -607,18 +608,27 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         if (a.paused && now - lastSoftResumeAtRef.current > MOBILE_SOFT_RESUME_COOLDOWN_MS) {
           lastSoftResumeAtRef.current = now;
           reportResume("mobile-soft-resume");
-          a.play().then(() => markPlaybackAlive(a)).catch(() => {});
+          logPlayback("info", "recovery", "mobile-soft-resume (in-window)", { sinceProgress });
+          a.play().then(() => markPlaybackAlive(a)).catch((e) => {
+            logPlayback("warn", "recovery", "mobile-soft-resume play() rejected", { err: String(e) });
+          });
+        } else {
+          logPlayback("info", "recovery", "mobile: recent progress, no-op", { sinceProgress });
         }
         return;
       }
       if (a.paused && a.readyState >= 2 && now - lastSoftResumeAtRef.current > MOBILE_SOFT_RESUME_COOLDOWN_MS) {
         lastSoftResumeAtRef.current = now;
         reportResume("mobile-paused-resume");
-        a.play().then(() => markPlaybackAlive(a)).catch(() => {});
+        logPlayback("warn", "recovery", "mobile-paused-resume (past window)", snapshot());
+        a.play().then(() => markPlaybackAlive(a)).catch((e) => {
+          logPlayback("error", "recovery", "mobile-paused-resume play() failed", { err: String(e) });
+        });
         return;
       }
     }
     reportReconnect(`retry#${retryCountRef.current + 1}`);
+    logPlayback("warn", "recovery", `retry#${retryCountRef.current + 1}/${MAX_RETRIES}`);
 
     if (retryCountRef.current < MAX_RETRIES) {
       const delay = RETRY_DELAYS_MS[retryCountRef.current] ?? 4000;
@@ -626,8 +636,12 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       retryCountRef.current += 1;
       setReconnecting(true);
       setError(null);
+      logPlayback("info", "recovery", `scheduling retry in ${delay}ms (cacheBust=${shouldCacheBust})`);
       retryTimerRef.current = window.setTimeout(() => {
-        playUrl(currentUrl, shouldCacheBust).catch(() => attemptRecovery());
+        playUrl(currentUrl, shouldCacheBust).catch((e) => {
+          logPlayback("error", "recovery", "retry playUrl threw", { err: String(e) });
+          attemptRecovery();
+        });
       }, delay);
       return;
     }
@@ -636,20 +650,24 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       retryCountRef.current = 0;
       setReconnecting(false);
       setError(null);
+      const delay = Math.max(10_000, getStallTimeoutMs());
+      logPlayback("warn", "recovery", `mobile: retries exhausted, backoff ${delay}ms`);
       retryTimerRef.current = window.setTimeout(() => {
         if (shouldPlayRef.current) attemptRecovery();
-      }, Math.max(10_000, getStallTimeoutMs()));
+      }, delay);
       return;
     }
 
     failedStreamsRef.current.set(currentUrl, Date.now());
     const nextUrl = pickNextStream(currentUrl);
     if (!nextUrl || nextUrl === currentUrl) {
+      logPlayback("error", "recovery", "all streams unavailable");
       setReconnecting(false);
       setError("All streams unavailable");
       shouldPlayRef.current = false;
       return;
     }
+    logPlayback("warn", "recovery", "failover to next stream", { from: currentUrl, to: nextUrl });
     retryCountRef.current = 0;
     setSelectedUrl(nextUrl);
     setNowPlaying(null);
@@ -657,16 +675,23 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     retryTimerRef.current = window.setTimeout(() => {
       playUrl(nextUrl, true).catch(() => attemptRecovery());
     }, 500);
-  }, [clearTimers, markPlaybackAlive, notePlaybackProgress, pickNextStream, playUrl, selectedUrl]);
+  }, [clearTimers, markPlaybackAlive, notePlaybackProgress, pickNextStream, playUrl, selectedUrl, snapshot]);
   useEffect(() => { attemptRecoveryRef.current = attemptRecovery; }, [attemptRecovery]);
 
   const scheduleStallCheck = useCallback((eventName: "waiting" | "stalled") => {
     if (!shouldPlayRef.current) return;
     if (loadingRef.current) return;
-    if (Date.now() - lastLoadAtRef.current < INITIAL_BUFFER_GRACE_MS) return;
+    if (Date.now() - lastLoadAtRef.current < INITIAL_BUFFER_GRACE_MS) {
+      logPlayback("info", "stall", `${eventName} suppressed by initial-buffer grace`);
+      return;
+    }
     const a = audioRef.current;
+    logPlayback("warn", "stall", `${eventName} event`, snapshot());
     if (IS_MOBILE) {
-      if (typeof document !== "undefined" && document.hidden) return;
+      if (typeof document !== "undefined" && document.hidden) {
+        logPlayback("info", "stall", "mobile hidden, ignore");
+        return;
+      }
       notePlaybackProgress(a);
       const sinceProgress = Date.now() - lastProgressAtRef.current;
       const remaining = getStallTimeoutMs() - sinceProgress;
@@ -674,6 +699,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         setReconnecting(false);
         if (stallTimerRef.current !== null) return;
         if (typeof document !== "undefined" && document.hidden) return;
+        logPlayback("info", "stall", `mobile: arm timer ${Math.max(1000, remaining)}ms`);
         stallTimerRef.current = window.setTimeout(() => {
           stallTimerRef.current = null;
           const audio = audioRef.current;
@@ -681,6 +707,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           if (shouldPlayRef.current && Date.now() - lastProgressAtRef.current >= getStallTimeoutMs()) {
             reportStall();
             reportReconnect(`mobile-${eventName}-timeout`);
+            logPlayback("warn", "stall", `mobile-${eventName}-timeout fired → recovery`);
             attemptRecovery();
           }
         }, Math.max(1000, remaining));
@@ -688,17 +715,22 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       }
       reportStall();
       reportReconnect(`mobile-${eventName}-timeout`);
+      logPlayback("warn", "stall", `mobile-${eventName} immediate → recovery`);
       attemptRecovery();
       return;
     }
     reportStall();
     if (stallTimerRef.current !== null) return;
     if (typeof document !== "undefined" && document.hidden) return;
+    logPlayback("info", "stall", `desktop: arm timer ${getStallTimeoutMs()}ms`);
     stallTimerRef.current = window.setTimeout(() => {
       stallTimerRef.current = null;
-      if (shouldPlayRef.current) attemptRecovery();
+      if (shouldPlayRef.current) {
+        logPlayback("warn", "stall", "desktop stall timeout → recovery");
+        attemptRecovery();
+      }
     }, getStallTimeoutMs());
-  }, [attemptRecovery, notePlaybackProgress]);
+  }, [attemptRecovery, notePlaybackProgress, snapshot]);
 
   const pausePlayback = useCallback(() => {
     shouldPlayRef.current = false;
