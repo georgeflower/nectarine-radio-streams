@@ -209,19 +209,15 @@ const Index = () => {
   });
 
   useEffect(() => {
-    const target = fontScale * 16;
-    // Cap font-size so frames never exceed viewport width on small screens.
-    // ~22 root-em units of width keeps panels readable without horizontal overflow.
-    document.documentElement.style.fontSize = `min(${target}px, calc(100vw / 22))`;
+    // Font-scale is applied to <main> inline (see below) so header controls
+    // keep their fixed size when the user presses A− / A+.
     try {
       localStorage.setItem("nectarine-font-scale", String(fontScale));
     } catch {
       // ignore
     }
-    return () => {
-      document.documentElement.style.fontSize = "";
-    };
   }, [fontScale]);
+  const mainFontSize = `min(${fontScale * 16}px, calc(100vw / 22))`;
 
   const adjustFont = (delta: number) =>
     setFontScale((s) => Math.min(1.6, Math.max(0.7, Math.round((s + delta) * 10) / 10)));
