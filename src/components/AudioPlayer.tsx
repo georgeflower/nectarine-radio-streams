@@ -21,6 +21,7 @@ import { sendNowPlaying, sendScrobble, getLastfmSession } from "@/lib/lastfm";
 import {
   getStallTimeoutMs,
   getVisibilityResumeDelayMs,
+  logPlayback,
   reportPlaybackMode,
   reportReconnect,
   reportResume,
