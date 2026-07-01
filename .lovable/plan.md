@@ -1,41 +1,62 @@
-## Plan: detailed reconnect logging in AudioPlayer
+## 1. Main page (`src/pages/Index.tsx`) — declutter header
 
-Add focused, structured console logging inside `src/components/AudioPlayer.tsx` (and a small helper in `src/lib/playbackWatchdog.ts`) so every reconnect/stall/resume on iOS and Android is traceable. No behavior changes — logging only.
+Keep in the top bar (always visible):
+- Theme selector
+- A− / A+ text-size stepper
+- ▶ Scroller Mode
+- Refresh
 
-### 1. Logger helper (in `playbackWatchdog.ts`)
+Move into a new "⚙ Settings" popover button (using existing `Popover` from shadcn):
+- Scanlines toggle
+- Visualizer style dropdown
+- Diagnostics toggle
+- Last.fm button
 
-- Add `logPlayback(category, message, data?)` that:
-  - Prefixes entries with `[AudioPlayer]` + platform (`ios`/`android`/`desktop`) + ISO timestamp.
-  - Uses `console.info` for resume/visibility, `console.warn` for stalls/reconnects, `console.error` for failures.
-  - Includes a monotonically increasing event id so consecutive entries can be correlated on mobile remote debuggers.
-- Add a small ring buffer (last 100 entries) exposed via `getPlaybackLog()` so the existing diagnostics panel could surface it later (no UI change in this plan).
+The popover opens a compact vertical panel anchored under the button.
 
-### 2. AudioPlayer event logging
+## 2. Stop the A−/A+ from resizing the header buttons
 
-Instrument every code path that can drop or restart the stream. Each log includes a snapshot: `{ url, target, currentTime, readyState, paused, hidden, sinceProgressMs, sinceLoadMs, retryCount, mode }`.
+Problem: `fontScale` is applied to `document.documentElement.style.fontSize`, so every rem-based element (including header controls) grows.
 
-- **playUrl**
-  - Log on entry: requested url, cacheBust flag, chosen target, chosen mode (`mse` / `bypass` / `webaudio`), same-src fast-path hits.
-  - Log resolved `play()` success and any non-AbortError failure.
-- **attemptRecovery**
-  - Log entry reason, current retry count, mobile soft-resume branch taken, mobile paused-resume branch, escalation to full reload, failover to next stream, "All streams unavailable".
-- **scheduleStallCheck**
-  - Log triggering event (`waiting`/`stalled`), whether it was suppressed by the initial-buffer grace, mobile progress check result, timer scheduling vs immediate recovery.
-- **Background watchdog (`doWake`)**
-  - Log the wake reason (`visibility` / `pageshow` / `online`), whether it short-circuited (recent progress), soft-resume path, paused-resume path, and stall-timeout escalation.
-- **Audio element events**
-  - `onError`: log `audio.error.code` + message, network state, ready state.
-  - `onWaiting` / `onStalled` / `onPlaying` / `onPause` / `onEnded`: one-line log each.
-  - `onPlay`: log resolved mode + currentTime.
-- **Visibility / pageshow / online listeners**: log raw transitions before scheduling.
+Fix: apply the font-scale as a CSS variable on `<main>` only (or use an inline `style={{ fontSize: ... }}` on `<main>`), and remove the write to `document.documentElement`. The header lives above/outside the scaled wrapper and stays at the browser default 16px, so button sizes are fixed regardless of the text-size setting. Panels inside `<main>` continue to scale because they inherit font-size from `<main>`.
 
-### 3. Make logging cheap & toggleable
+## 3. Cracktro settings — sectioned layout with dividers
 
-- Gate verbose logs behind `localStorage.getItem("playback-debug") === "1"` OR the diagnostics panel being mounted (already implies the user wants visibility). Default ON for now so the user immediately sees the data on iOS/Android; document the toggle in a single-line comment.
-- Never log secrets or full headers. URLs are already non-sensitive (public streams + proxy endpoint).
+Reorganise the expanded settings bar (`src/components/Cracktro.tsx`, lines 1256–1499) into three horizontal sections separated by vertical dividers (`<div class="w-px h-8 bg-border" />` or the shadcn `Separator` with `orientation="vertical"`). Each section has its own small sticky label.
 
-### Acceptance
+Sections:
 
-- On iOS and Android remote consoles, every reconnect cycle prints an ordered trace: trigger event → decision branch → action taken → outcome.
-- No change to playback behavior, UI, or timers.
-- Desktop logs remain quiet unless an actual stall/reconnect happens (info-level events for resume/visibility are throttled to one line each).
+**Visuals** — Scroller (on/off + mode buttons), Font (skin select), Effect (viz picker), FPS toggle, Size (S/M/L).
+
+**Geese** — Goose, Brown Goose, Boing, Procreation, Family Reset.
+
+**Panels** — Info Bar toggle (moved here), Oneliner, Online, Up Next, Recent, Geese, Diag.
+
+Trailing right cluster (outside the three groups, separated by a divider): Last.fm compact button + version chip.
+
+Layout uses `flex flex-wrap items-start` with each section as a flex column: label on top, controls in a wrapping row. On narrow widths sections stack vertically and dividers become horizontal (`sm:w-px sm:h-auto h-px w-full`).
+
+## 4. Remove Scene Eras
+
+Delete from `Cracktro.tsx`:
+- `STORAGE_SCENE_ERAS`, `STORAGE_SCENE_ERA_LISTEN_MS` constants
+- `sceneErasOn` state + its persistence effect
+- Listening-time tracker and `lastEraTickAtRef` effect (lines ~525–566)
+- The Era badge JSX (~lines 888–902)
+- The Scene Eras toggle in the settings bar (~lines 1389–1402)
+- Imports of `getSceneEraConfig`, `getSceneEraFromListeningMs`, `setGooseSceneEra`
+
+Replace uses:
+- `sceneEraConfig.scrollerSpeed` → constant `1`
+- `sceneEraConfig.infoBarOpacity` → constant `0.9`
+- Auto-viz mapping based on era → remove; keep user-selected `style`
+- Drop the `setGooseSceneEra` calls entirely
+
+Leave `src/lib/gooseSceneEra.ts` and the `setGooseSceneEra` API in place (unused) so no cross-module churn; can be deleted later.
+
+## 5. Verification
+
+- Header buttons stay the same visual size when clicking A− / A+; only panel text changes.
+- Settings popover opens/closes on click and does not overflow on mobile.
+- Cracktro settings bar shows three clearly divided groups with the specified controls and no Scene Eras row.
+- No console errors; existing tests still pass.
