@@ -335,13 +335,17 @@ const Index = () => {
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"
         style={{
           zIndex: 1,
+          fontSize: mainFontSize,
           paddingTop: "max(1rem, var(--safe-top))",
           paddingBottom: "max(1rem, var(--safe-bottom))",
           paddingLeft: "max(0.75rem, var(--safe-left))",
           paddingRight: "max(0.75rem, var(--safe-right))",
         }}
       >
-        <header className="flex flex-col gap-3 mb-5 border-b border-border pb-4 md:flex-row md:items-center md:justify-between">
+        <header
+          className="flex flex-col gap-3 mb-5 border-b border-border pb-4 md:flex-row md:items-center md:justify-between"
+          style={{ fontSize: "16px" }}
+        >
           <div>
             <h1 className="text-2xl md:text-3xl font-bold neon tracking-widest uppercase">▌Necta Compact View</h1>
           </div>
@@ -355,27 +359,6 @@ const Index = () => {
               {THEMES.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => setScanlines((s) => !s)}
-              aria-pressed={scanlines}
-              title="Toggle CRT scanlines"
-              className="min-h-11 px-2 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation"
-            >
-              Scanlines: {scanlines ? "On" : "Off"}
-            </button>
-            <select
-              value={vizStyle}
-              onChange={(e) => setVizStyle(e.target.value as VisualizerStyle)}
-              aria-label="Visualizer style"
-              className="min-h-11 px-2 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation flex-1 min-w-0 md:flex-none"
-            >
-              {VIZ_STYLES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
                 </option>
               ))}
             </select>
@@ -413,18 +396,54 @@ const Index = () => {
               title="Open cracktro scroller mode in a window"
             >
               ▶ Scroller Mode
-
             </button>
-            <LastfmButton />
-            <button
-              type="button"
-              onClick={() => setDiagnosticsOpen((v) => !v)}
-              className="min-h-11 px-3 py-2 uppercase text-xs tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card transition-colors touch-manipulation shrink-0"
-              title="Toggle playback diagnostics overlay"
-              aria-pressed={diagnosticsOpen}
-            >
-              Diagnostics
-            </button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="min-h-11 px-3 py-2 uppercase text-xs tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card transition-colors touch-manipulation shrink-0"
+                  title="More settings"
+                  aria-label="Settings"
+                >
+                  ⚙ Settings
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 p-2 flex flex-col gap-2" style={{ fontSize: "16px" }}>
+                <button
+                  type="button"
+                  onClick={() => setScanlines((s) => !s)}
+                  aria-pressed={scanlines}
+                  title="Toggle CRT scanlines"
+                  className="min-h-10 px-2 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation text-left"
+                >
+                  Scanlines: {scanlines ? "On" : "Off"}
+                </button>
+                <label className="text-[10px] uppercase tracking-widest text-muted-foreground px-1">Visualizer</label>
+                <select
+                  value={vizStyle}
+                  onChange={(e) => setVizStyle(e.target.value as VisualizerStyle)}
+                  aria-label="Visualizer style"
+                  className="min-h-10 px-2 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation"
+                >
+                  {VIZ_STYLES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setDiagnosticsOpen((v) => !v)}
+                  className="min-h-10 px-2 py-2 uppercase text-xs tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card transition-colors touch-manipulation text-left"
+                  aria-pressed={diagnosticsOpen}
+                >
+                  Diagnostics: {diagnosticsOpen ? "On" : "Off"}
+                </button>
+                <div className="pt-1 border-t border-border">
+                  <LastfmButton />
+                </div>
+              </PopoverContent>
+            </Popover>
             <button
               onClick={refreshAll}
               className="min-h-11 px-3 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity touch-manipulation shrink-0"
@@ -434,6 +453,7 @@ const Index = () => {
             </button>
           </div>
         </header>
+
 
         <div className="mb-4">
           <AudioPlayer
