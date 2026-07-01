@@ -14,8 +14,7 @@ import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/li
 import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl, formatDuration, computeTimeLeft } from "@/lib/nectarine";
 import { StageProvider } from "@/lib/stage";
 import { renderBBCode } from "@/lib/bbcode";
-import { getSceneEraConfig, getSceneEraFromListeningMs } from "@/lib/gooseSceneEra";
-import { sayFromAnyGoose, setGoosePerformanceState, setGooseSceneEra, setProcreationEnabled } from "@/lib/gooseSocial";
+import { sayFromAnyGoose, setGoosePerformanceState, setProcreationEnabled } from "@/lib/gooseSocial";
 import { notePlatformChange } from "@/lib/gooseRaptureEvents";
 import { pickRatingLine } from "@/lib/gooseSongChatter";
 import {
@@ -78,8 +77,6 @@ const STORAGE_MODE = "cracktro-scroll-mode";
 const STORAGE_ON = "cracktro-scroll-on";
 const STORAGE_INFOBAR = "cracktro-infobar-on";
 const STORAGE_FPS_COUNTER = "cracktro-fps-counter";
-const STORAGE_SCENE_ERAS = "cracktro-scene-eras";
-const STORAGE_SCENE_ERA_LISTEN_MS = "cracktro-scene-era-listen-ms";
 const MAX_FRAME_TIME_MS = 100;
 const FPS_EMA_ALPHA = 0.1;
 const LOW_FPS_THRESHOLD = 28;
@@ -499,77 +496,8 @@ const Cracktro = ({
       /* ignore */
     }
   }, []);
-  const [sceneErasOn, setSceneErasOn] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(STORAGE_SCENE_ERAS) === "1";
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_SCENE_ERAS, sceneErasOn ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [sceneErasOn]);
-  const [listeningMs, setListeningMs] = useState<number>(() => {
-    try {
-      const raw = Number(localStorage.getItem(STORAGE_SCENE_ERA_LISTEN_MS));
-      return Number.isFinite(raw) ? Math.max(0, raw) : 0;
-    } catch {
-      return 0;
-    }
-  });
-  const listeningMsRef = useRef(listeningMs);
-  const lastEraTickAtRef = useRef<number | null>(null);
-  const lastPersistedMinuteRef = useRef(Math.floor(listeningMs / 60_000));
-  useEffect(() => {
-    listeningMsRef.current = listeningMs;
-  }, [listeningMs]);
-  useEffect(() => {
-    const minuteBucket = Math.floor(listeningMs / 60_000);
-    if (minuteBucket === lastPersistedMinuteRef.current) return;
-    lastPersistedMinuteRef.current = minuteBucket;
-    try {
-      localStorage.setItem(STORAGE_SCENE_ERA_LISTEN_MS, String(Math.floor(listeningMs)));
-    } catch {
-      /* ignore */
-    }
-  }, [listeningMs]);
-  // Persist once per minute during runtime plus one final write on unmount.
-  useEffect(
-    () => () => {
-      try {
-        localStorage.setItem(STORAGE_SCENE_ERA_LISTEN_MS, String(Math.floor(listeningMsRef.current)));
-      } catch {
-        /* ignore */
-      }
-    },
-    [],
-  );
-  useEffect(() => {
-    if (!sceneErasOn) return;
-    lastEraTickAtRef.current = Date.now();
-    const interval = window.setInterval(() => {
-      // Approximation: listening time advances while cracktro view stays open.
-      const now = Date.now();
-      const prev = lastEraTickAtRef.current ?? now;
-      lastEraTickAtRef.current = now;
-      const deltaMs = Math.min(60_000, Math.max(5_000, now - prev));
-      setListeningMs((v) => v + deltaMs);
-    }, 15_000);
-    return () => {
-      lastEraTickAtRef.current = null;
-      window.clearInterval(interval);
-    };
-  }, [sceneErasOn]);
-  const sceneEra = sceneErasOn ? getSceneEraFromListeningMs(listeningMs) : "intro";
-  const sceneEraConfig = getSceneEraConfig(sceneEra);
-  useEffect(() => {
-    setGooseSceneEra(sceneEra);
-    return () => setGooseSceneEra("intro");
-  }, [sceneEra]);
+  // Scene Eras feature removed.
+  const sceneEraConfig = { scrollerSpeed: 1, infoBarOpacity: 0.9 };
   useEffect(() => {
     setGoosePerformanceState({ lowFps: lowFpsDetected });
     return () => setGoosePerformanceState({ lowFps: false });
@@ -579,13 +507,8 @@ const Cracktro = ({
     setFps(null);
     setLowFpsDetected(false);
   }, [scrollOn]);
-  const effectiveStyle = useMemo<VisualizerStyle>(() => {
-    if (style !== "off") return style;
-    if (sceneEra === "warmed") return "starfield";
-    if (sceneEra === "party") return "rings";
-    if (sceneEra === "veteran") return "particles";
-    return "tunnel";
-  }, [sceneEra, style]);
+  const effectiveStyle = style === "off" ? "tunnel" : style;
+
 
   // Scroller canvas — modes: sinus / bouncy / zoomer / wobble / copper / vector.
   useEffect(() => {
@@ -885,21 +808,6 @@ const Cracktro = ({
         >
           EXIT
         </button>
-        {sceneErasOn && (
-          <div
-            className={`absolute z-10 min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground transition-opacity duration-500 flex items-center ${
-              showHintChrome ? "opacity-100" : "opacity-0 pointer-events-none"
-            }`}
-            style={{
-              top: "calc(env(safe-area-inset-top, 0px) + 0.5rem)",
-              left: "calc(env(safe-area-inset-left, 0px) + 5rem)",
-            }}
-            aria-label={`Scene Era: ${sceneEraConfig.label}`}
-            title={`Scene Era: ${sceneEraConfig.label}`}
-          >
-            Era: {sceneEraConfig.label}
-          </div>
-        )}
         {fpsCounterOn && (
           <div
             className="absolute z-10 rounded-sm border border-border bg-card/60 px-2 py-1 text-[10px] uppercase tracking-widest text-foreground"
@@ -1253,249 +1161,212 @@ const Cracktro = ({
               ▼
             </button>
           </div>
-          {/* Row 1: scroller controls */}
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mr-1">Scroller</span>
-            <button
-              type="button"
-              onClick={() => setScrollOn((v) => !v)}
-              className="min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
-              aria-pressed={scrollOn}
-            >
-              {scrollOn ? "ON" : "OFF"}
-            </button>
-            <div className="flex flex-wrap items-center gap-1">
-              {MODES.map((m) => (
+          {/* Sectioned settings — Visuals · Geese · Panels */}
+          <div className="flex flex-wrap items-start justify-center gap-3">
+            {/* ── Visuals ─────────────────────────── */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">Visuals</span>
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Scroller</span>
                 <button
-                  key={m.id}
                   type="button"
-                  onClick={() => {
-                    setMode(m.id);
-                    if (!scrollOn) setScrollOn(true);
-                  }}
-                  disabled={!scrollOn}
-                  className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                    mode === m.id
-                      ? "border-primary bg-primary/20 text-foreground"
-                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                  } ${!scrollOn ? "opacity-40 cursor-not-allowed" : ""}`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Font</span>
-            <select
-              value={skinOverride}
-              onChange={(e) => setSkinOverride(e.target.value as Skin | "auto")}
-              className="min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
-            >
-              <option value="auto">Auto ({autoSkin})</option>
-              <option value="xm">XM</option>
-              <option value="amiga">Amiga</option>
-              <option value="atari">Atari</option>
-              <option value="c64">C64</option>
-              <option value="default">Default</option>
-            </select>
-
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Info Bar</span>
-            <button
-              type="button"
-              onClick={() => setInfobarOn((v) => !v)}
-              className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                infobarOn
-                  ? "border-primary bg-primary/20 text-foreground"
-                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={infobarOn}
-            >
-              {infobarOn ? "ON" : "OFF"}
-            </button>
-
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">FPS</span>
-            <button
-              type="button"
-              onClick={() => setFpsCounterOn((v) => !v)}
-              className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                fpsCounterOn
-                  ? "border-primary bg-primary/20 text-foreground"
-                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={fpsCounterOn}
-              aria-label="Toggle FPS counter"
-            >
-              {fpsCounterOn ? "ON" : "OFF"}
-            </button>
-
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Goose</span>
-            <button
-              type="button"
-              onClick={() => setGooseOn((v) => !v)}
-              className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                gooseOn
-                  ? "border-primary bg-primary/20 text-foreground"
-                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={gooseOn}
-              title="Toggle flying goose"
-            >
-              {gooseOn ? "ON" : "OFF"}
-            </button>
-
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Brown Goose</span>
-            <button
-              type="button"
-              onClick={() => setBrownGooseOn((v) => !v)}
-              className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                brownGooseOn
-                  ? "border-primary bg-primary/20 text-foreground"
-                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={brownGooseOn}
-              title="Toggle brown flying goose"
-            >
-              {brownGooseOn ? "ON" : "OFF"}
-            </button>
-
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Boing</span>
-            <button
-              type="button"
-              onClick={() => setBoingOn((v) => !v)}
-              className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                boingOn
-                  ? "border-primary bg-primary/20 text-foreground"
-                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={boingOn}
-              title="Toggle Amiga boing ball"
-            >
-              {boingOn ? "ON" : "OFF"}
-            </button>
-
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Procreation</span>
-            <button
-              type="button"
-              onClick={() => setProcreationOn((v) => !v)}
-              className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                procreationOn
-                  ? "border-primary bg-primary/20 text-foreground"
-                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={procreationOn}
-              title="Toggle goose procreation (eggs, goslings, family adults)"
-            >
-              {procreationOn ? "ON" : "OFF"}
-            </button>
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Scene Eras</span>
-            <button
-              type="button"
-              onClick={() => setSceneErasOn((v) => !v)}
-              className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                sceneErasOn
-                  ? "border-primary bg-primary/20 text-foreground"
-                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={sceneErasOn}
-              title="Evolve scene style over long cracktro sessions"
-            >
-              {sceneErasOn ? "ON" : "OFF"}
-            </button>
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-2 mr-1">Last.fm</span>
-            <LastfmButton compact />
-          </div>
-
-          {/* Row: floating panel toggles */}
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mr-1">Panels</span>
-            <div className="flex flex-wrap items-center gap-1">
-              {PANELS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => togglePanel(p.id)}
-                  className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                    panelsOn[p.id]
-                      ? "border-primary bg-primary/20 text-foreground"
-                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-pressed={panelsOn[p.id]}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Row: window size + reset family */}
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mr-1">Size</span>
-            <div className="flex items-center gap-1">
-              {(["s", "m", "l"] as WindowSize[]).map((sz) => (
-                <button
-                  key={sz}
-                  type="button"
-                  onClick={() => applyWindowSize(sz)}
+                  onClick={() => setScrollOn((v) => !v)}
                   className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                    windowSize === sz
+                    scrollOn
                       ? "border-primary bg-primary/20 text-foreground"
                       : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
                   }`}
-                  aria-pressed={windowSize === sz}
-                  title="Resize floating windows and info box"
+                  aria-pressed={scrollOn}
                 >
-                  {sz.toUpperCase()}
+                  {scrollOn ? "ON" : "OFF"}
                 </button>
-              ))}
-            </div>
-            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground ml-3 mr-1">Family</span>
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm(
-                  "Reset the goose family?\n\nThis will permanently delete all your geese, eggs, goslings and grown-up offspring. The two original geese will return. Continue?",
-                )) {
-                  clearRoster();
-                  window.location.reload();
-                }
-              }}
-              className="min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-destructive/60 bg-background/60 text-destructive hover:bg-destructive/20"
-              title="Permanently remove all family members"
-            >
-              Reset
-            </button>
-            <button
-              type="button"
-              onClick={() => setChangelogOpen(true)}
-              className="min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-muted-foreground hover:text-foreground hover:border-primary transition-colors ml-3"
-              title="View changelog"
-            >
-              v{APP_VERSION}
-            </button>
-          </div>
-
-
-          {/* Row 2: visualizer effect picker */}
-          {onStyleChange && (
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mr-1">Effect</span>
-              <div className="flex flex-wrap items-center gap-1">
-                {VIZ_STYLES.map((v) => (
+                {MODES.map((m) => (
                   <button
-                    key={v.id}
+                    key={m.id}
                     type="button"
-                    onClick={() => onStyleChange(v.id)}
+                    onClick={() => {
+                      setMode(m.id);
+                      if (!scrollOn) setScrollOn(true);
+                    }}
+                    disabled={!scrollOn}
                     className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                      style === v.id
+                      mode === m.id
+                        ? "border-primary bg-primary/20 text-foreground"
+                        : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                    } ${!scrollOn ? "opacity-40 cursor-not-allowed" : ""}`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Font</span>
+                <select
+                  value={skinOverride}
+                  onChange={(e) => setSkinOverride(e.target.value as Skin | "auto")}
+                  className="min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
+                >
+                  <option value="auto">Auto ({autoSkin})</option>
+                  <option value="xm">XM</option>
+                  <option value="amiga">Amiga</option>
+                  <option value="atari">Atari</option>
+                  <option value="c64">C64</option>
+                  <option value="default">Default</option>
+                </select>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground ml-1">FPS</span>
+                <button
+                  type="button"
+                  onClick={() => setFpsCounterOn((v) => !v)}
+                  className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                    fpsCounterOn
+                      ? "border-primary bg-primary/20 text-foreground"
+                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-pressed={fpsCounterOn}
+                  aria-label="Toggle FPS counter"
+                >
+                  {fpsCounterOn ? "ON" : "OFF"}
+                </button>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground ml-1">Size</span>
+                {(["s", "m", "l"] as WindowSize[]).map((sz) => (
+                  <button
+                    key={sz}
+                    type="button"
+                    onClick={() => applyWindowSize(sz)}
+                    className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                      windowSize === sz
                         ? "border-primary bg-primary/20 text-foreground"
                         : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
                     }`}
+                    aria-pressed={windowSize === sz}
+                    title="Resize floating windows and info box"
                   >
-                    {v.label}
+                    {sz.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              {onStyleChange && (
+                <div className="flex flex-wrap items-center justify-center gap-1.5">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Effect</span>
+                  {VIZ_STYLES.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => onStyleChange(v.id)}
+                      className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                        style === v.id
+                          ? "border-primary bg-primary/20 text-foreground"
+                          : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="w-px self-stretch bg-border hidden sm:block" aria-hidden />
+
+            {/* ── Geese ─────────────────────────── */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">Geese</span>
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                {[
+                  { label: "Goose", state: gooseOn, toggle: () => setGooseOn((v) => !v), title: "Toggle flying goose" },
+                  { label: "Brown", state: brownGooseOn, toggle: () => setBrownGooseOn((v) => !v), title: "Toggle brown flying goose" },
+                  { label: "Boing", state: boingOn, toggle: () => setBoingOn((v) => !v), title: "Toggle Amiga boing ball" },
+                  { label: "Procreation", state: procreationOn, toggle: () => setProcreationOn((v) => !v), title: "Toggle goose procreation" },
+                ].map((it) => (
+                  <button
+                    key={it.label}
+                    type="button"
+                    onClick={it.toggle}
+                    className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                      it.state
+                        ? "border-primary bg-primary/20 text-foreground"
+                        : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                    }`}
+                    aria-pressed={it.state}
+                    title={it.title}
+                  >
+                    {it.label}: {it.state ? "ON" : "OFF"}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(
+                      "Reset the goose family?\n\nThis will permanently delete all your geese, eggs, goslings and grown-up offspring. The two original geese will return. Continue?",
+                    )) {
+                      clearRoster();
+                      window.location.reload();
+                    }
+                  }}
+                  className="min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-destructive/60 bg-background/60 text-destructive hover:bg-destructive/20"
+                  title="Permanently remove all family members"
+                >
+                  Reset Family
+                </button>
+              </div>
+            </div>
+
+            <div className="w-px self-stretch bg-border hidden sm:block" aria-hidden />
+
+            {/* ── Panels ─────────────────────────── */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">Panels</span>
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setInfobarOn((v) => !v)}
+                  className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                    infobarOn
+                      ? "border-primary bg-primary/20 text-foreground"
+                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-pressed={infobarOn}
+                  title="Toggle the now-playing info bar"
+                >
+                  Info Bar: {infobarOn ? "ON" : "OFF"}
+                </button>
+                {PANELS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => togglePanel(p.id)}
+                    className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                      panelsOn[p.id]
+                        ? "border-primary bg-primary/20 text-foreground"
+                        : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                    }`}
+                    aria-pressed={panelsOn[p.id]}
+                  >
+                    {p.label}
                   </button>
                 ))}
               </div>
             </div>
-          )}
+
+            <div className="w-px self-stretch bg-border hidden sm:block" aria-hidden />
+
+            {/* ── Trailing: Last.fm + version ─────── */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">More</span>
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                <LastfmButton compact />
+                <button
+                  type="button"
+                  onClick={() => setChangelogOpen(true)}
+                  className="min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+                  title="View changelog"
+                >
+                  v{APP_VERSION}
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </StageProvider>
       {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
