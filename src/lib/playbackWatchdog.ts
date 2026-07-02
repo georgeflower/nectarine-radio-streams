@@ -92,6 +92,16 @@ export const getVisibilityResumeDelayMs = (): number => {
   );
 };
 
+/** Threshold above which a hidden-period is long enough that any buffered
+ *  audio should be treated as stale. Returns Infinity on desktop (never
+ *  force a live-edge reload from a visibility change alone). */
+export const getLiveEdgeReloadAfterHiddenMs = (): number => {
+  const p = detectPlatform();
+  if (p === "ios") return Math.max(1000, config.iosLiveEdgeReloadAfterHiddenMs);
+  if (p === "android") return Math.max(1000, config.androidLiveEdgeReloadAfterHiddenMs);
+  return Number.POSITIVE_INFINITY;
+};
+
 // --- Diagnostics state -----------------------------------------------------
 
 export type PlaybackMode = "idle" | "bypass" | "mse" | "webaudio";
