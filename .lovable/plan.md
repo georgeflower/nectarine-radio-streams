@@ -1,62 +1,58 @@
-## 1. Main page (`src/pages/Index.tsx`) — declutter header
+# What's New Popup on Version Update
 
-Keep in the top bar (always visible):
-- Theme selector
-- A− / A+ text-size stepper
-- ▶ Scroller Mode
-- Refresh
+Add an auto-triggered "New Version" announcement that appears once per release, styled in the demoscene/cracktro aesthetic, and dismissible with per-version persistence.
 
-Move into a new "⚙ Settings" popover button (using existing `Popover` from shadcn):
-- Scanlines toggle
-- Visualizer style dropdown
-- Diagnostics toggle
-- Last.fm button
+## Behavior
 
-The popover opens a compact vertical panel anchored under the button.
+- On app mount, compare `APP_VERSION` (from `ChangelogModal.tsx`) against `localStorage["changelog-seen-version"]`.
+- If they differ (or key is missing), show a new `WhatsNewPopup` overlay.
+- On close, write the current `APP_VERSION` into `localStorage["changelog-seen-version"]` so it won't reappear until the next bump.
+- First-ever visitors also see it once (so they're introduced to the changelog) — acceptable and matches the spec.
+- A "View full changelog" button inside the popup opens the existing `ChangelogModal` and marks the version seen.
 
-## 2. Stop the A−/A+ from resizing the header buttons
+## New component: `src/components/WhatsNewPopup.tsx`
 
-Problem: `fontScale` is applied to `document.documentElement.style.fontSize`, so every rem-based element (including header controls) grows.
+Demoscene-flavored, standalone from `ChangelogModal`:
 
-Fix: apply the font-scale as a CSS variable on `<main>` only (or use an inline `style={{ fontSize: ... }}` on `<main>`), and remove the write to `document.documentElement`. The header lives above/outside the scaled wrapper and stays at the browser default 16px, so button sizes are fixed regardless of the text-size setting. Panels inside `<main>` continue to scale because they inherit font-size from `<main>`.
+- Fixed overlay, centered, with backdrop blur + subtle scanlines.
+- Card sized `max-w-md` on desktop, full-width with margin on mobile; max-height `85vh` with internal scroll for the changes list.
+- Content shows only the **latest** entry from `CHANGELOG[0]` (version, date, bullet list) plus a headline like `NEW RELEASE // v{APP_VERSION}`.
+- Two buttons: `[ DISMISS ]` and `[ FULL CHANGELOG ]`.
+- Close via ✕, Escape, backdrop click, or Dismiss — all persist the seen version.
 
-## 3. Cracktro settings — sectioned layout with dividers
+### Demoscene styling & animation
 
-Reorganise the expanded settings bar (`src/components/Cracktro.tsx`, lines 1256–1499) into three horizontal sections separated by vertical dividers (`<div class="w-px h-8 bg-border" />` or the shadcn `Separator` with `orientation="vertical"`). Each section has its own small sticky label.
+Reuse existing tokens (`neon-accent`, `bg-background`, `border-border`) — no hardcoded colors. Effects:
 
-Sections:
+- Entrance: scale-in + fade-in, plus a chromatic-aberration glitch flash (2–3 quick RGB-split frames) using CSS keyframes.
+- Animated neon gradient border (conic-gradient rotation) around the card.
+- Subtle CRT scanline overlay inside the card (repeating-linear-gradient).
+- Marquee "★ NEW VERSION ★ NEW VERSION ★" strip across the header, scrolling horizontally.
+- Pulsing glow on the version number.
+- Bullet items stagger-fade in (CSS animation-delay per index).
+- Respect `prefers-reduced-motion`: disable glitch/marquee, keep fade only.
 
-**Visuals** — Scroller (on/off + mode buttons), Font (skin select), Effect (viz picker), FPS toggle, Size (S/M/L).
+All keyframes added inline to the component via a `<style>` tag or added to `tailwind.config.ts` `keyframes` block (prefer tailwind config for `glitch`, `marquee`, `border-spin`).
 
-**Geese** — Goose, Brown Goose, Boing, Procreation, Family Reset.
+## Wiring: `src/pages/Index.tsx`
 
-**Panels** — Info Bar toggle (moved here), Oneliner, Online, Up Next, Recent, Geese, Diag.
+- Add `const [whatsNewOpen, setWhatsNewOpen] = useState(false)`.
+- In a `useEffect` on mount, read `localStorage.getItem("changelog-seen-version")`; if `!== APP_VERSION`, set `whatsNewOpen(true)`.
+- Render `{whatsNewOpen && <WhatsNewPopup onClose={...} onViewFull={...} />}` at the same level as the existing `ChangelogModal`.
+- `onClose` writes localStorage and closes.
+- `onViewFull` writes localStorage, closes popup, opens `setChangelogOpen(true)`.
 
-Trailing right cluster (outside the three groups, separated by a divider): Last.fm compact button + version chip.
+Cracktro mode (`Cracktro.tsx`) already renders inside `Index.tsx`, so mounting the popup at the `Index.tsx` level covers both modes. Confirm by ensuring the popup uses `z-[10001]` so it sits above cracktro chrome and its own changelog modal (which is `z-[10000]`).
 
-Layout uses `flex flex-wrap items-start` with each section as a flex column: label on top, controls in a wrapping row. On narrow widths sections stack vertically and dividers become horizontal (`sm:w-px sm:h-auto h-px w-full`).
+## Responsive check
 
-## 4. Remove Scene Eras
+- Mobile: `w-[calc(100%-1.5rem)] mx-3`, larger tap targets (min 44px), buttons stack vertically under `sm`.
+- Desktop: horizontal button row, `max-w-md`.
 
-Delete from `Cracktro.tsx`:
-- `STORAGE_SCENE_ERAS`, `STORAGE_SCENE_ERA_LISTEN_MS` constants
-- `sceneErasOn` state + its persistence effect
-- Listening-time tracker and `lastEraTickAtRef` effect (lines ~525–566)
-- The Era badge JSX (~lines 888–902)
-- The Scene Eras toggle in the settings bar (~lines 1389–1402)
-- Imports of `getSceneEraConfig`, `getSceneEraFromListeningMs`, `setGooseSceneEra`
+## Files touched
 
-Replace uses:
-- `sceneEraConfig.scrollerSpeed` → constant `1`
-- `sceneEraConfig.infoBarOpacity` → constant `0.9`
-- Auto-viz mapping based on era → remove; keep user-selected `style`
-- Drop the `setGooseSceneEra` calls entirely
+- **New**: `src/components/WhatsNewPopup.tsx`
+- **Edit**: `src/pages/Index.tsx` (mount + effect)
+- **Edit**: `tailwind.config.ts` (add `glitch`, `marquee`, `border-spin` keyframes/animations)
 
-Leave `src/lib/gooseSceneEra.ts` and the `setGooseSceneEra` API in place (unused) so no cross-module churn; can be deleted later.
-
-## 5. Verification
-
-- Header buttons stay the same visual size when clicking A− / A+; only panel text changes.
-- Settings popover opens/closes on click and does not overflow on mobile.
-- Cracktro settings bar shows three clearly divided groups with the specified controls and no Scene Eras row.
-- No console errors; existing tests still pass.
+No backend, no version bump — this ships as part of the current v0.6.9 (the very first release with the feature will itself trigger the popup for existing users, which is the desired behavior).

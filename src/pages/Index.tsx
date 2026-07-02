@@ -27,6 +27,7 @@ import BeatOverlay from "@/components/BeatOverlay";
 import PlaybackDiagnostics from "@/components/PlaybackDiagnostics";
 import Cracktro from "@/components/Cracktro";
 import ChangelogModal, { APP_VERSION } from "@/components/ChangelogModal";
+import WhatsNewPopup from "@/components/WhatsNewPopup";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
@@ -182,6 +183,7 @@ const Index = () => {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [seekCount, setSeekCount] = useState(0);
   useWakeLock();
 
@@ -196,6 +198,12 @@ const Index = () => {
   useEffect(() => {
     void hydrateCloudLexiconOnce();
     void handleLastfmCallback();
+    try {
+      const seen = localStorage.getItem("changelog-seen-version");
+      if (seen !== APP_VERSION) setWhatsNewOpen(true);
+    } catch {
+      // ignore
+    }
   }, []);
 
 
@@ -331,6 +339,19 @@ const Index = () => {
         />
       )}
       {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
+      {whatsNewOpen && (
+        <WhatsNewPopup
+          onClose={() => {
+            try { localStorage.setItem("changelog-seen-version", APP_VERSION); } catch {}
+            setWhatsNewOpen(false);
+          }}
+          onViewFull={() => {
+            try { localStorage.setItem("changelog-seen-version", APP_VERSION); } catch {}
+            setWhatsNewOpen(false);
+            setChangelogOpen(true);
+          }}
+        />
+      )}
       {diagnosticsOpen && <PlaybackDiagnostics onClose={() => setDiagnosticsOpen(false)} />}
       <main
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"

@@ -8,7 +8,7 @@ interface ChangelogEntry {
   changes: string[];
 }
 
-const CHANGELOG: ChangelogEntry[] = [
+export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "0.6.9",
     date: "2026-07-01",
