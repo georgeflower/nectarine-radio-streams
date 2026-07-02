@@ -19,6 +19,7 @@ import {
 } from "@/lib/songArtwork";
 import { sendNowPlaying, sendScrobble, getLastfmSession } from "@/lib/lastfm";
 import {
+  getLiveEdgeReloadAfterHiddenMs,
   getStallTimeoutMs,
   getVisibilityResumeDelayMs,
   logPlayback,
