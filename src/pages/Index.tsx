@@ -219,6 +219,25 @@ const Index = () => {
     }
   }, []);
 
+  // Surface "new version available" events dispatched by main.tsx.
+  useEffect(() => {
+    const handler = async () => {
+      const { toast } = await import("sonner");
+      const { forceReloadForNewVersion } = await import("@/lib/versionCheck");
+      toast("A new version is available", {
+        description: "Reload to get the latest streams, fixes and features.",
+        duration: 20_000,
+        action: {
+          label: "Reload now",
+          onClick: () => { void forceReloadForNewVersion(); },
+        },
+      });
+    };
+    window.addEventListener("nectarine:update-available", handler as EventListener);
+    return () => window.removeEventListener("nectarine:update-available", handler as EventListener);
+  }, []);
+
+
 
   const [fontScale, setFontScale] = useState<number>(() => {
     try {
