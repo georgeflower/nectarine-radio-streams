@@ -11,6 +11,10 @@ export type WatchdogConfig = {
   iosVisibilityResumeDelayMs: number;
   androidVisibilityResumeDelayMs: number;
   desktopVisibilityResumeDelayMs: number;
+  /** How long the tab may be hidden before we treat any buffered <audio>
+   *  content as stale and force a live-edge reload instead of a soft resume. */
+  iosLiveEdgeReloadAfterHiddenMs: number;
+  androidLiveEdgeReloadAfterHiddenMs: number;
 };
 
 export const DEFAULT_WATCHDOG_CONFIG: WatchdogConfig = {
@@ -20,6 +24,8 @@ export const DEFAULT_WATCHDOG_CONFIG: WatchdogConfig = {
   iosVisibilityResumeDelayMs: 250,
   androidVisibilityResumeDelayMs: 500,
   desktopVisibilityResumeDelayMs: 0,
+  iosLiveEdgeReloadAfterHiddenMs: 10_000,
+  androidLiveEdgeReloadAfterHiddenMs: 20_000,
 };
 
 const STORAGE_KEY = "playback-watchdog-config-v1";
