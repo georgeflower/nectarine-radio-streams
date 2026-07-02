@@ -145,14 +145,18 @@ export function useLastfm() {
   return { session, login, logout };
 }
 
-/** Call once on app mount; if ?token= is present, exchange and clean URL. */
-export async function handleLastfmCallback() {
+/** Call once on app mount; if ?token= is present, exchange and clean URL.
+ *  Returns a result object so the caller can surface success/failure UI. */
+export async function handleLastfmCallback(): Promise<LastfmAuthResult | null> {
   try {
     const url = new URL(window.location.href);
     const token = url.searchParams.get("token");
-    if (!token) return;
-    await exchangeToken(token);
+    if (!token) return null;
+    const result = await exchangeToken(token);
     url.searchParams.delete("token");
     window.history.replaceState({}, "", url.toString());
-  } catch { /* ignore */ }
+    return result;
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 }
