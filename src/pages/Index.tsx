@@ -183,6 +183,7 @@ const Index = () => {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [seekCount, setSeekCount] = useState(0);
   useWakeLock();
 
