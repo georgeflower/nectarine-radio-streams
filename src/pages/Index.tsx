@@ -27,6 +27,7 @@ import BeatOverlay from "@/components/BeatOverlay";
 import PlaybackDiagnostics from "@/components/PlaybackDiagnostics";
 import Cracktro from "@/components/Cracktro";
 import ChangelogModal, { APP_VERSION } from "@/components/ChangelogModal";
+import WhatsNewPopup from "@/components/WhatsNewPopup";
 import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
