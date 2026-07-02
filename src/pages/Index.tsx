@@ -196,8 +196,15 @@ const Index = () => {
   }, [vizStyle]);
 
   useEffect(() => {
+  useEffect(() => {
     void hydrateCloudLexiconOnce();
     void handleLastfmCallback();
+    try {
+      const seen = localStorage.getItem("changelog-seen-version");
+      if (seen !== APP_VERSION) setWhatsNewOpen(true);
+    } catch {
+      // ignore
+    }
   }, []);
 
 
