@@ -344,7 +344,11 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     const onVisibility = () => {
       reportVisibility(document.visibilityState);
       logPlayback("info", "visibility", `state=${document.visibilityState}`);
-      if (document.visibilityState === "visible") schedule("visibility");
+      if (document.visibilityState === "hidden") {
+        hiddenSinceRef.current = Date.now();
+      } else if (document.visibilityState === "visible") {
+        schedule("visibility");
+      }
     };
     const onPageshow = () => { logPlayback("info", "pageshow", "event"); schedule("pageshow"); };
     const onOnline = () => { logPlayback("info", "online", "event"); schedule("online"); };
