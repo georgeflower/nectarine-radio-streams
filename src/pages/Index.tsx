@@ -226,7 +226,7 @@ const Index = () => {
       // ignore
     }
   }, [fontScale]);
-  const mainFontSize = `min(${fontScale * 16}px, calc(100vw / 22))`;
+  const contentZoom = fontScale;
 
   const adjustFont = (delta: number) =>
     setFontScale((s) => Math.min(1.6, Math.max(0.7, Math.round((s + delta) * 10) / 10)));
@@ -357,7 +357,6 @@ const Index = () => {
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"
         style={{
           zIndex: 1,
-          fontSize: mainFontSize,
           paddingTop: "max(1rem, var(--safe-top))",
           paddingBottom: "max(1rem, var(--safe-bottom))",
           paddingLeft: "max(0.75rem, var(--safe-left))",
@@ -476,7 +475,7 @@ const Index = () => {
           </div>
         </header>
 
-
+        <div style={{ zoom: contentZoom } as React.CSSProperties}>
         <div className="mb-4">
           <AudioPlayer
             streams={streams}
@@ -765,6 +764,7 @@ const Index = () => {
             v{APP_VERSION}
           </button>
         </footer>
+        </div>
       </main>
     </div>
   );
