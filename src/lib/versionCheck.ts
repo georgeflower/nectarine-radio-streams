@@ -88,27 +88,29 @@ export async function forceReloadForNewVersion(): Promise<void> {
   location.replace(url.toString());
 }
 
-/** Poll for a new version every `intervalMs`. Fires `onStale` once when a
- *  new build is detected. Returns a cleanup function. */
+/** Poll for a new version every `intervalMs`. Fires `onStale` at most once
+ *  per distinct server build id (persisted in localStorage). Returns a
+ *  cleanup function. */
 export function startVersionPolling(
   onStale: (result: VersionCheckResult) => void,
   intervalMs = 5 * 60_000,
 ): () => void {
-  let fired = false;
+  const NOTIFIED_KEY = "nectarine-build-id-notified";
   let cancelled = false;
   const tick = async () => {
     if (cancelled) return;
     const r = await checkForNewVersion();
-    if (!fired && r.stale) {
-      fired = true;
-      onStale(r);
-    }
+    if (!r.stale || !r.server) return;
+    let alreadyNotified: string | null = null;
+    try { alreadyNotified = localStorage.getItem(NOTIFIED_KEY); } catch { /* ignore */ }
+    if (alreadyNotified === r.server) return;
+    try { localStorage.setItem(NOTIFIED_KEY, r.server); } catch { /* ignore */ }
+    onStale(r);
   };
   const id = window.setInterval(tick, intervalMs);
   const onFocus = () => { void tick(); };
   window.addEventListener("focus", onFocus);
   document.addEventListener("visibilitychange", onFocus);
-  // Kick off after 5s so we don't fight initial load.
   const kickoff = window.setTimeout(tick, 5000);
   return () => {
     cancelled = true;
