@@ -196,7 +196,6 @@ const Index = () => {
   }, [vizStyle]);
 
   useEffect(() => {
-  useEffect(() => {
     void hydrateCloudLexiconOnce();
     void handleLastfmCallback();
     try {
