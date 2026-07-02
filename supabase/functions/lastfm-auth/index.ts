@@ -15,6 +15,16 @@ async function md5(s: string): Promise<string> {
   return toHex(buf);
 }
 
+function keyMeta(k: string | undefined) {
+  if (!k) return { present: false };
+  return {
+    present: true,
+    len: k.length,
+    prefix: k.slice(0, 4),
+    suffix: k.slice(-4),
+  };
+}
+
 async function signedCall(params: Record<string, string>) {
   const all: Record<string, string> = { ...params, api_key: API_KEY };
   const sigBase = Object.keys(all)
@@ -33,26 +43,64 @@ async function signedCall(params: Record<string, string>) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  const meta = { apiKey: keyMeta(API_KEY), apiSecret: keyMeta(API_SECRET) };
+
   try {
-    const { token } = await req.json();
-    if (!token || typeof token !== "string") {
-      return new Response(JSON.stringify({ error: "missing token" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const { token, diag } = await req.json().catch(() => ({}));
+
+    // Diagnostic ping: returns config metadata (no secrets leaked) so the
+    // client can verify the edge function has matching credentials loaded.
+    if (diag === true) {
+      return new Response(JSON.stringify({ ok: true, meta }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    if (!token || typeof token !== "string") {
+      return new Response(JSON.stringify({ error: "missing token", meta }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!API_KEY || !API_SECRET) {
+      console.error("[lastfm-auth] Missing LASTFM_API_KEY / LASTFM_API_SECRET secrets", meta);
+      return new Response(
+        JSON.stringify({ error: "server misconfigured: missing Last.fm secrets", meta }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const data = await signedCall({ method: "auth.getSession", token });
     if (data?.session?.key) {
-      return new Response(JSON.stringify({
-        sessionKey: data.session.key,
-        username: data.session.name,
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(
+        JSON.stringify({
+          sessionKey: data.session.key,
+          username: data.session.name,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
-    return new Response(JSON.stringify({ error: data?.message || "auth failed", raw: data }), {
-      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+
+    console.warn("[lastfm-auth] auth.getSession failed", {
+      lastfmMessage: data?.message,
+      lastfmError: data?.error,
+      apiKeyMeta: meta.apiKey,
     });
+    return new Response(
+      JSON.stringify({
+        error: data?.message || "auth failed",
+        lastfmError: data?.error ?? null,
+        meta,
+        raw: data,
+      }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    console.error("[lastfm-auth] exception", e);
+    return new Response(JSON.stringify({ error: String(e), meta }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
