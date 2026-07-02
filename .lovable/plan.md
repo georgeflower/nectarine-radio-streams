@@ -1,58 +1,59 @@
-# What's New Popup on Version Update
+## Three separate fixes
 
-Add an auto-triggered "New Version" announcement that appears once per release, styled in the demoscene/cracktro aesthetic, and dismissible with per-version persistence.
+### 1. Last.fm scrobbling "not authorized"
 
-## Behavior
+**Root cause candidates (need to verify one at a time):**
 
-- On app mount, compare `APP_VERSION` (from `ChangelogModal.tsx`) against `localStorage["changelog-seen-version"]`.
-- If they differ (or key is missing), show a new `WhatsNewPopup` overlay.
-- On close, write the current `APP_VERSION` into `localStorage["changelog-seen-version"]` so it won't reappear until the next bump.
-- First-ever visitors also see it once (so they're introduced to the changelog) — acceptable and matches the spec.
-- A "View full changelog" button inside the popup opens the existing `ChangelogModal` and marks the version seen.
+- The frontend builds the auth URL with a hardcoded `LASTFM_API_KEY = "79ba44ee3d4dd0dff77eedf557b0fd3b"` in `src/lib/lastfm.ts`, but the two edge functions (`lastfm-auth`, `lastfm-scrobble`) call the Last.fm API with `Deno.env.get("LASTFM_API_KEY")` + `LASTFM_API_SECRET`. If those two values are not from the **same registered Last.fm API app**, `auth.getSession` returns "Invalid API key" / "Unauthorized Token", the frontend logs `[lastfm] auth failed` in the console, and the session is never stored — so every subsequent scrobble call short-circuits at `if (!current) return`.
+- Last.fm requires the callback URL passed to `auth/?cb=` to match the "Callback URL" registered on the API app page. We currently send `window.location.origin + window.location.pathname`, which is different for `id-preview--…lovable.app`, `demoscene-radio-compact.lovable.app`, and any custom domain. If the registered callback is a single URL, auth silently fails on the other origins.
+- After a successful `auth.getSession`, `handleLastfmCallback` strips the `?token=` param but there is no user-visible success or failure toast, so a failed exchange looks like "it did nothing".
 
-## New component: `src/components/WhatsNewPopup.tsx`
+**Fix:**
 
-Demoscene-flavored, standalone from `ChangelogModal`:
+1. Add temporary structured logging in `lastfm-auth` (log the Last.fm response body when `session.key` is missing) and in the frontend `exchangeToken` (surface the error string via a toast so the user sees exactly why it failed).
+2. Add a diagnostics endpoint / one-shot log in `lastfm-auth` that prints `LASTFM_API_KEY` **length + first/last 4 chars only** and confirms the secret is loaded and matches the frontend key's prefix. Never log the full key/secret.
+3. If the frontend hardcoded key and the secret's key do not match, unify them: keep the API key in code (it's a publishable value) and store only `LASTFM_API_SECRET` in Lovable Cloud, OR pass the frontend key into the edge function request and validate. Recommended: expose the API key from the edge function via a small `lastfm-config` function (or hardcode the same string in the edge function) so we have a single source of truth.
+4. Re-check the Last.fm application settings and ensure the Callback URL is set to a value that matches how users actually reach the app (published `demoscene-radio-compact.lovable.app` + any custom domain). If Last.fm only supports one callback, funnel all environments through the published URL and redirect back after exchange.
+5. Add a visible "Last.fm status" indicator: after `handleLastfmCallback`, if there was a `?token=` param but no session got stored, show a toast with the actual Last.fm error message.
+6. Add a small "Test scrobble" button in the diagnostics panel that calls `sendNowPlaying` with the current track and surfaces the raw response, so we can distinguish auth failure from scrobble failure.
 
-- Fixed overlay, centered, with backdrop blur + subtle scanlines.
-- Card sized `max-w-md` on desktop, full-width with margin on mobile; max-height `85vh` with internal scroll for the changes list.
-- Content shows only the **latest** entry from `CHANGELOG[0]` (version, date, bullet list) plus a headline like `NEW RELEASE // v{APP_VERSION}`.
-- Two buttons: `[ DISMISS ]` and `[ FULL CHANGELOG ]`.
-- Close via ✕, Escape, backdrop click, or Dismiss — all persist the seen version.
+### 2. Mobile stream jumps back to a track from several minutes ago
 
-### Demoscene styling & animation
+**Root cause:**
 
-Reuse existing tokens (`neon-accent`, `bg-background`, `border-border`) — no hardcoded colors. Effects:
+In `AudioPlayer.tsx`, the mobile background-resume watchdog (`doWake`) prefers `a.play()` as a "soft resume" whenever `sinceProgress < stallTimeoutMs`. When the OS suspends the tab, the `<audio>` element keeps its internal buffer. On resume, `play()` continues from `currentTime`, which is minutes behind live — so the listener hears the old song that was playing when the phone was locked.
 
-- Entrance: scale-in + fade-in, plus a chromatic-aberration glitch flash (2–3 quick RGB-split frames) using CSS keyframes.
-- Animated neon gradient border (conic-gradient rotation) around the card.
-- Subtle CRT scanline overlay inside the card (repeating-linear-gradient).
-- Marquee "★ NEW VERSION ★ NEW VERSION ★" strip across the header, scrolling horizontally.
-- Pulsing glow on the version number.
-- Bullet items stagger-fade in (CSS animation-delay per index).
-- Respect `prefers-reduced-motion`: disable glitch/marquee, keep fade only.
+Also, when mobile mode uses the direct stream URL, some Icecast/Shoutcast endpoints replay the recent chunk buffer to new listeners on reconnect; combined with our soft resume this compounds the delay.
 
-All keyframes added inline to the component via a `<style>` tag or added to `tailwind.config.ts` `keyframes` block (prefer tailwind config for `glitch`, `marquee`, `border-spin`).
+**Fix:**
 
-## Wiring: `src/pages/Index.tsx`
+1. Track the timestamp of the last user-visible playback event and the timestamp when the tab was hidden. If the tab was hidden for more than a configurable threshold (default ~10s on iOS, ~20s on Android — reuse `WatchdogConfig`), skip soft resume and instead:
+   - Force a live-edge seek: `a.currentTime = a.seekable.end(a.seekable.length - 1)` when `seekable` is non-empty.
+   - If the source is Icecast/Shoutcast (which is non-seekable), fully reload the element via `playUrl(selectedUrl, /* cacheBust */ true)` so we drop the stale internal buffer and reconnect to the live edge.
+2. Only allow the "soft resume" path when the tab was hidden for a very short interval (e.g. <3s) — otherwise assume the buffer is stale.
+3. Log both branches through `logPlayback` with a new category `live-edge` so the diagnostics panel shows why each resume chose reload vs. soft resume.
+4. Add two configurable thresholds to `WatchdogConfig`: `iosLiveEdgeReloadAfterHiddenMs`, `androidLiveEdgeReloadAfterHiddenMs`, editable from the diagnostics panel.
 
-- Add `const [whatsNewOpen, setWhatsNewOpen] = useState(false)`.
-- In a `useEffect` on mount, read `localStorage.getItem("changelog-seen-version")`; if `!== APP_VERSION`, set `whatsNewOpen(true)`.
-- Render `{whatsNewOpen && <WhatsNewPopup onClose={...} onViewFull={...} />}` at the same level as the existing `ChangelogModal`.
-- `onClose` writes localStorage and closes.
-- `onViewFull` writes localStorage, closes popup, opens `setChangelogOpen(true)`.
+### 3. Phone sometimes opens an older version of the app
 
-Cracktro mode (`Cracktro.tsx`) already renders inside `Index.tsx`, so mounting the popup at the `Index.tsx` level covers both modes. Confirm by ensuring the popup uses `z-[10001]` so it sits above cracktro chrome and its own changelog modal (which is `z-[10000]`).
+**Root cause:**
 
-## Responsive check
+The app has no service worker (correct — we should keep it that way per Lovable's default), but `site.webmanifest` declares `display: standalone`, so users can add it to the iOS/Android home screen. iOS caches the `start_url` HTML aggressively for installed PWAs and shows it before the network request completes. Our `startVersionCheck` does compare hashed asset signatures and hard-reloads on mismatch, but:
 
-- Mobile: `w-[calc(100%-1.5rem)] mx-3`, larger tap targets (min 44px), buttons stack vertically under `sm`.
-- Desktop: horizontal button row, `max-w-md`.
+- It reads from `localStorage`; in private-mode / storage-evicted installs the stored signature can be missing, so the first-visit branch runs and no reload happens even when the served HTML is stale.
+- The reload only fires *after* the freshness fetch resolves, so users may see the stale UI for a second or two before it swaps.
+- There is no user-visible "you are on an old build" indicator.
 
-## Files touched
+**Fix:**
 
-- **New**: `src/components/WhatsNewPopup.tsx`
-- **Edit**: `src/pages/Index.tsx` (mount + effect)
-- **Edit**: `tailwind.config.ts` (add `glitch`, `marquee`, `border-spin` keyframes/animations)
+1. In `versionCheck.ts`, in addition to comparing to `localStorage`, embed the build-time signature into the bundle at compile time (Vite `define`: `__BUILD_ID__ = Date.now()` or the git SHA if available) and compare the *currently executing* bundle's signature against the freshly fetched HTML's asset hashes. If they differ, hard-reload — this works even on a fresh install with no localStorage.
+2. Add a defensive kill-switch cleanup: on app mount, unregister any stray service workers registered by an earlier build/experiment (`navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()))`) and clear caches whose name starts with `workbox-` / `qumran-`. This handles users whose phone has an SW installed from an old version.
+3. Show the current version in the header (or the Settings popover) with a tiny "Update available" pill when a new signature is fetched — one tap runs the hard reload immediately instead of waiting for the next natural page load.
+4. Trigger the freshness check more aggressively on installed-app entry: also on `pageshow` non-persisted (already partially covered) and on `resume` from lockscreen (via `visibilitychange`) with a small debounce.
+5. Ensure the deployed `index.html` is served with `Cache-Control: no-cache` at the CDN level (the meta tags in `<head>` are advisory only — most CDNs ignore them). If we don't control the CDN header, at minimum add a `<link rel="preload" href="/?v=BUILD">` trick or add a small inline script at the very top of `<head>` that fetches `/?v=<Date.now()>` and forces a reload on hashed-asset mismatch **before** the main bundle runs — a "poor man's SW".
 
-No backend, no version bump — this ships as part of the current v0.6.9 (the very first release with the feature will itself trigger the popup for existing users, which is the desired behavior).
+### Verification
+
+- Last.fm: after fix, open Connect Last.fm, complete flow, check console for `[lastfm] auth failed` — should be gone. The username should appear in the header. Then wait 4 minutes into a track and confirm scrobble arrives at last.fm/user/<name>.
+- Mobile stream: lock phone for 30s, unlock — the diagnostics panel should show `live-edge:reload` and the now-playing title should match the freshly fetched one, not the pre-lock title.
+- App version: bump `APP_VERSION`, redeploy, open the installed PWA, confirm the old build reloads within a couple seconds without a manual pull-to-refresh.

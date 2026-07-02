@@ -197,7 +197,20 @@ const Index = () => {
 
   useEffect(() => {
     void hydrateCloudLexiconOnce();
-    void handleLastfmCallback();
+    void (async () => {
+      const result = await handleLastfmCallback();
+      if (!result) return;
+      const { toast } = await import("sonner");
+      if (result.ok) {
+        toast.success(`Connected to Last.fm as ${result.session.username}`);
+        return;
+      }
+      const errMsg = (result as { ok: false; error: string }).error;
+      toast.error(`Last.fm auth failed: ${errMsg}`, {
+        description: "Check the API key configuration or try reconnecting.",
+        duration: 8000,
+      });
+    })();
     try {
       const seen = localStorage.getItem("changelog-seen-version");
       if (seen !== APP_VERSION) setWhatsNewOpen(true);
@@ -205,6 +218,25 @@ const Index = () => {
       // ignore
     }
   }, []);
+
+  // Surface "new version available" events dispatched by main.tsx.
+  useEffect(() => {
+    const handler = async () => {
+      const { toast } = await import("sonner");
+      const { forceReloadForNewVersion } = await import("@/lib/versionCheck");
+      toast("A new version is available", {
+        description: "Reload to get the latest streams, fixes and features.",
+        duration: 20_000,
+        action: {
+          label: "Reload now",
+          onClick: () => { void forceReloadForNewVersion(); },
+        },
+      });
+    };
+    window.addEventListener("nectarine:update-available", handler as EventListener);
+    return () => window.removeEventListener("nectarine:update-available", handler as EventListener);
+  }, []);
+
 
 
   const [fontScale, setFontScale] = useState<number>(() => {

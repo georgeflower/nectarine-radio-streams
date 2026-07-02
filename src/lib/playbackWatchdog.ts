@@ -11,6 +11,10 @@ export type WatchdogConfig = {
   iosVisibilityResumeDelayMs: number;
   androidVisibilityResumeDelayMs: number;
   desktopVisibilityResumeDelayMs: number;
+  /** How long the tab may be hidden before we treat any buffered <audio>
+   *  content as stale and force a live-edge reload instead of a soft resume. */
+  iosLiveEdgeReloadAfterHiddenMs: number;
+  androidLiveEdgeReloadAfterHiddenMs: number;
 };
 
 export const DEFAULT_WATCHDOG_CONFIG: WatchdogConfig = {
@@ -20,6 +24,8 @@ export const DEFAULT_WATCHDOG_CONFIG: WatchdogConfig = {
   iosVisibilityResumeDelayMs: 250,
   androidVisibilityResumeDelayMs: 500,
   desktopVisibilityResumeDelayMs: 0,
+  iosLiveEdgeReloadAfterHiddenMs: 10_000,
+  androidLiveEdgeReloadAfterHiddenMs: 20_000,
 };
 
 const STORAGE_KEY = "playback-watchdog-config-v1";
@@ -84,6 +90,16 @@ export const getVisibilityResumeDelayMs = (): number => {
     p === "android" ? config.androidVisibilityResumeDelayMs :
     config.desktopVisibilityResumeDelayMs,
   );
+};
+
+/** Threshold above which a hidden-period is long enough that any buffered
+ *  audio should be treated as stale. Returns Infinity on desktop (never
+ *  force a live-edge reload from a visibility change alone). */
+export const getLiveEdgeReloadAfterHiddenMs = (): number => {
+  const p = detectPlatform();
+  if (p === "ios") return Math.max(1000, config.iosLiveEdgeReloadAfterHiddenMs);
+  if (p === "android") return Math.max(1000, config.androidLiveEdgeReloadAfterHiddenMs);
+  return Number.POSITIVE_INFINITY;
 };
 
 // --- Diagnostics state -----------------------------------------------------

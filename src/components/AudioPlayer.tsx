@@ -19,6 +19,7 @@ import {
 } from "@/lib/songArtwork";
 import { sendNowPlaying, sendScrobble, getLastfmSession } from "@/lib/lastfm";
 import {
+  getLiveEdgeReloadAfterHiddenMs,
   getStallTimeoutMs,
   getVisibilityResumeDelayMs,
   logPlayback,
@@ -169,6 +170,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const lastProgressAtRef = useRef(Date.now());
   const lastMediaTimeRef = useRef(0);
   const lastSoftResumeAtRef = useRef(0);
+  const hiddenSinceRef = useRef<number | null>(null);
   const INITIAL_BUFFER_GRACE_MS = 8000;
 
   // Auto-pick first playable stream when list arrives or selection becomes invalid
@@ -261,6 +263,18 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         const now = Date.now();
         const stallTimeoutMs = getStallTimeoutMs();
         const sinceProgress = now - lastProgressAtRef.current;
+        // If the tab was hidden long enough, buffered <audio> content is
+        // almost certainly stale (an older tune). Force a live-edge reload
+        // instead of a soft resume to avoid playing minutes-old audio.
+        const hiddenMs = hiddenSinceRef.current !== null ? now - hiddenSinceRef.current : 0;
+        const liveEdgeAfter = getLiveEdgeReloadAfterHiddenMs();
+        hiddenSinceRef.current = null;
+        if (hiddenMs >= liveEdgeAfter) {
+          logPlayback("warn", "wake", "mobile-hidden-too-long → live-edge reload", { hiddenMs, liveEdgeAfter });
+          reportReconnect(`${reason}-mobile-hidden-${Math.round(hiddenMs / 1000)}s`);
+          attemptRecoveryRef.current?.();
+          return;
+        }
         if (sinceProgress < stallTimeoutMs) {
           setReconnecting(false);
           if (a.paused && now - lastSoftResumeAtRef.current > MOBILE_SOFT_RESUME_COOLDOWN_MS) {
@@ -330,7 +344,11 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     const onVisibility = () => {
       reportVisibility(document.visibilityState);
       logPlayback("info", "visibility", `state=${document.visibilityState}`);
-      if (document.visibilityState === "visible") schedule("visibility");
+      if (document.visibilityState === "hidden") {
+        hiddenSinceRef.current = Date.now();
+      } else if (document.visibilityState === "visible") {
+        schedule("visibility");
+      }
     };
     const onPageshow = () => { logPlayback("info", "pageshow", "event"); schedule("pageshow"); };
     const onOnline = () => { logPlayback("info", "online", "event"); schedule("online"); };
