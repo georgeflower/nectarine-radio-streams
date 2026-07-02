@@ -200,16 +200,15 @@ const Index = () => {
     void (async () => {
       const result = await handleLastfmCallback();
       if (!result) return;
-      // Dynamic import so we don't add sonner to the initial critical path.
       const { toast } = await import("sonner");
-      if (result.ok) {
+      if (result.ok === true) {
         toast.success(`Connected to Last.fm as ${result.session.username}`);
-      } else {
-        toast.error(`Last.fm auth failed: ${result.error}`, {
-          description: "Check the API key configuration or try reconnecting.",
-          duration: 8000,
-        });
+        return;
       }
+      toast.error(`Last.fm auth failed: ${result.error}`, {
+        description: "Check the API key configuration or try reconnecting.",
+        duration: 8000,
+      });
     })();
     try {
       const seen = localStorage.getItem("changelog-seen-version");
