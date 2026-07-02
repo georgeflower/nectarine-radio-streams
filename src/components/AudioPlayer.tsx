@@ -170,6 +170,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const lastProgressAtRef = useRef(Date.now());
   const lastMediaTimeRef = useRef(0);
   const lastSoftResumeAtRef = useRef(0);
+  const hiddenSinceRef = useRef<number | null>(null);
   const INITIAL_BUFFER_GRACE_MS = 8000;
 
   // Auto-pick first playable stream when list arrives or selection becomes invalid
