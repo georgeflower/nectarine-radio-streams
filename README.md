@@ -15,8 +15,11 @@ This app combines live stream playback, Demovibes XML panels, visualizers, and a
 - Cracktro settings organized into Visuals · Geese · Panels · More sections
 - Main-page ⚙ Settings popover for scanlines, visualizer style, diagnostics and Last.fm
 - Browser-local goose learning with phrase memory + lexicon-based chatter
-
 - Goose social dialogue and scripted exchanges (Amiga/Atari banter, periodic routines, oneliner reactions)
+- What's New demoscene popup on version bumps with glitch title, neon border, and marquee
+- PWA version check detects stale cached bundles and auto-reloads with service-worker purge
+- Playback diagnostics panel (draggable): reconnect log, stall counters, and current playback mode
+- Last.fm diagnostic mode to verify API key alignment between frontend and edge function
 - Mobile screen wake lock so the display stays active while listening
 - OS lockscreen artwork (iOS / Android) via MediaSession — song screenshots with app-icon fallback
 - Optional per-station now-playing metadata polling for Media Session metadata

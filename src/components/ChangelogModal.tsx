@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.6.9";
+export const APP_VERSION = "0.7.0";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,20 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.0",
+    date: "2026-07-02",
+    changes: [
+      "What's New popup: demoscene-styled animated announcement on every version bump with neon border, glitch title, and marquee strip",
+      "PWA version check: detects stale cached bundles and auto-reloads with service-worker/cache purge",
+      "Playback diagnostics panel: draggable overlay showing reconnect log, stall counters, and current playback mode",
+      "Last.fm diagnostic mode: verify API key alignment between frontend and edge function without exposing secrets",
+      "Mobile live-edge reload: force fresh stream after long backgrounding to prevent stale audio resumes",
+      "Font scaling fixed: A−/A+ now applies CSS zoom to all content while keeping the header at fixed size",
+      "Main menu settings popover: Scanlines, Visualizer, Diagnostics, and Last.fm tucked into a single ⚙ button",
+      "Cracktro settings reorganized into Visuals · Geese · Panels · More sections with vertical dividers",
+    ],
+  },
   {
     version: "0.6.9",
     date: "2026-07-01",
