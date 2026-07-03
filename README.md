@@ -10,7 +10,11 @@ This app combines live stream playback, Demovibes XML panels, visualizers, and a
 - Stream retry + failover and optional MSE buffering for steadier playback
 - Queue / now playing / history panels
 - Infamous OneLiner + online users panels
-- Multiple visualizer styles and beat overlay
+- Multiple visualizer styles and beat overlay, including a starfield mode with audio-reactive comets, nebula shimmer, and treble-driven sparkle bursts
+- Adaptive quality: the visualizer auto-downgrades/upgrades between high / medium / low rendering tiers based on live FPS to stay smooth on lower-power devices and Firefox
+- Audio reactivity tuning drawer (⚙ Settings → ♪ Reactivity…) — global frequency bands, beat/sparkle thresholds, and master intensity, plus per-visualizer bass/mid/treble gain and motion/glow overrides, persisted per browser
+- Performance tips modal (⚡ Performance tips) with browser recommendations, tuning guidance, and issue-reporting links
+- Dismissible Firefox performance warning banner
 - Fullscreen cracktro mode with floating windows, scroller, info bar, geese, and boing ball
 - Cracktro settings organized into Visuals · Geese · Panels · More sections
 - Main-page ⚙ Settings popover for scanlines, visualizer style, diagnostics and Last.fm
@@ -45,6 +49,8 @@ src/
     FlyingGoose.tsx
     FloatingWindow.tsx
     Visualizer.tsx
+    ReactivityDrawer.tsx
+    PerformanceTipsModal.tsx
   lib/
     nectarine.ts
     nowPlaying.ts
@@ -52,6 +58,7 @@ src/
     onelinerReactions.ts
     gooseLearnedPhrases.ts
     gooseLearnedLexicon.ts
+    reactivitySettings.ts
   pages/
     Index.tsx
   test/
@@ -79,6 +86,15 @@ supabase/functions/
 4. Player logic handles retries, failover, analyser hookup, and Media Session metadata.
 5. If stream metadata provides now-playing JSON, `src/lib/nowPlaying.ts` parses station payloads.
 
+### Visualizer reactivity & adaptive quality
+
+- `src/lib/reactivitySettings.ts` defines the tunable model: global frequency band ranges (bass / low-mid / mid / treble in Hz), beat/sparkle thresholds, master intensity, and per-visualizer-style overrides (bass/mid/treble gain, motion, glow). Settings live in a small store (`reactivityStore`) consumed via `useSyncExternalStore` and persisted to `localStorage` under `demo.reactivity.v1`.
+- `src/components/ReactivityDrawer.tsx` renders the tuning UI (⚙ Settings → ♪ Reactivity…): global sliders plus an accordion of per-mode overrides, with reset-to-defaults at both the global and per-mode level.
+- `src/components/Visualizer.tsx` reads the live settings each frame, converts the Hz band ranges into analyser bin ranges, and applies master/per-mode gains before driving each render mode.
+- An adaptive quality monitor tracks smoothed FPS and automatically steps the renderer between `high` / `medium` / `low` tiers (star/particle/comet/sparkle counts, DPR cap, glow multiplier, tunnel complexity) — downgrading after ~1.5s below 45fps and upgrading after ~5s above 55fps. Firefox starts one tier down and always disables `shadowBlur`, since its Canvas2D backend renders it on the CPU.
+- The starfield mode adds audio-reactive comets (spawned on beats, with an ambient trickle driven by low-mid energy) and treble-triggered sparkle bursts, plus an optional nebula shimmer layer that's skipped on the low tier.
+- `src/components/PerformanceTipsModal.tsx` (⚡ Performance tips) surfaces browser recommendations and links these settings for users experiencing slowdowns, alongside issue-reporting contact info.
+
 ### Cracktro mode
 
 `src/components/Cracktro.tsx` renders a fullscreen retro scene with:
@@ -101,8 +117,6 @@ Most cracktro toggles persist in `localStorage`.
 `src/lib/gooseLearnedPhrases.ts` stores safe short phrases from oneliners in browser `localStorage`, tracks frequency/recency/users, and provides weighted picks plus emphatic trigger detection.
 
 `src/lib/gooseLearnedLexicon.ts` extends this idea to a token/category/mood lexicon system without AI, and goose chatter uses lexicon output as a short-form fallback before static lines.
-
-
 
 ## Setup
 
