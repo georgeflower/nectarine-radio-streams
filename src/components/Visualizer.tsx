@@ -906,6 +906,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       if (ro) ro.disconnect();
       else window.removeEventListener("resize", resize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      unsubSettings();
     };
   }, [analyser, style]);
 
