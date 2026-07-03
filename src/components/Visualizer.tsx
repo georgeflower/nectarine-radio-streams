@@ -406,7 +406,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       // Stars
       const baseSpeed = 1.4 * dpr;
       const drive = lowMid * 0.75 + bass * 0.25;
-      const speed = baseSpeed * dtScale * (1 + drive * 2 + rms * 1.5);
+      const speed = baseSpeed * dtScale * (1 + drive * 2 + rms * 1.5) * modeMotionMul;
       const beatBoost = beat ? 1.5 : 1;
       const starHue = (28 + treble * 120) % 360;
       const starLight = 60 + treble * 20;
