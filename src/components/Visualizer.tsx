@@ -31,9 +31,58 @@ type AudioSnapshot = {
   time: Uint8Array | null;
 };
 
-const STAR_COUNT = 400;
 const MAX_DEPTH = 1000;
-const PARTICLE_COUNT = 220;
+
+type Quality = "high" | "medium" | "low";
+type QualityProfile = {
+  starCount: number;
+  particleCount: number;
+  maxComets: number;
+  maxSparkles: number;
+  dprCap: number;
+  glowMul: number;
+  nebula: boolean;
+  tunnelSides: number;
+  tunnelRingCutoff: number;
+  tunnelSegCutoff: number;
+  tunnelHueBucket: number;
+  cometBeatMax: number;
+  cometAmbientMs: number; // 0 = off
+  sparkleThreshold: number;
+};
+
+const makeProfile = (q: Quality, isFirefox: boolean): QualityProfile => {
+  const base: QualityProfile =
+    q === "low"
+      ? {
+          starCount: 140, particleCount: 70, maxComets: 6, maxSparkles: 10,
+          dprCap: 1, glowMul: 0, nebula: false,
+          tunnelSides: 10, tunnelRingCutoff: 0.18, tunnelSegCutoff: 0.10, tunnelHueBucket: 30,
+          cometBeatMax: 1, cometAmbientMs: 0, sparkleThreshold: 2.2,
+        }
+      : q === "medium"
+      ? {
+          starCount: 240, particleCount: 130, maxComets: 14, maxSparkles: 22,
+          dprCap: 1.5, glowMul: 0.5, nebula: true,
+          tunnelSides: 12, tunnelRingCutoff: 0.10, tunnelSegCutoff: 0.05, tunnelHueBucket: 60,
+          cometBeatMax: 2, cometAmbientMs: 700, sparkleThreshold: 1.7,
+        }
+      : {
+          starCount: 400, particleCount: 220, maxComets: 24, maxSparkles: 40,
+          dprCap: 2, glowMul: 1, nebula: true,
+          tunnelSides: 14, tunnelRingCutoff: 0.05, tunnelSegCutoff: 0.02, tunnelHueBucket: 360,
+          cometBeatMax: 3, cometAmbientMs: 400, sparkleThreshold: 1.4,
+        };
+  if (isFirefox) {
+    return {
+      ...base,
+      glowMul: 0,
+      tunnelHueBucket: Math.min(base.tunnelHueBucket, 30),
+      dprCap: Math.min(base.dprCap, 1.5),
+    };
+  }
+  return base;
+};
 // Keep a small reuse window so multiple rAF-driven hooks in the same visual frame
 // can share analyser data without adding noticeable latency.
 const FRAME_CACHE_WINDOW_MS = 4;
