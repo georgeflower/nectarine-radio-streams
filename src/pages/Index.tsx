@@ -395,6 +395,7 @@ const Index = () => {
         />
       )}
       {diagnosticsOpen && <PlaybackDiagnostics onClose={() => setDiagnosticsOpen(false)} />}
+      <PerformanceTipsModal open={perfTipsOpen} onClose={() => setPerfTipsOpen(false)} />
       <main
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"
         style={{
