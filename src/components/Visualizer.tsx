@@ -73,6 +73,8 @@ const Visualizer = ({ analyser, style }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const starsRef = useRef<Star[]>([]);
   const particlesRef = useRef<Particle[]>([]);
+  const cometsRef = useRef<Comet[]>([]);
+  const sparklesRef = useRef<Sparkle[]>([]);
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
   const plasmaTRef = useRef(0);
@@ -81,6 +83,8 @@ const Visualizer = ({ analyser, style }: Props) => {
   const ringsTRef = useRef(0);
   const bassAvgRef = useRef(0);
   const beatCooldownRef = useRef(0);
+  const trebleAvgRef = useRef(0);
+  const cometAccRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
