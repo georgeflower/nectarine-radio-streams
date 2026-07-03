@@ -184,6 +184,7 @@ const Index = () => {
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
+  const [perfTipsOpen, setPerfTipsOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [seekCount, setSeekCount] = useState(0);
