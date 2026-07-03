@@ -17,9 +17,12 @@ type Props = {
 
 type Star = { x: number; y: number; z: number };
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; hue: number };
+type Comet = { x: number; y: number; vx: number; vy: number; len: number; life: number; hue: number };
+type Sparkle = { x: number; y: number; vx: number; vy: number; life: number; hue: number };
 
 type AudioSnapshot = {
   bass: number;
+  lowMid: number;
   mid: number;
   treble: number;
   rms: number;
