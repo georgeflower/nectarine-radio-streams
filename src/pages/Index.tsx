@@ -518,6 +518,14 @@ const Index = () => {
                 </ReactivityDrawer>
                 <button
                   type="button"
+                  onClick={() => setPerfTipsOpen(true)}
+                  className="min-h-10 px-2 py-2 uppercase text-xs tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card transition-colors touch-manipulation text-left"
+                  title="Performance tips and how to report issues"
+                >
+                  ⚡ Performance tips
+                </button>
+                <button
+                  type="button"
                   onClick={() => setDiagnosticsOpen((v) => !v)}
                   className="min-h-10 px-2 py-2 uppercase text-xs tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card transition-colors touch-manipulation text-left"
                   aria-pressed={diagnosticsOpen}
