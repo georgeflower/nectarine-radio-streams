@@ -626,7 +626,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const h = canvas.height;
       const { bass, mid, treble, rms } = sampleAudio();
       // Forward speed boosted by bass; minimum idle motion.
-      tunnelTRef.current += 0.04 + bass * 0.18 + rms * 0.08;
+      tunnelTRef.current += (0.04 + bass * 0.18 + rms * 0.08) * modeMotionMul;
       const t = tunnelTRef.current;
 
       // Motion-blur background trail.
