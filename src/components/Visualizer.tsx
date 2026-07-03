@@ -381,7 +381,8 @@ const Visualizer = ({ analyser, style }: Props) => {
       // Treble spike tracking for sparkles
       const tAvg = trebleAvgRef.current;
       trebleAvgRef.current = tAvg * 0.9 + treble * 0.1;
-      const trebleSpike = treble > tAvg * qState.profile.sparkleThreshold && treble > 0.12;
+      const sparkleT = Math.max(qState.profile.sparkleThreshold, settingsSnapshot.global.sparkleThreshold);
+      const trebleSpike = treble > tAvg * sparkleT && treble > 0.12;
 
       // Background trail
       ctx.fillStyle = `hsla(20, 25%, 6%, ${0.18 + bass * 0.08})`;
