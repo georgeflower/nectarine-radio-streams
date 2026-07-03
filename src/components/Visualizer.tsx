@@ -358,14 +358,14 @@ const Visualizer = ({ analyser, style }: Props) => {
       // Treble spike tracking for sparkles
       const tAvg = trebleAvgRef.current;
       trebleAvgRef.current = tAvg * 0.9 + treble * 0.1;
-      const trebleSpike = treble > tAvg * 1.4 && treble > 0.12;
+      const trebleSpike = treble > tAvg * qState.profile.sparkleThreshold && treble > 0.12;
 
       // Background trail
       ctx.fillStyle = `hsla(20, 25%, 6%, ${0.18 + bass * 0.08})`;
       ctx.fillRect(0, 0, w, h);
 
-      // Nebula shimmer
-      if (!isFirefox) {
+      // Nebula shimmer (skipped on low tier / firefox)
+      if (qState.profile.nebula) {
         const nebR = Math.max(w, h) * (0.35 + mid * 0.25 + rms * 0.2);
         const neb = ctx.createRadialGradient(cx, cy, 0, cx, cy, nebR);
         const nebHue = (260 + treble * 80) % 360;
