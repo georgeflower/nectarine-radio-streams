@@ -825,10 +825,36 @@ const Visualizer = ({ analyser, style }: Props) => {
       ctx.shadowBlur = 0;
     };
 
+    // Adaptive FPS monitor. Downgrade if smoothed FPS < 45 for 1.5s,
+    // upgrade if > 55 for 5s. 3s cooldown after any tier change avoids
+    // oscillation. Warmup skips the first ~1s so startup jank doesn't
+    // trigger a premature downgrade.
+    const fpsMon = { emaDt: 16.7, belowT: 0, aboveT: 0, cooldown: 3000, warmup: 1000 };
+
     const render = (now: number) => {
       if (!lastTimeRef.current) lastTimeRef.current = now;
       const dt = Math.min(now - lastTimeRef.current, 50); // cap at 50ms to avoid huge jumps
       lastTimeRef.current = now;
+
+      // FPS tracking (only meaningful while animating a real scene).
+      fpsMon.emaDt = fpsMon.emaDt * 0.95 + dt * 0.05;
+      if (fpsMon.warmup > 0) {
+        fpsMon.warmup -= dt;
+      } else if (fpsMon.cooldown > 0) {
+        fpsMon.cooldown -= dt;
+      } else {
+        const fps = 1000 / fpsMon.emaDt;
+        if (fps < 45) { fpsMon.belowT += dt; fpsMon.aboveT = 0; }
+        else if (fps > 55) { fpsMon.aboveT += dt; fpsMon.belowT = 0; }
+        else { fpsMon.belowT = 0; fpsMon.aboveT = 0; }
+        if (fpsMon.belowT > 1500 && qState.quality !== "low") {
+          applyQuality(qState.quality === "high" ? "medium" : "low");
+          fpsMon.belowT = 0; fpsMon.aboveT = 0; fpsMon.cooldown = 3000;
+        } else if (fpsMon.aboveT > 5000 && qState.quality !== "high") {
+          applyQuality(qState.quality === "low" ? "medium" : "high");
+          fpsMon.belowT = 0; fpsMon.aboveT = 0; fpsMon.cooldown = 3000;
+        }
+      }
 
       switch (style) {
         case "bars": renderBars(); break;
