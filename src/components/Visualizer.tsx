@@ -1,4 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  reactivityStore,
+  resolveMode,
+  DEFAULT_MODE,
+  type ReactivitySettings,
+  type ModeReactivity,
+} from "@/lib/reactivitySettings";
 
 export type VisualizerStyle =
   | "off"
@@ -156,7 +163,10 @@ const Visualizer = ({ analyser, style }: Props) => {
     qState.dpr = computeDpr(qState.profile.dprCap);
     // shadowBlur is a major bottleneck (esp. Firefox). glowMul folds device
     // capability and adaptive tier into a single multiplier — 0 disables it.
-    const glow = (px: number) => px * qState.profile.glowMul;
+    // Per-mode intensity multipliers refreshed each rAF before dispatching.
+    let modeGlowMul = 1;
+    let modeMotionMul = 1;
+    const glow = (px: number) => px * qState.profile.glowMul * modeGlowMul;
     // Mutable aliases updated in applyQuality() so the inline `dpr` /
     // MAX_COMETS / MAX_SPARKLES references throughout the render functions
     // stay valid without threading state everywhere.
@@ -170,6 +180,24 @@ const Visualizer = ({ analyser, style }: Props) => {
     const time: Uint8Array<ArrayBuffer> | null = analyser
       ? (new Uint8Array(new ArrayBuffer(analyser.fftSize)) as Uint8Array<ArrayBuffer>)
       : null;
+
+    // Live reactivity settings; updated via store subscription so users can tune
+    // without reinitializing the render loop.
+    let settingsSnapshot: ReactivitySettings = reactivityStore.get();
+    const unsubSettings = reactivityStore.subscribe(() => {
+      settingsSnapshot = reactivityStore.get();
+    });
+    const currentMode = (): ModeReactivity => {
+      if (style === "off") return DEFAULT_MODE;
+      return resolveMode(style, settingsSnapshot);
+    };
+    // Convert a Hz value to a bin index for the current analyser.
+    const hzToBin = (hz: number): number => {
+      if (!analyser || !freq) return 0;
+      const nyquist = analyser.context.sampleRate / 2;
+      const n = freq.length;
+      return Math.max(0, Math.min(n, Math.round((hz / nyquist) * n)));
+    };
 
     const stageEl = canvas.parentElement;
     const stageW = () => (stageEl ? stageEl.clientWidth : window.innerWidth);
@@ -196,25 +224,19 @@ const Visualizer = ({ analyser, style }: Props) => {
         analyser.getByteTimeDomainData(time);
 
         const n = freq.length;
-        const bEnd = Math.max(1, Math.floor(n * 0.08));
-        const lmEnd = Math.max(bEnd + 1, Math.floor(n * 0.20));
-        const mEnd = Math.max(lmEnd + 1, Math.floor(n * 0.38));
-
-        let sumBass = 0;
-        for (let i = 0; i < bEnd; i++) sumBass += freq[i] ?? 0;
-        bass = sumBass / bEnd / 255;
-
-        let sumLowMid = 0;
-        for (let i = bEnd; i < lmEnd; i++) sumLowMid += freq[i] ?? 0;
-        lowMid = sumLowMid / Math.max(1, lmEnd - bEnd) / 255;
-
-        let sumMid = 0;
-        for (let i = lmEnd; i < mEnd; i++) sumMid += freq[i] ?? 0;
-        mid = sumMid / Math.max(1, mEnd - lmEnd) / 255;
-
-        let sumTreble = 0;
-        for (let i = mEnd; i < n; i++) sumTreble += freq[i] ?? 0;
-        treble = sumTreble / Math.max(1, n - mEnd) / 255;
+        const bands = settingsSnapshot.global.bandsHz;
+        const master = settingsSnapshot.global.masterIntensity;
+        const bandAvg = (loHz: number, hiHz: number) => {
+          const lo = hzToBin(loHz);
+          const hi = Math.max(lo + 1, hzToBin(hiHz));
+          let sum = 0;
+          for (let i = lo; i < hi && i < n; i++) sum += freq[i] ?? 0;
+          return sum / Math.max(1, hi - lo) / 255;
+        };
+        bass = bandAvg(bands.bass[0], bands.bass[1]) * master;
+        lowMid = bandAvg(bands.lowMid[0], bands.lowMid[1]) * master;
+        mid = bandAvg(bands.mid[0], bands.mid[1]) * master;
+        treble = bandAvg(bands.treble[0], bands.treble[1]) * master;
 
         let sq = 0;
         for (let i = 0; i < time.length; i++) {
@@ -227,7 +249,8 @@ const Visualizer = ({ analyser, style }: Props) => {
         const avg = bassAvgRef.current;
         bassAvgRef.current = avg * 0.92 + bass * 0.08;
         if (beatCooldownRef.current > 0) beatCooldownRef.current -= 1;
-        if (bass > avg * 1.35 && bass > 0.15 && beatCooldownRef.current <= 0) {
+        const beatMul = settingsSnapshot.global.beatThreshold;
+        if (bass > avg * beatMul && bass > 0.15 && beatCooldownRef.current <= 0) {
           beat = true;
           beatCooldownRef.current = 10;
         }
@@ -358,7 +381,8 @@ const Visualizer = ({ analyser, style }: Props) => {
       // Treble spike tracking for sparkles
       const tAvg = trebleAvgRef.current;
       trebleAvgRef.current = tAvg * 0.9 + treble * 0.1;
-      const trebleSpike = treble > tAvg * qState.profile.sparkleThreshold && treble > 0.12;
+      const sparkleT = Math.max(qState.profile.sparkleThreshold, settingsSnapshot.global.sparkleThreshold);
+      const trebleSpike = treble > tAvg * sparkleT && treble > 0.12;
 
       // Background trail
       ctx.fillStyle = `hsla(20, 25%, 6%, ${0.18 + bass * 0.08})`;
@@ -382,7 +406,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       // Stars
       const baseSpeed = 1.4 * dpr;
       const drive = lowMid * 0.75 + bass * 0.25;
-      const speed = baseSpeed * dtScale * (1 + drive * 2 + rms * 1.5);
+      const speed = baseSpeed * dtScale * (1 + drive * 2 + rms * 1.5) * modeMotionMul;
       const beatBoost = beat ? 1.5 : 1;
       const starHue = (28 + treble * 120) % 360;
       const starLight = 60 + treble * 20;
@@ -484,7 +508,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const w = canvas.width;
       const h = canvas.height;
       const { bass, mid, treble, rms, freq } = sampleAudio();
-      idleTRef.current += 0.03 + bass * 0.05;
+      idleTRef.current += (0.03 + bass * 0.05) * modeMotionMul;
 
       ctx.fillStyle = "hsla(20, 25%, 6%, 0.2)";
       ctx.fillRect(0, 0, w, h);
@@ -532,7 +556,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const w = canvas.width;
       const h = canvas.height;
       const { bass, mid, treble } = sampleAudio();
-      plasmaTRef.current += 0.005 + bass * 0.025;
+      plasmaTRef.current += (0.005 + bass * 0.025) * modeMotionMul;
       const t = plasmaTRef.current;
       const cell = Math.max(8, Math.floor(12 * dpr));
       const energy = 0.4 + bass * 0.6 + mid * 0.3;
@@ -557,7 +581,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const w = canvas.width;
       const h = canvas.height;
       const { bass, treble, rms, time } = sampleAudio();
-      idleTRef.current += 0.04;
+      idleTRef.current += 0.04 * modeMotionMul;
 
       ctx.fillStyle = "hsla(20, 25%, 6%, 0.22)";
       ctx.fillRect(0, 0, w, h);
@@ -602,7 +626,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const h = canvas.height;
       const { bass, mid, treble, rms } = sampleAudio();
       // Forward speed boosted by bass; minimum idle motion.
-      tunnelTRef.current += 0.04 + bass * 0.18 + rms * 0.08;
+      tunnelTRef.current += (0.04 + bass * 0.18 + rms * 0.08) * modeMotionMul;
       const t = tunnelTRef.current;
 
       // Motion-blur background trail.
@@ -724,7 +748,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const w = canvas.width;
       const h = canvas.height;
       const { bass, mid, treble, rms, freq } = sampleAudio();
-      ringsTRef.current += 0.004 + rms * 0.08;
+      ringsTRef.current += (0.004 + rms * 0.08) * modeMotionMul;
       const t = ringsTRef.current;
 
       ctx.fillStyle = "hsla(20, 25%, 6%, 0.25)";
@@ -787,7 +811,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       for (const p of ps) {
         if (beat) {
           const a = Math.random() * Math.PI * 2;
-          const kick = (3 + bass * 12) * dpr;
+          const kick = (3 + bass * 12) * dpr * modeMotionMul;
           p.vx += Math.cos(a) * kick * 0.3;
           p.vy += Math.sin(a) * kick * 0.3;
           p.life = 1;
@@ -856,6 +880,10 @@ const Visualizer = ({ analyser, style }: Props) => {
         }
       }
 
+      const mR = currentMode();
+      modeGlowMul = mR.glow;
+      modeMotionMul = mR.motion;
+
       switch (style) {
         case "bars": renderBars(); break;
         case "plasma": renderPlasma(); break;
@@ -879,6 +907,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       if (ro) ro.disconnect();
       else window.removeEventListener("resize", resize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      unsubSettings();
     };
   }, [analyser, style]);
 

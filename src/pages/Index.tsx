@@ -35,6 +35,7 @@ import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/li
 import { hydrateCloudLexiconOnce } from "@/lib/gooseLexiconCloud";
 import LastfmButton from "@/components/LastfmButton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import ReactivityDrawer from "@/components/ReactivityDrawer";
 import { handleLastfmCallback } from "@/lib/lastfm";
 
 function SongRating({ songId }: { songId: string }) {
@@ -504,6 +505,15 @@ const Index = () => {
                     </option>
                   ))}
                 </select>
+                <ReactivityDrawer>
+                  <button
+                    type="button"
+                    className="min-h-10 px-2 py-2 uppercase text-xs tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card transition-colors touch-manipulation text-left"
+                    title="Tune audio reactivity per visualizer"
+                  >
+                    ♪ Reactivity…
+                  </button>
+                </ReactivityDrawer>
                 <button
                   type="button"
                   onClick={() => setDiagnosticsOpen((v) => !v)}

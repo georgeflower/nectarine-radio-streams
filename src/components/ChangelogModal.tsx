@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.1";
+export const APP_VERSION = "0.7.2";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,16 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.2",
+    date: "2026-07-03",
+    changes: [
+      "Audio reactivity tuning: side drawer with tunable frequency ranges (bass/low-mid/mid/treble), beat and sparkle thresholds, and master intensity",
+      "Per-visualizer overrides: bass/mid/treble gain, motion and glow intensity for each mode with a one-click reset",
+      "Firefox performance warning banner and cracktro scroller notice",
+      "Settings persisted per browser; reset-to-defaults button",
+    ],
+  },
   {
     version: "0.7.1",
     date: "2026-07-03",
