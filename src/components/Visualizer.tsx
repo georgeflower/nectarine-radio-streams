@@ -407,13 +407,15 @@ const Visualizer = ({ analyser, style }: Props) => {
 
       // Comet spawns: on beats + ambient trickle driven by lowMid
       if (beat) {
-        const n = 1 + Math.floor(drive * 3);
+        const n = 1 + Math.floor(drive * qState.profile.cometBeatMax);
         for (let i = 0; i < n; i++) spawnComet(w, h, drive, (28 + treble * 200) % 360);
       }
-      cometAccRef.current += dt * (0.7 + lowMid * 2.5);
-      while (cometAccRef.current > 400) {
-        cometAccRef.current -= 400;
-        spawnComet(w, h, drive * 0.6 + 0.2, (200 + Math.random() * 160) % 360);
+      if (qState.profile.cometAmbientMs > 0) {
+        cometAccRef.current += dt * (0.7 + lowMid * 2.5);
+        while (cometAccRef.current > qState.profile.cometAmbientMs) {
+          cometAccRef.current -= qState.profile.cometAmbientMs;
+          spawnComet(w, h, drive * 0.6 + 0.2, (200 + Math.random() * 160) % 360);
+        }
       }
 
       // Draw + update comets
