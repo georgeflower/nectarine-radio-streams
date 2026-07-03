@@ -185,6 +185,13 @@ const Index = () => {
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [seekCount, setSeekCount] = useState(0);
+  const [firefoxWarnDismissed, setFirefoxWarnDismissed] = useState(() => {
+    try { return localStorage.getItem("nectarine-firefox-warn") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("nectarine-firefox-warn", firefoxWarnDismissed ? "1" : "0"); } catch {}
+  }, [firefoxWarnDismissed]);
+  const isFirefox = typeof navigator !== "undefined" && /Firefox/i.test(navigator.userAgent);
   useWakeLock();
 
   useEffect(() => {
