@@ -1,44 +1,51 @@
 
-# Starfield Visualizer Enhancements
+# Adaptive Low-Power Mode for Visualizer
 
-Enhance the existing `starfield` mode in `src/components/Visualizer.tsx` so it becomes an audio-reactive scene instead of a silent star flight. All work stays in that single file to avoid touching unrelated logic.
+Add automatic FPS-based quality scaling to `src/components/Visualizer.tsx` so all scenes (starfield, particles, bars, tunnel, rings, plasma) gracefully degrade on slow devices instead of dropping frames.
 
-## Changes
+## Behavior
 
-### 1. Audio sampling for starfield
-Currently `renderStarfield` ignores the analyser. Call `sampleAudio()` each frame to get `{ bass, mid, treble, rms, beat }`.
+- **Tiers**: `high` (default), `medium`, `low`. Start at `high`. Devices already flagged `isFirefox` start at `medium` to preserve the current guardrails.
+- **Sampling**: keep a rolling average of frame delta (EMA over ~60 frames). Convert to FPS once per second.
+- **Downgrade** when smoothed FPS < 45 sustained for ~1.5s. **Upgrade** when smoothed FPS > 55 sustained for ~5s (asymmetric to avoid oscillation). Cooldown of 3s after any tier change.
+- Tier changes re-seed `starsRef` / `particlesRef` / clear `cometsRef` + `sparklesRef` to the new caps (same pattern used today when the canvas resizes).
 
-Per the request, shift the "bass-driven" reactivity a bit higher up the spectrum. Introduce a `lowMid` band inside `sampleAudio` (roughly 8–20% of bins, sitting just above the current bass band) and use `lowMid` (blended with a touch of bass) as the primary drive for starfield warp/comet spawns. Bass stays available for subtle background pulse.
+## Scaling table
 
-### 2. Reactive star flight
-- Base speed multiplied by `1 + lowMid * 2 + rms * 1.5` so the field warps forward on kicks/low-mid hits.
-- Star color/lightness modulated by `treble` (cooler/whiter on highs).
-- Star size gets a small boost on `beat`.
+| Knob | high | medium | low |
+|---|---|---|---|
+| `STAR_COUNT` | 400 | 240 | 140 |
+| `PARTICLE_COUNT` | 220 | 130 | 70 |
+| `MAX_COMETS` | 24 | 14 | 6 |
+| `MAX_SPARKLES` | 40 | 22 | 10 |
+| `dpr` cap | 2 | 1.5 | 1 |
+| `glow()` multiplier | 1× | 0.5× | 0 (like Firefox) |
+| Nebula radial gradient | on | on | off (flat rect) |
+| Bars slices | 36 | 28 | 20 |
+| Tunnel sides | 14 | 12 | 10 |
+| Tunnel ring/seg cutoff | 0.05 / 0.02 | 0.10 / 0.05 | 0.18 / 0.10 |
+| Hue bucketing (tunnel) | 360 | 60 | 30 |
+| Beat comet spawn | 1–3 | 1–2 | 0–1 |
+| Ambient comet trickle | ~1/400ms | ~1/700ms | off |
+| Sparkle spike threshold | avg×1.4 | avg×1.7 | avg×2.2 |
 
-### 3. Comets (new)
-Add a `Comet` pool (~24 slots) stored in a new ref. Each comet: `{ x, y, vx, vy, len, life, hue }`.
-- Spawn 1–3 comets on each detected `beat`, plus a slow ambient trickle (~1 every 400ms) so idle scenes still get some.
-- Comets travel across the screen with a fading tail drawn as a gradient line (start = bright hue, end = transparent). Length scales with `lowMid`.
-- Recycle when off-screen or `life <= 0`.
+Firefox continues to use the existing `isFirefox` branches; the tier just clamps things further. A device already in `low` uses the Firefox-style flat/no-glow paths regardless of browser.
 
-### 4. Nebula shimmer (new, cheap)
-Behind the stars, draw a very low-alpha radial gradient whose radius/opacity breathes with `mid` + `rms`. One `createRadialGradient` + one `fillRect` per frame — negligible cost, adds depth.
+## Implementation notes
 
-### 5. Shooting sparkles on treble spikes
-Track a running average of `treble`; when current treble exceeds `avg * 1.4`, emit 2–4 short-lived spark particles (reuse existing `particlesRef` pool is risky since other scenes share it — use a small dedicated `sparklesRef` pool of ~40).
+- Add a `qualityRef = useRef<'high'|'medium'|'low'>(isFirefox ? 'medium' : 'high')` and a small `fpsMonitor` object (last-tick timestamp, EMA delta, above/below timers, cooldown timer) inside the existing `useEffect` in `Visualizer.tsx`. No new files, no new deps.
+- Replace the hard-coded `MAX_COMETS`, `MAX_SPARKLES`, `STAR_COUNT`, `PARTICLE_COUNT`, `dpr`, `glow()` values with lookups from a `qualityProfile(quality, isFirefox)` helper defined at the top of the effect.
+- The main `render()` loop reads `qualityRef.current` each frame — cheap ref read, no rerender.
+- On tier change: recompute the profile, re-seed star/particle pools to new counts (truncate or pad), clear comets/sparkles, and update the canvas backing size for the new `dpr` cap (reuse the existing `resize()` function).
+- No prop changes to `Visualizer`. No new user setting in this pass — fully automatic. (A manual override in settings can be added later if wanted.)
+- Keep a `console.debug` line when the tier changes so `PlaybackDiagnostics` / devtools users can see it, but no UI surface.
 
-### 6. Firefox performance guardrails
-Follow the same rules the rest of the file uses:
-- Use the `glow()` helper (returns 0 on Firefox) for any `shadowBlur`.
-- Cap comet count to 12 and sparkles to 20 on Firefox.
-- Skip the nebula radial gradient on Firefox (fall back to a flat translucent rect).
+## Files touched
 
-### 7. Idle behavior
-When `analyser` is null or all bands are ~0, drive `lowMid`/`beat` from a slow sine so the scene still has ambient comets and gentle warp — matches how `renderBars` handles idle.
+- `src/components/Visualizer.tsx` — only file modified.
 
-## Technical notes
+## Out of scope
 
-- All new state lives in `useRef` arrays initialized in the existing `useEffect`, cleared/re-seeded alongside `starsRef`/`particlesRef`.
-- No new dependencies, no API changes to `Visualizer` props, no changes to `useAudioLevel` / `useBeat`.
-- Frame budget stays the same order of magnitude: comets (≤24 line strokes), sparkles (≤40 tiny fills), one nebula gradient — well under current `bars`/`tunnel` cost.
-- No changes to other visualizer styles, no changes to `Cracktro.tsx` or settings UI.
+- No changes to `useAudioLevel`, `useBeat`, `Cracktro`, or settings UI.
+- No persisted user preference for quality tier.
+- No changes to other animation-heavy components (goose family, boing ball) — can be a follow-up if the user wants.

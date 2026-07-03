@@ -31,9 +31,58 @@ type AudioSnapshot = {
   time: Uint8Array | null;
 };
 
-const STAR_COUNT = 400;
 const MAX_DEPTH = 1000;
-const PARTICLE_COUNT = 220;
+
+type Quality = "high" | "medium" | "low";
+type QualityProfile = {
+  starCount: number;
+  particleCount: number;
+  maxComets: number;
+  maxSparkles: number;
+  dprCap: number;
+  glowMul: number;
+  nebula: boolean;
+  tunnelSides: number;
+  tunnelRingCutoff: number;
+  tunnelSegCutoff: number;
+  tunnelHueBucket: number;
+  cometBeatMax: number;
+  cometAmbientMs: number; // 0 = off
+  sparkleThreshold: number;
+};
+
+const makeProfile = (q: Quality, isFirefox: boolean): QualityProfile => {
+  const base: QualityProfile =
+    q === "low"
+      ? {
+          starCount: 140, particleCount: 70, maxComets: 6, maxSparkles: 10,
+          dprCap: 1, glowMul: 0, nebula: false,
+          tunnelSides: 10, tunnelRingCutoff: 0.18, tunnelSegCutoff: 0.10, tunnelHueBucket: 30,
+          cometBeatMax: 1, cometAmbientMs: 0, sparkleThreshold: 2.2,
+        }
+      : q === "medium"
+      ? {
+          starCount: 240, particleCount: 130, maxComets: 14, maxSparkles: 22,
+          dprCap: 1.5, glowMul: 0.5, nebula: true,
+          tunnelSides: 12, tunnelRingCutoff: 0.10, tunnelSegCutoff: 0.05, tunnelHueBucket: 60,
+          cometBeatMax: 2, cometAmbientMs: 700, sparkleThreshold: 1.7,
+        }
+      : {
+          starCount: 400, particleCount: 220, maxComets: 24, maxSparkles: 40,
+          dprCap: 2, glowMul: 1, nebula: true,
+          tunnelSides: 14, tunnelRingCutoff: 0.05, tunnelSegCutoff: 0.02, tunnelHueBucket: 360,
+          cometBeatMax: 3, cometAmbientMs: 400, sparkleThreshold: 1.4,
+        };
+  if (isFirefox) {
+    return {
+      ...base,
+      glowMul: 0,
+      tunnelHueBucket: Math.min(base.tunnelHueBucket, 30),
+      dprCap: Math.min(base.dprCap, 1.5),
+    };
+  }
+  return base;
+};
 // Keep a small reuse window so multiple rAF-driven hooks in the same visual frame
 // can share analyser data without adding noticeable latency.
 const FRAME_CACHE_WINDOW_MS = 4;
@@ -94,13 +143,27 @@ const Visualizer = ({ analyser, style }: Props) => {
 
     const isFirefox =
       typeof navigator !== "undefined" && /Firefox/i.test(navigator.userAgent);
-    // Firefox's Canvas2D backend renders shadowBlur on the CPU and the blur
-    // kernel scales with pixel count, so cap dpr more aggressively there.
-    const dpr = Math.min(window.devicePixelRatio || 1, isFirefox ? 1.5 : 2);
-    // shadowBlur is a major bottleneck in Firefox: every stroke/fill that
-    // happens while shadowBlur > 0 hits a slow software path. Disable it
-    // entirely on Firefox; individual scenes substitute a cheaper neon look.
-    const glow = (px: number) => (isFirefox ? 0 : px);
+
+    // Adaptive quality state. Firefox starts one tier down since its Canvas2D
+    // backend renders shadowBlur on the CPU. The FPS monitor in render() can
+    // downgrade or upgrade further at runtime based on smoothed frame time.
+    const qState = {
+      quality: (isFirefox ? "medium" : "high") as Quality,
+      profile: makeProfile(isFirefox ? "medium" : "high", isFirefox),
+      dpr: 1,
+    };
+    const computeDpr = (cap: number) => Math.min(window.devicePixelRatio || 1, cap);
+    qState.dpr = computeDpr(qState.profile.dprCap);
+    // shadowBlur is a major bottleneck (esp. Firefox). glowMul folds device
+    // capability and adaptive tier into a single multiplier — 0 disables it.
+    const glow = (px: number) => px * qState.profile.glowMul;
+    // Mutable aliases updated in applyQuality() so the inline `dpr` /
+    // MAX_COMETS / MAX_SPARKLES references throughout the render functions
+    // stay valid without threading state everywhere.
+    let dpr = qState.dpr;
+    let MAX_COMETS = qState.profile.maxComets;
+    let MAX_SPARKLES = qState.profile.maxSparkles;
+
     const freq: Uint8Array<ArrayBuffer> | null = analyser
       ? (new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>)
       : null;
@@ -114,8 +177,8 @@ const Visualizer = ({ analyser, style }: Props) => {
     const resize = () => {
       const w = stageW();
       const h = stageH();
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
+      canvas.width = Math.floor(w * qState.dpr);
+      canvas.height = Math.floor(h * qState.dpr);
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
     };
@@ -182,23 +245,60 @@ const Visualizer = ({ analyser, style }: Props) => {
       window.addEventListener("resize", resize);
     }
 
-    starsRef.current = Array.from({ length: STAR_COUNT }, () => ({
-      x: (Math.random() - 0.5) * 2000,
-      y: (Math.random() - 0.5) * 2000,
-      z: Math.random() * MAX_DEPTH,
-    }));
+    const seedStars = (count: number) => {
+      const arr = starsRef.current;
+      if (arr.length > count) arr.length = count;
+      while (arr.length < count) {
+        arr.push({
+          x: (Math.random() - 0.5) * 2000,
+          y: (Math.random() - 0.5) * 2000,
+          z: Math.random() * MAX_DEPTH,
+        });
+      }
+    };
+    const seedParticles = (count: number) => {
+      const arr = particlesRef.current;
+      if (arr.length > count) arr.length = count;
+      while (arr.length < count) {
+        arr.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: (Math.random() - 0.5) * 0.5,
+          life: Math.random(),
+          hue: 28 + Math.random() * 40,
+        });
+      }
+    };
+    seedStars(qState.profile.starCount);
+    seedParticles(qState.profile.particleCount);
 
-    particlesRef.current = Array.from({ length: PARTICLE_COUNT }, () => ({
-      x: canvas.width / 2,
-      y: canvas.height / 2,
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: (Math.random() - 0.5) * 0.5,
-      life: Math.random(),
-      hue: 28 + Math.random() * 40,
-    }));
+    const applyQuality = (next: Quality) => {
+      if (next === qState.quality) return;
+      const prev = qState.quality;
+      qState.quality = next;
+      qState.profile = makeProfile(next, isFirefox);
+      const newDpr = computeDpr(qState.profile.dprCap);
+      if (newDpr !== qState.dpr) {
+        qState.dpr = newDpr;
+        dpr = newDpr;
+        resize();
+      }
+      MAX_COMETS = qState.profile.maxComets;
+      MAX_SPARKLES = qState.profile.maxSparkles;
+      seedStars(qState.profile.starCount);
+      seedParticles(qState.profile.particleCount);
+      // Trim comet/sparkle pools to new caps.
+      if (cometsRef.current.length > MAX_COMETS) {
+        cometsRef.current.length = MAX_COMETS;
+      }
+      if (sparklesRef.current.length > MAX_SPARKLES) {
+        sparklesRef.current.length = MAX_SPARKLES;
+      }
+      // eslint-disable-next-line no-console
+      console.debug(`[Visualizer] quality ${prev} → ${next} (dpr=${qState.dpr})`);
+    };
 
-    const MAX_COMETS = isFirefox ? 12 : 24;
-    const MAX_SPARKLES = isFirefox ? 20 : 40;
 
     const spawnComet = (w: number, h: number, drive: number, hueBase: number) => {
       if (cometsRef.current.length >= MAX_COMETS) return;
@@ -258,14 +358,14 @@ const Visualizer = ({ analyser, style }: Props) => {
       // Treble spike tracking for sparkles
       const tAvg = trebleAvgRef.current;
       trebleAvgRef.current = tAvg * 0.9 + treble * 0.1;
-      const trebleSpike = treble > tAvg * 1.4 && treble > 0.12;
+      const trebleSpike = treble > tAvg * qState.profile.sparkleThreshold && treble > 0.12;
 
       // Background trail
       ctx.fillStyle = `hsla(20, 25%, 6%, ${0.18 + bass * 0.08})`;
       ctx.fillRect(0, 0, w, h);
 
-      // Nebula shimmer
-      if (!isFirefox) {
+      // Nebula shimmer (skipped on low tier / firefox)
+      if (qState.profile.nebula) {
         const nebR = Math.max(w, h) * (0.35 + mid * 0.25 + rms * 0.2);
         const neb = ctx.createRadialGradient(cx, cy, 0, cx, cy, nebR);
         const nebHue = (260 + treble * 80) % 360;
@@ -307,13 +407,15 @@ const Visualizer = ({ analyser, style }: Props) => {
 
       // Comet spawns: on beats + ambient trickle driven by lowMid
       if (beat) {
-        const n = 1 + Math.floor(drive * 3);
+        const n = 1 + Math.floor(drive * qState.profile.cometBeatMax);
         for (let i = 0; i < n; i++) spawnComet(w, h, drive, (28 + treble * 200) % 360);
       }
-      cometAccRef.current += dt * (0.7 + lowMid * 2.5);
-      while (cometAccRef.current > 400) {
-        cometAccRef.current -= 400;
-        spawnComet(w, h, drive * 0.6 + 0.2, (200 + Math.random() * 160) % 360);
+      if (qState.profile.cometAmbientMs > 0) {
+        cometAccRef.current += dt * (0.7 + lowMid * 2.5);
+        while (cometAccRef.current > qState.profile.cometAmbientMs) {
+          cometAccRef.current -= qState.profile.cometAmbientMs;
+          spawnComet(w, h, drive * 0.6 + 0.2, (200 + Math.random() * 160) % 360);
+        }
       }
 
       // Draw + update comets
@@ -509,7 +611,7 @@ const Visualizer = ({ analyser, style }: Props) => {
 
       const cx = w / 2;
       const cy = h / 2;
-      const slices = isFirefox ? 24 : 36;
+      const slices = qState.quality === "low" ? 20 : qState.quality === "medium" ? 28 : 36;
       const baseR = Math.min(w, h) * 0.55;
       // Tunnel curvature amplitude reacts to mid.
       const curve = (60 + mid * 220) * dpr;
@@ -533,15 +635,16 @@ const Visualizer = ({ analyser, style }: Props) => {
         sl.push({ x: cx + px, y: cy + py, r, roll, hue, depth });
       }
 
-      const sides = isFirefox ? 10 : 14;
-      const ringCutoff = isFirefox ? 0.15 : 0.05;
-      const segCutoff = isFirefox ? 0.08 : 0.02;
+      const sides = qState.profile.tunnelSides;
+      const ringCutoff = qState.profile.tunnelRingCutoff;
+      const segCutoff = qState.profile.tunnelSegCutoff;
       ctx.lineCap = "round";
 
       // --- Connecting wireframe between consecutive slices ---
-      // Batch by hue bucket (30° on FF) so we issue a handful of strokes
-      // instead of one per slice. Big win since each stroke() flushes state.
-      const hueBucket = isFirefox ? 30 : 360; // 360 == no bucketing
+      // Batch by hue bucket (smaller on low-tier / FF) so we issue a handful
+      // of strokes instead of one per slice. Big win since each stroke()
+      // flushes state.
+      const hueBucket = qState.profile.tunnelHueBucket; // 360 == no bucketing
       type Bucket = { hue: number; fadeSum: number; count: number; segs: Array<[number, number, number, number]> };
       const buckets = new Map<number, Bucket>();
       for (let i = 0; i < sl.length - 1; i++) {
@@ -722,10 +825,36 @@ const Visualizer = ({ analyser, style }: Props) => {
       ctx.shadowBlur = 0;
     };
 
+    // Adaptive FPS monitor. Downgrade if smoothed FPS < 45 for 1.5s,
+    // upgrade if > 55 for 5s. 3s cooldown after any tier change avoids
+    // oscillation. Warmup skips the first ~1s so startup jank doesn't
+    // trigger a premature downgrade.
+    const fpsMon = { emaDt: 16.7, belowT: 0, aboveT: 0, cooldown: 3000, warmup: 1000 };
+
     const render = (now: number) => {
       if (!lastTimeRef.current) lastTimeRef.current = now;
       const dt = Math.min(now - lastTimeRef.current, 50); // cap at 50ms to avoid huge jumps
       lastTimeRef.current = now;
+
+      // FPS tracking (only meaningful while animating a real scene).
+      fpsMon.emaDt = fpsMon.emaDt * 0.95 + dt * 0.05;
+      if (fpsMon.warmup > 0) {
+        fpsMon.warmup -= dt;
+      } else if (fpsMon.cooldown > 0) {
+        fpsMon.cooldown -= dt;
+      } else {
+        const fps = 1000 / fpsMon.emaDt;
+        if (fps < 45) { fpsMon.belowT += dt; fpsMon.aboveT = 0; }
+        else if (fps > 55) { fpsMon.aboveT += dt; fpsMon.belowT = 0; }
+        else { fpsMon.belowT = 0; fpsMon.aboveT = 0; }
+        if (fpsMon.belowT > 1500 && qState.quality !== "low") {
+          applyQuality(qState.quality === "high" ? "medium" : "low");
+          fpsMon.belowT = 0; fpsMon.aboveT = 0; fpsMon.cooldown = 3000;
+        } else if (fpsMon.aboveT > 5000 && qState.quality !== "high") {
+          applyQuality(qState.quality === "low" ? "medium" : "high");
+          fpsMon.belowT = 0; fpsMon.aboveT = 0; fpsMon.cooldown = 3000;
+        }
+      }
 
       switch (style) {
         case "bars": renderBars(); break;
