@@ -118,6 +118,7 @@ const Visualizer = ({ analyser, style }: Props) => {
 
     const sampleAudio = (): AudioSnapshot => {
       let bass = 0;
+      let lowMid = 0;
       let mid = 0;
       let treble = 0;
       let rms = 0;
@@ -129,15 +130,20 @@ const Visualizer = ({ analyser, style }: Props) => {
 
         const n = freq.length;
         const bEnd = Math.max(1, Math.floor(n * 0.08));
-        const mEnd = Math.max(bEnd + 1, Math.floor(n * 0.38));
+        const lmEnd = Math.max(bEnd + 1, Math.floor(n * 0.20));
+        const mEnd = Math.max(lmEnd + 1, Math.floor(n * 0.38));
 
         let sumBass = 0;
         for (let i = 0; i < bEnd; i++) sumBass += freq[i] ?? 0;
         bass = sumBass / bEnd / 255;
 
+        let sumLowMid = 0;
+        for (let i = bEnd; i < lmEnd; i++) sumLowMid += freq[i] ?? 0;
+        lowMid = sumLowMid / Math.max(1, lmEnd - bEnd) / 255;
+
         let sumMid = 0;
-        for (let i = bEnd; i < mEnd; i++) sumMid += freq[i] ?? 0;
-        mid = sumMid / Math.max(1, mEnd - bEnd) / 255;
+        for (let i = lmEnd; i < mEnd; i++) sumMid += freq[i] ?? 0;
+        mid = sumMid / Math.max(1, mEnd - lmEnd) / 255;
 
         let sumTreble = 0;
         for (let i = mEnd; i < n; i++) sumTreble += freq[i] ?? 0;
@@ -160,7 +166,7 @@ const Visualizer = ({ analyser, style }: Props) => {
         }
       }
 
-      return { bass, mid, treble, rms, beat, freq, time };
+      return { bass, lowMid, mid, treble, rms, beat, freq, time };
     };
 
     resize();
