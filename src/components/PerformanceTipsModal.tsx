@@ -24,7 +24,7 @@ const PerformanceTipsModal = ({ open, onClose }: Props) => {
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="perf-tips-title"
