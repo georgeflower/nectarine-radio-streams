@@ -811,7 +811,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       for (const p of ps) {
         if (beat) {
           const a = Math.random() * Math.PI * 2;
-          const kick = (3 + bass * 12) * dpr;
+          const kick = (3 + bass * 12) * dpr * modeMotionMul;
           p.vx += Math.cos(a) * kick * 0.3;
           p.vy += Math.sin(a) * kick * 0.3;
           p.life = 1;
