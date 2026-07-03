@@ -879,6 +879,10 @@ const Visualizer = ({ analyser, style }: Props) => {
         }
       }
 
+      const mR = currentMode();
+      modeGlowMul = mR.glow;
+      modeMotionMul = mR.motion;
+
       switch (style) {
         case "bars": renderBars(); break;
         case "plasma": renderPlasma(); break;
