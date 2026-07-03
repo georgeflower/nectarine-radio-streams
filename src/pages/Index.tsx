@@ -402,6 +402,19 @@ const Index = () => {
           paddingRight: "max(0.75rem, var(--safe-right))",
         }}
       >
+        {isFirefox && !firefoxWarnDismissed && (
+          <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-sm border border-red-500/30 bg-red-950/20 text-red-400 text-xs uppercase tracking-wider">
+            <span className="flex-1">Known performance issues with Firefox for the effects. For best performance change to Chrome, Edge or Safari.</span>
+            <button
+              type="button"
+              onClick={() => setFirefoxWarnDismissed(true)}
+              aria-label="Dismiss Firefox warning"
+              className="shrink-0 hover:text-red-300 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         <header
           className="flex flex-col gap-3 mb-5 border-b border-border pb-4 md:flex-row md:items-center md:justify-between"
           style={{ fontSize: "16px" }}
