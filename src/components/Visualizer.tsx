@@ -635,15 +635,16 @@ const Visualizer = ({ analyser, style }: Props) => {
         sl.push({ x: cx + px, y: cy + py, r, roll, hue, depth });
       }
 
-      const sides = isFirefox ? 10 : 14;
-      const ringCutoff = isFirefox ? 0.15 : 0.05;
-      const segCutoff = isFirefox ? 0.08 : 0.02;
+      const sides = qState.profile.tunnelSides;
+      const ringCutoff = qState.profile.tunnelRingCutoff;
+      const segCutoff = qState.profile.tunnelSegCutoff;
       ctx.lineCap = "round";
 
       // --- Connecting wireframe between consecutive slices ---
-      // Batch by hue bucket (30° on FF) so we issue a handful of strokes
-      // instead of one per slice. Big win since each stroke() flushes state.
-      const hueBucket = isFirefox ? 30 : 360; // 360 == no bucketing
+      // Batch by hue bucket (smaller on low-tier / FF) so we issue a handful
+      // of strokes instead of one per slice. Big win since each stroke()
+      // flushes state.
+      const hueBucket = qState.profile.tunnelHueBucket; // 360 == no bucketing
       type Bucket = { hue: number; fadeSum: number; count: number; segs: Array<[number, number, number, number]> };
       const buckets = new Map<number, Bucket>();
       for (let i = 0; i < sl.length - 1; i++) {
