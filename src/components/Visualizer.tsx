@@ -163,7 +163,10 @@ const Visualizer = ({ analyser, style }: Props) => {
     qState.dpr = computeDpr(qState.profile.dprCap);
     // shadowBlur is a major bottleneck (esp. Firefox). glowMul folds device
     // capability and adaptive tier into a single multiplier — 0 disables it.
-    const glow = (px: number) => px * qState.profile.glowMul;
+    // Per-mode intensity multipliers refreshed each rAF before dispatching.
+    let modeGlowMul = 1;
+    let modeMotionMul = 1;
+    const glow = (px: number) => px * qState.profile.glowMul * modeGlowMul;
     // Mutable aliases updated in applyQuality() so the inline `dpr` /
     // MAX_COMETS / MAX_SPARKLES references throughout the render functions
     // stay valid without threading state everywhere.
