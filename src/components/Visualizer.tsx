@@ -556,7 +556,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const w = canvas.width;
       const h = canvas.height;
       const { bass, mid, treble } = sampleAudio();
-      plasmaTRef.current += 0.005 + bass * 0.025;
+      plasmaTRef.current += (0.005 + bass * 0.025) * modeMotionMul;
       const t = plasmaTRef.current;
       const cell = Math.max(8, Math.floor(12 * dpr));
       const energy = 0.4 + bass * 0.6 + mid * 0.3;
