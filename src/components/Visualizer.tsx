@@ -178,6 +178,24 @@ const Visualizer = ({ analyser, style }: Props) => {
       ? (new Uint8Array(new ArrayBuffer(analyser.fftSize)) as Uint8Array<ArrayBuffer>)
       : null;
 
+    // Live reactivity settings; updated via store subscription so users can tune
+    // without reinitializing the render loop.
+    let settingsSnapshot: ReactivitySettings = reactivityStore.get();
+    const unsubSettings = reactivityStore.subscribe(() => {
+      settingsSnapshot = reactivityStore.get();
+    });
+    const currentMode = (): ModeReactivity => {
+      if (style === "off") return DEFAULT_MODE;
+      return resolveMode(style, settingsSnapshot);
+    };
+    // Convert a Hz value to a bin index for the current analyser.
+    const hzToBin = (hz: number): number => {
+      if (!analyser || !freq) return 0;
+      const nyquist = analyser.context.sampleRate / 2;
+      const n = freq.length;
+      return Math.max(0, Math.min(n, Math.round((hz / nyquist) * n)));
+    };
+
     const stageEl = canvas.parentElement;
     const stageW = () => (stageEl ? stageEl.clientWidth : window.innerWidth);
     const stageH = () => (stageEl ? stageEl.clientHeight : window.innerHeight);
