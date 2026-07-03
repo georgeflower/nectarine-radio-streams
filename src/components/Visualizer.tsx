@@ -157,6 +157,12 @@ const Visualizer = ({ analyser, style }: Props) => {
     // shadowBlur is a major bottleneck (esp. Firefox). glowMul folds device
     // capability and adaptive tier into a single multiplier — 0 disables it.
     const glow = (px: number) => px * qState.profile.glowMul;
+    // Mutable aliases updated in applyQuality() so the inline `dpr` /
+    // MAX_COMETS / MAX_SPARKLES references throughout the render functions
+    // stay valid without threading state everywhere.
+    let dpr = qState.dpr;
+    let MAX_COMETS = qState.profile.maxComets;
+    let MAX_SPARKLES = qState.profile.maxSparkles;
 
     const freq: Uint8Array<ArrayBuffer> | null = analyser
       ? (new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>)
