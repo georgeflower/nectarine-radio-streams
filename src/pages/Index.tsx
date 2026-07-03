@@ -36,6 +36,7 @@ import { hydrateCloudLexiconOnce } from "@/lib/gooseLexiconCloud";
 import LastfmButton from "@/components/LastfmButton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ReactivityDrawer from "@/components/ReactivityDrawer";
+import PerformanceTipsModal from "@/components/PerformanceTipsModal";
 import { handleLastfmCallback } from "@/lib/lastfm";
 
 function SongRating({ songId }: { songId: string }) {
