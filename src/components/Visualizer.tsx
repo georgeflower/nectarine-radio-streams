@@ -281,16 +281,19 @@ const Visualizer = ({ analyser, style }: Props) => {
       const newDpr = computeDpr(qState.profile.dprCap);
       if (newDpr !== qState.dpr) {
         qState.dpr = newDpr;
+        dpr = newDpr;
         resize();
       }
+      MAX_COMETS = qState.profile.maxComets;
+      MAX_SPARKLES = qState.profile.maxSparkles;
       seedStars(qState.profile.starCount);
       seedParticles(qState.profile.particleCount);
       // Trim comet/sparkle pools to new caps.
-      if (cometsRef.current.length > qState.profile.maxComets) {
-        cometsRef.current.length = qState.profile.maxComets;
+      if (cometsRef.current.length > MAX_COMETS) {
+        cometsRef.current.length = MAX_COMETS;
       }
-      if (sparklesRef.current.length > qState.profile.maxSparkles) {
-        sparklesRef.current.length = qState.profile.maxSparkles;
+      if (sparklesRef.current.length > MAX_SPARKLES) {
+        sparklesRef.current.length = MAX_SPARKLES;
       }
       // eslint-disable-next-line no-console
       console.debug(`[Visualizer] quality ${prev} → ${next} (dpr=${qState.dpr})`);
