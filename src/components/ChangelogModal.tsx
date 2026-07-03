@@ -10,6 +10,14 @@ interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.7.3",
+    date: "2026-07-03",
+    changes: [
+      "Added Performance tips modal with browser recommendations, reactivity tuning guidance, and issue reporting links",
+      "Performance tips modal opens without dimming the page behind it",
+    ],
+  },
+  {
     version: "0.7.2",
     date: "2026-07-03",
     changes: [
