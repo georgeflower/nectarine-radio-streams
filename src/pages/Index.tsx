@@ -36,6 +36,7 @@ import { hydrateCloudLexiconOnce } from "@/lib/gooseLexiconCloud";
 import LastfmButton from "@/components/LastfmButton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ReactivityDrawer from "@/components/ReactivityDrawer";
+import PerformanceTipsModal from "@/components/PerformanceTipsModal";
 import { handleLastfmCallback } from "@/lib/lastfm";
 
 function SongRating({ songId }: { songId: string }) {
@@ -183,6 +184,7 @@ const Index = () => {
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
+  const [perfTipsOpen, setPerfTipsOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [seekCount, setSeekCount] = useState(0);
@@ -393,6 +395,7 @@ const Index = () => {
         />
       )}
       {diagnosticsOpen && <PlaybackDiagnostics onClose={() => setDiagnosticsOpen(false)} />}
+      <PerformanceTipsModal open={perfTipsOpen} onClose={() => setPerfTipsOpen(false)} />
       <main
         className="mx-auto max-w-5xl px-3 sm:px-4 py-4 md:py-10 relative"
         style={{
@@ -514,6 +517,14 @@ const Index = () => {
                     ♪ Reactivity…
                   </button>
                 </ReactivityDrawer>
+                <button
+                  type="button"
+                  onClick={() => setPerfTipsOpen(true)}
+                  className="min-h-10 px-2 py-2 uppercase text-xs tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card transition-colors touch-manipulation text-left"
+                  title="Performance tips and how to report issues"
+                >
+                  ⚡ Performance tips
+                </button>
                 <button
                   type="button"
                   onClick={() => setDiagnosticsOpen((v) => !v)}
