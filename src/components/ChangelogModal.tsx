@@ -10,6 +10,13 @@ interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.7.4",
+    date: "2026-07-03",
+    changes: [
+      "Reactivity settings drawer now opens without dimming the page behind it",
+    ],
+  },
+  {
     version: "0.7.3",
     date: "2026-07-03",
     changes: [
