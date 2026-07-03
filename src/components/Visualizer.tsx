@@ -1,4 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  reactivityStore,
+  resolveMode,
+  DEFAULT_MODE,
+  type ReactivitySettings,
+  type ModeReactivity,
+} from "@/lib/reactivitySettings";
 
 export type VisualizerStyle =
   | "off"
