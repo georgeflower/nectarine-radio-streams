@@ -748,7 +748,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const w = canvas.width;
       const h = canvas.height;
       const { bass, mid, treble, rms, freq } = sampleAudio();
-      ringsTRef.current += 0.004 + rms * 0.08;
+      ringsTRef.current += (0.004 + rms * 0.08) * modeMotionMul;
       const t = ringsTRef.current;
 
       ctx.fillStyle = "hsla(20, 25%, 6%, 0.25)";
