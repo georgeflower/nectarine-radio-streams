@@ -581,7 +581,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const w = canvas.width;
       const h = canvas.height;
       const { bass, treble, rms, time } = sampleAudio();
-      idleTRef.current += 0.04;
+      idleTRef.current += 0.04 * modeMotionMul;
 
       ctx.fillStyle = "hsla(20, 25%, 6%, 0.22)";
       ctx.fillRect(0, 0, w, h);
