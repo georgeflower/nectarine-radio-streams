@@ -17,9 +17,12 @@ type Props = {
 
 type Star = { x: number; y: number; z: number };
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; hue: number };
+type Comet = { x: number; y: number; vx: number; vy: number; len: number; life: number; hue: number };
+type Sparkle = { x: number; y: number; vx: number; vy: number; life: number; hue: number };
 
 type AudioSnapshot = {
   bass: number;
+  lowMid: number;
   mid: number;
   treble: number;
   rms: number;
@@ -70,6 +73,8 @@ const Visualizer = ({ analyser, style }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const starsRef = useRef<Star[]>([]);
   const particlesRef = useRef<Particle[]>([]);
+  const cometsRef = useRef<Comet[]>([]);
+  const sparklesRef = useRef<Sparkle[]>([]);
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
   const plasmaTRef = useRef(0);
@@ -78,6 +83,8 @@ const Visualizer = ({ analyser, style }: Props) => {
   const ringsTRef = useRef(0);
   const bassAvgRef = useRef(0);
   const beatCooldownRef = useRef(0);
+  const trebleAvgRef = useRef(0);
+  const cometAccRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -115,6 +122,7 @@ const Visualizer = ({ analyser, style }: Props) => {
 
     const sampleAudio = (): AudioSnapshot => {
       let bass = 0;
+      let lowMid = 0;
       let mid = 0;
       let treble = 0;
       let rms = 0;
@@ -126,15 +134,20 @@ const Visualizer = ({ analyser, style }: Props) => {
 
         const n = freq.length;
         const bEnd = Math.max(1, Math.floor(n * 0.08));
-        const mEnd = Math.max(bEnd + 1, Math.floor(n * 0.38));
+        const lmEnd = Math.max(bEnd + 1, Math.floor(n * 0.20));
+        const mEnd = Math.max(lmEnd + 1, Math.floor(n * 0.38));
 
         let sumBass = 0;
         for (let i = 0; i < bEnd; i++) sumBass += freq[i] ?? 0;
         bass = sumBass / bEnd / 255;
 
+        let sumLowMid = 0;
+        for (let i = bEnd; i < lmEnd; i++) sumLowMid += freq[i] ?? 0;
+        lowMid = sumLowMid / Math.max(1, lmEnd - bEnd) / 255;
+
         let sumMid = 0;
-        for (let i = bEnd; i < mEnd; i++) sumMid += freq[i] ?? 0;
-        mid = sumMid / Math.max(1, mEnd - bEnd) / 255;
+        for (let i = lmEnd; i < mEnd; i++) sumMid += freq[i] ?? 0;
+        mid = sumMid / Math.max(1, mEnd - lmEnd) / 255;
 
         let sumTreble = 0;
         for (let i = mEnd; i < n; i++) sumTreble += freq[i] ?? 0;
@@ -157,7 +170,7 @@ const Visualizer = ({ analyser, style }: Props) => {
         }
       }
 
-      return { bass, mid, treble, rms, beat, freq, time };
+      return { bass, lowMid, mid, treble, rms, beat, freq, time };
     };
 
     resize();
@@ -184,17 +197,95 @@ const Visualizer = ({ analyser, style }: Props) => {
       hue: 28 + Math.random() * 40,
     }));
 
+    const MAX_COMETS = isFirefox ? 12 : 24;
+    const MAX_SPARKLES = isFirefox ? 20 : 40;
+
+    const spawnComet = (w: number, h: number, drive: number, hueBase: number) => {
+      if (cometsRef.current.length >= MAX_COMETS) return;
+      // Enter from a random edge, aim roughly across the screen.
+      const edge = Math.floor(Math.random() * 4);
+      let x = 0, y = 0;
+      if (edge === 0) { x = Math.random() * w; y = -20; }
+      else if (edge === 1) { x = w + 20; y = Math.random() * h; }
+      else if (edge === 2) { x = Math.random() * w; y = h + 20; }
+      else { x = -20; y = Math.random() * h; }
+      const tx = w / 2 + (Math.random() - 0.5) * w * 0.6;
+      const ty = h / 2 + (Math.random() - 0.5) * h * 0.6;
+      const ang = Math.atan2(ty - y, tx - x);
+      const speed = (4 + Math.random() * 5 + drive * 8) * dpr;
+      cometsRef.current.push({
+        x, y,
+        vx: Math.cos(ang) * speed,
+        vy: Math.sin(ang) * speed,
+        len: (30 + drive * 90 + Math.random() * 40) * dpr,
+        life: 1,
+        hue: (hueBase + Math.random() * 40) % 360,
+      });
+    };
+
+    const spawnSparkle = (w: number, h: number, hueBase: number) => {
+      if (sparklesRef.current.length >= MAX_SPARKLES) return;
+      const a = Math.random() * Math.PI * 2;
+      const s = (1 + Math.random() * 2.5) * dpr;
+      sparklesRef.current.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s,
+        life: 0.6 + Math.random() * 0.4,
+        hue: (hueBase + Math.random() * 60) % 360,
+      });
+    };
+
     const renderStarfield = (dt: number) => {
       const w = canvas.width;
       const h = canvas.height;
       const cx = w / 2;
       const cy = h / 2;
-      ctx.fillStyle = "hsla(20, 25%, 6%, 0.2)";
+      const dtScale = dt / (1000 / 60);
+      const audio = sampleAudio();
+      const hasAudio = !!analyser;
+
+      idleTRef.current += 0.02;
+      const idleBeat = !hasAudio && Math.sin(idleTRef.current * 0.9) > 0.985;
+      const lowMid = hasAudio ? audio.lowMid : 0.15 + 0.1 * Math.sin(idleTRef.current * 0.7);
+      const bass = hasAudio ? audio.bass : 0;
+      const mid = hasAudio ? audio.mid : 0.1;
+      const treble = hasAudio ? audio.treble : 0.05;
+      const rms = hasAudio ? audio.rms : 0.05;
+      const beat = hasAudio ? audio.beat : idleBeat;
+
+      // Treble spike tracking for sparkles
+      const tAvg = trebleAvgRef.current;
+      trebleAvgRef.current = tAvg * 0.9 + treble * 0.1;
+      const trebleSpike = treble > tAvg * 1.4 && treble > 0.12;
+
+      // Background trail
+      ctx.fillStyle = `hsla(20, 25%, 6%, ${0.18 + bass * 0.08})`;
       ctx.fillRect(0, 0, w, h);
-      const baseSpeed = 1.4 * dpr; // units per frame at 60fps
-      const speed = baseSpeed * (dt / (1000 / 60)); // scale by actual frame time
-      const hue = 28;
-      const light = 60;
+
+      // Nebula shimmer
+      if (!isFirefox) {
+        const nebR = Math.max(w, h) * (0.35 + mid * 0.25 + rms * 0.2);
+        const neb = ctx.createRadialGradient(cx, cy, 0, cx, cy, nebR);
+        const nebHue = (260 + treble * 80) % 360;
+        neb.addColorStop(0, `hsla(${nebHue}, 90%, 55%, ${0.06 + mid * 0.12})`);
+        neb.addColorStop(0.5, `hsla(${(nebHue + 40) % 360}, 90%, 40%, ${0.03 + rms * 0.08})`);
+        neb.addColorStop(1, "hsla(20, 25%, 6%, 0)");
+        ctx.fillStyle = neb;
+        ctx.fillRect(0, 0, w, h);
+      } else {
+        ctx.fillStyle = `hsla(${(260 + treble * 80) % 360}, 90%, 50%, ${0.03 + mid * 0.05})`;
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      // Stars
+      const baseSpeed = 1.4 * dpr;
+      const drive = lowMid * 0.75 + bass * 0.25;
+      const speed = baseSpeed * dtScale * (1 + drive * 2 + rms * 1.5);
+      const beatBoost = beat ? 1.5 : 1;
+      const starHue = (28 + treble * 120) % 360;
+      const starLight = 60 + treble * 20;
 
       for (const s of starsRef.current) {
         s.z -= speed * 2;
@@ -207,11 +298,84 @@ const Visualizer = ({ analyser, style }: Props) => {
         const px = cx + s.x * k * dpr;
         const py = cy + s.y * k * dpr;
         if (px < 0 || px >= w || py < 0 || py >= h) continue;
-        const size = (1 - s.z / MAX_DEPTH) * 3 * dpr + 0.5;
-        const alpha = Math.min(1, (1 - s.z / MAX_DEPTH) * 0.7);
-        ctx.fillStyle = `hsla(${hue}, 100%, ${light}%, ${alpha})`;
+        const depth = 1 - s.z / MAX_DEPTH;
+        const size = depth * 3 * dpr * beatBoost + 0.5;
+        const alpha = Math.min(1, depth * 0.7 + treble * 0.2);
+        ctx.fillStyle = `hsla(${starHue}, 100%, ${starLight}%, ${alpha})`;
         ctx.fillRect(px, py, size, size);
       }
+
+      // Comet spawns: on beats + ambient trickle driven by lowMid
+      if (beat) {
+        const n = 1 + Math.floor(drive * 3);
+        for (let i = 0; i < n; i++) spawnComet(w, h, drive, (28 + treble * 200) % 360);
+      }
+      cometAccRef.current += dt * (0.7 + lowMid * 2.5);
+      while (cometAccRef.current > 400) {
+        cometAccRef.current -= 400;
+        spawnComet(w, h, drive * 0.6 + 0.2, (200 + Math.random() * 160) % 360);
+      }
+
+      // Draw + update comets
+      const comets = cometsRef.current;
+      for (let i = comets.length - 1; i >= 0; i--) {
+        const c = comets[i];
+        c.x += c.vx * dtScale;
+        c.y += c.vy * dtScale;
+        c.life -= 0.006 * dtScale;
+        const tailX = c.x - c.vx * (c.len / Math.hypot(c.vx, c.vy || 1));
+        const tailY = c.y - c.vy * (c.len / Math.hypot(c.vx, c.vy || 1));
+        const grad = ctx.createLinearGradient(c.x, c.y, tailX, tailY);
+        grad.addColorStop(0, `hsla(${c.hue}, 100%, 75%, ${c.life})`);
+        grad.addColorStop(0.4, `hsla(${c.hue}, 100%, 60%, ${c.life * 0.5})`);
+        grad.addColorStop(1, `hsla(${c.hue}, 100%, 60%, 0)`);
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = (1.5 + drive * 2) * dpr;
+        ctx.lineCap = "round";
+        ctx.shadowBlur = glow(10 * dpr);
+        ctx.shadowColor = `hsl(${c.hue}, 100%, 65%)`;
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y);
+        ctx.lineTo(tailX, tailY);
+        ctx.stroke();
+        // Head
+        ctx.fillStyle = `hsla(${c.hue}, 100%, 85%, ${c.life})`;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, (1.5 + drive * 2) * dpr, 0, Math.PI * 2);
+        ctx.fill();
+        if (
+          c.life <= 0 ||
+          c.x < -50 || c.x > w + 50 ||
+          c.y < -50 || c.y > h + 50
+        ) {
+          comets.splice(i, 1);
+        }
+      }
+      ctx.shadowBlur = 0;
+
+      // Sparkles on treble spikes
+      if (trebleSpike) {
+        const n = 2 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < n; i++) spawnSparkle(w, h, (40 + treble * 200) % 360);
+      }
+      const sparkles = sparklesRef.current;
+      for (let i = sparkles.length - 1; i >= 0; i--) {
+        const p = sparkles[i];
+        p.x += p.vx * dtScale;
+        p.y += p.vy * dtScale;
+        p.vx *= 0.94;
+        p.vy *= 0.94;
+        p.life -= 0.02 * dtScale;
+        if (p.life <= 0) { sparkles.splice(i, 1); continue; }
+        const sz = (1.2 + treble * 2) * dpr * p.life;
+        ctx.fillStyle = `hsla(${p.hue}, 100%, 80%, ${p.life})`;
+        ctx.shadowBlur = glow(8 * dpr * p.life);
+        ctx.shadowColor = `hsl(${p.hue}, 100%, 70%)`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
     };
 
     const renderBars = () => {
