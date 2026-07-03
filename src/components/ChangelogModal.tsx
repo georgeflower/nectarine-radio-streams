@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.0";
+export const APP_VERSION = "0.7.1";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,16 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.1",
+    date: "2026-07-03",
+    changes: [
+      "Starfield visualizer: audio-reactive comets with gradient tails, nebula shimmer, and treble-driven sparkle bursts",
+      "Bass reactivity shifted to low-mids for tighter sync with kick drums",
+      "Adaptive low-power quality mode: auto-downgrades rendering tier when FPS drops, upgrades when smooth",
+      "Quality tiers (high / medium / low) scale star/particle counts, glow, and effect complexity automatically",
+    ],
+  },
   {
     version: "0.7.0",
     date: "2026-07-02",
