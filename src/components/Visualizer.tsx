@@ -611,7 +611,7 @@ const Visualizer = ({ analyser, style }: Props) => {
 
       const cx = w / 2;
       const cy = h / 2;
-      const slices = isFirefox ? 24 : 36;
+      const slices = qState.quality === "low" ? 20 : qState.quality === "medium" ? 28 : 36;
       const baseR = Math.min(w, h) * 0.55;
       // Tunnel curvature amplitude reacts to mid.
       const curve = (60 + mid * 220) * dpr;
