@@ -221,25 +221,19 @@ const Visualizer = ({ analyser, style }: Props) => {
         analyser.getByteTimeDomainData(time);
 
         const n = freq.length;
-        const bEnd = Math.max(1, Math.floor(n * 0.08));
-        const lmEnd = Math.max(bEnd + 1, Math.floor(n * 0.20));
-        const mEnd = Math.max(lmEnd + 1, Math.floor(n * 0.38));
-
-        let sumBass = 0;
-        for (let i = 0; i < bEnd; i++) sumBass += freq[i] ?? 0;
-        bass = sumBass / bEnd / 255;
-
-        let sumLowMid = 0;
-        for (let i = bEnd; i < lmEnd; i++) sumLowMid += freq[i] ?? 0;
-        lowMid = sumLowMid / Math.max(1, lmEnd - bEnd) / 255;
-
-        let sumMid = 0;
-        for (let i = lmEnd; i < mEnd; i++) sumMid += freq[i] ?? 0;
-        mid = sumMid / Math.max(1, mEnd - lmEnd) / 255;
-
-        let sumTreble = 0;
-        for (let i = mEnd; i < n; i++) sumTreble += freq[i] ?? 0;
-        treble = sumTreble / Math.max(1, n - mEnd) / 255;
+        const bands = settingsSnapshot.global.bandsHz;
+        const master = settingsSnapshot.global.masterIntensity;
+        const bandAvg = (loHz: number, hiHz: number) => {
+          const lo = hzToBin(loHz);
+          const hi = Math.max(lo + 1, hzToBin(hiHz));
+          let sum = 0;
+          for (let i = lo; i < hi && i < n; i++) sum += freq[i] ?? 0;
+          return sum / Math.max(1, hi - lo) / 255;
+        };
+        bass = bandAvg(bands.bass[0], bands.bass[1]) * master;
+        lowMid = bandAvg(bands.lowMid[0], bands.lowMid[1]) * master;
+        mid = bandAvg(bands.mid[0], bands.mid[1]) * master;
+        treble = bandAvg(bands.treble[0], bands.treble[1]) * master;
 
         let sq = 0;
         for (let i = 0; i < time.length; i++) {
@@ -252,7 +246,8 @@ const Visualizer = ({ analyser, style }: Props) => {
         const avg = bassAvgRef.current;
         bassAvgRef.current = avg * 0.92 + bass * 0.08;
         if (beatCooldownRef.current > 0) beatCooldownRef.current -= 1;
-        if (bass > avg * 1.35 && bass > 0.15 && beatCooldownRef.current <= 0) {
+        const beatMul = settingsSnapshot.global.beatThreshold;
+        if (bass > avg * beatMul && bass > 0.15 && beatCooldownRef.current <= 0) {
           beat = true;
           beatCooldownRef.current = 10;
         }
