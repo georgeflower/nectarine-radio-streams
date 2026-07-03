@@ -143,13 +143,21 @@ const Visualizer = ({ analyser, style }: Props) => {
 
     const isFirefox =
       typeof navigator !== "undefined" && /Firefox/i.test(navigator.userAgent);
-    // Firefox's Canvas2D backend renders shadowBlur on the CPU and the blur
-    // kernel scales with pixel count, so cap dpr more aggressively there.
-    const dpr = Math.min(window.devicePixelRatio || 1, isFirefox ? 1.5 : 2);
-    // shadowBlur is a major bottleneck in Firefox: every stroke/fill that
-    // happens while shadowBlur > 0 hits a slow software path. Disable it
-    // entirely on Firefox; individual scenes substitute a cheaper neon look.
-    const glow = (px: number) => (isFirefox ? 0 : px);
+
+    // Adaptive quality state. Firefox starts one tier down since its Canvas2D
+    // backend renders shadowBlur on the CPU. The FPS monitor in render() can
+    // downgrade or upgrade further at runtime based on smoothed frame time.
+    const qState = {
+      quality: (isFirefox ? "medium" : "high") as Quality,
+      profile: makeProfile(isFirefox ? "medium" : "high", isFirefox),
+      dpr: 1,
+    };
+    const computeDpr = (cap: number) => Math.min(window.devicePixelRatio || 1, cap);
+    qState.dpr = computeDpr(qState.profile.dprCap);
+    // shadowBlur is a major bottleneck (esp. Firefox). glowMul folds device
+    // capability and adaptive tier into a single multiplier — 0 disables it.
+    const glow = (px: number) => px * qState.profile.glowMul;
+
     const freq: Uint8Array<ArrayBuffer> | null = analyser
       ? (new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>)
       : null;
@@ -163,8 +171,8 @@ const Visualizer = ({ analyser, style }: Props) => {
     const resize = () => {
       const w = stageW();
       const h = stageH();
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
+      canvas.width = Math.floor(w * qState.dpr);
+      canvas.height = Math.floor(h * qState.dpr);
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
     };
@@ -231,23 +239,57 @@ const Visualizer = ({ analyser, style }: Props) => {
       window.addEventListener("resize", resize);
     }
 
-    starsRef.current = Array.from({ length: STAR_COUNT }, () => ({
-      x: (Math.random() - 0.5) * 2000,
-      y: (Math.random() - 0.5) * 2000,
-      z: Math.random() * MAX_DEPTH,
-    }));
+    const seedStars = (count: number) => {
+      const arr = starsRef.current;
+      if (arr.length > count) arr.length = count;
+      while (arr.length < count) {
+        arr.push({
+          x: (Math.random() - 0.5) * 2000,
+          y: (Math.random() - 0.5) * 2000,
+          z: Math.random() * MAX_DEPTH,
+        });
+      }
+    };
+    const seedParticles = (count: number) => {
+      const arr = particlesRef.current;
+      if (arr.length > count) arr.length = count;
+      while (arr.length < count) {
+        arr.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: (Math.random() - 0.5) * 0.5,
+          life: Math.random(),
+          hue: 28 + Math.random() * 40,
+        });
+      }
+    };
+    seedStars(qState.profile.starCount);
+    seedParticles(qState.profile.particleCount);
 
-    particlesRef.current = Array.from({ length: PARTICLE_COUNT }, () => ({
-      x: canvas.width / 2,
-      y: canvas.height / 2,
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: (Math.random() - 0.5) * 0.5,
-      life: Math.random(),
-      hue: 28 + Math.random() * 40,
-    }));
+    const applyQuality = (next: Quality) => {
+      if (next === qState.quality) return;
+      const prev = qState.quality;
+      qState.quality = next;
+      qState.profile = makeProfile(next, isFirefox);
+      const newDpr = computeDpr(qState.profile.dprCap);
+      if (newDpr !== qState.dpr) {
+        qState.dpr = newDpr;
+        resize();
+      }
+      seedStars(qState.profile.starCount);
+      seedParticles(qState.profile.particleCount);
+      // Trim comet/sparkle pools to new caps.
+      if (cometsRef.current.length > qState.profile.maxComets) {
+        cometsRef.current.length = qState.profile.maxComets;
+      }
+      if (sparklesRef.current.length > qState.profile.maxSparkles) {
+        sparklesRef.current.length = qState.profile.maxSparkles;
+      }
+      // eslint-disable-next-line no-console
+      console.debug(`[Visualizer] quality ${prev} → ${next} (dpr=${qState.dpr})`);
+    };
 
-    const MAX_COMETS = isFirefox ? 12 : 24;
-    const MAX_SPARKLES = isFirefox ? 20 : 40;
 
     const spawnComet = (w: number, h: number, drive: number, hueBase: number) => {
       if (cometsRef.current.length >= MAX_COMETS) return;
