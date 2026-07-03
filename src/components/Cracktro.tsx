@@ -388,13 +388,17 @@ const Cracktro = ({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const text = useMemo(() => (
-    `   NOW SPINNING:  ${(artist || "UNKNOWN ARTIST").toUpperCase()}  ---  ${(title || "UNKNOWN TUNE").toUpperCase()}` +
-    `${platform ? `   ON  ${platform.toUpperCase()}` : ""}` +
-    `${rating !== undefined ? `   ★ ${rating.toFixed(2)}` : ""}` +
-    `${lowFpsDetected ? "   ***   BIRDS SAY: SLOW PC + BAD GPU :( :(   ***" : ""}` +
-    `   ***   STAY TUNED TO NECTARINE DEMOSCENE RADIO   ***   GREETZ TO ALL THE SCENERS OUT THERE   ***   `
-  ), [artist, title, platform, rating, lowFpsDetected]);
+  const text = useMemo(() => {
+    const isFirefox = typeof navigator !== "undefined" && /Firefox/i.test(navigator.userAgent);
+    return (
+      `   NOW SPINNING:  ${(artist || "UNKNOWN ARTIST").toUpperCase()}  ---  ${(title || "UNKNOWN TUNE").toUpperCase()}` +
+      `${platform ? `   ON  ${platform.toUpperCase()}` : ""}` +
+      `${rating !== undefined ? `   ★ ${rating.toFixed(2)}` : ""}` +
+      `${lowFpsDetected ? "   ***   BIRDS SAY: SLOW PC + BAD GPU :( :(   ***" : ""}` +
+      `${isFirefox ? "   ***   KNOWN FIREFOX PERFORMANCE ISSUES — FOR BEST EXPERIENCE USE CHROME, EDGE OR SAFARI   ***" : ""}` +
+      `   ***   STAY TUNED TO NECTARINE DEMOSCENE RADIO   ***   GREETZ TO ALL THE SCENERS OUT THERE   ***   `
+    );
+  }, [artist, title, platform, rating, lowFpsDetected]);
 
   type Skin = "default" | "amiga" | "atari" | "c64" | "xm";
   const autoSkin = useMemo<Skin>(() => {
