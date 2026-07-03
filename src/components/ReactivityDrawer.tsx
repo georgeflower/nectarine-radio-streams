@@ -138,7 +138,7 @@ const ReactivityDrawer = ({ children }: Props) => {
   return (
     <Sheet>
       <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent side="right" className="w-[380px] sm:w-[420px] overflow-y-auto">
+      <SheetContent side="right" className="w-[380px] sm:w-[420px] overflow-y-auto" overlayClassName="bg-transparent">
         <SheetHeader>
           <SheetTitle className="uppercase tracking-widest text-sm">Audio reactivity</SheetTitle>
         </SheetHeader>
