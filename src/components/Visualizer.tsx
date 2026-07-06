@@ -166,6 +166,11 @@ const Visualizer = ({ analyser, style }: Props) => {
     // Per-mode intensity multipliers refreshed each rAF before dispatching.
     let modeGlowMul = 1;
     let modeMotionMul = 1;
+    let modeEffects: Record<string, number> = {};
+    const eff = (key: string, fallback = 1): number => {
+      const v = modeEffects[key];
+      return typeof v === "number" ? v : fallback;
+    };
     const glow = (px: number) => px * qState.profile.glowMul * modeGlowMul;
     // Mutable aliases updated in applyQuality() so the inline `dpr` /
     // MAX_COMETS / MAX_SPARKLES references throughout the render functions
