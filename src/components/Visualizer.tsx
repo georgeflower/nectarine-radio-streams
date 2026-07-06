@@ -383,10 +383,14 @@ const Visualizer = ({ analyser, style }: Props) => {
       const rms = hasAudio ? audio.rms : 0.05;
       const beat = hasAudio ? audio.beat : idleBeat;
 
+      // Dynamic star density
+      const starTarget = Math.max(20, Math.round(qState.profile.starCount * eff("starDensity", 1)));
+      if (starsRef.current.length !== starTarget) seedStars(starTarget);
+
       // Treble spike tracking for sparkles
       const tAvg = trebleAvgRef.current;
       trebleAvgRef.current = tAvg * 0.9 + treble * 0.1;
-      const sparkleT = Math.max(qState.profile.sparkleThreshold, settingsSnapshot.global.sparkleThreshold);
+      const sparkleT = Math.max(qState.profile.sparkleThreshold, settingsSnapshot.global.sparkleThreshold) * eff("sparkleThresh", 1);
       const trebleSpike = treble > tAvg * sparkleT && treble > 0.12;
 
       // Background trail
