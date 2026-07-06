@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.5";
+export const APP_VERSION = "0.7.6";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,13 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.6",
+    date: "2026-07-03",
+    changes: [
+      "Reactivity settings are now accessible from scroller mode (Visuals → Effect row)",
+    ],
+  },
   {
     version: "0.7.5",
     date: "2026-07-03",
