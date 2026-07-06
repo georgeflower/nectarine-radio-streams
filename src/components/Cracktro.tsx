@@ -1267,6 +1267,15 @@ const Cracktro = ({
                       {v.label}
                     </button>
                   ))}
+                  <ReactivityDrawer>
+                    <button
+                      type="button"
+                      className="min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
+                      title="Tune audio reactivity per visualizer"
+                    >
+                      ♪ Reactivity…
+                    </button>
+                  </ReactivityDrawer>
                 </div>
               )}
             </div>
