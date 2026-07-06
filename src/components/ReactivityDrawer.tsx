@@ -148,15 +148,17 @@ const ModePanel = ({ style }: { style: VisualizerStyle }) => {
 
 type Props = {
   children: React.ReactNode; // trigger
+  container?: HTMLElement | null;
 };
 
-const ReactivityDrawer = ({ children }: Props) => {
+const ReactivityDrawer = ({ children, container }: Props) => {
   const settings = useSyncExternalStore(reactivityStore.subscribe, reactivityStore.get);
   const g = settings.global;
   return (
     <Sheet>
       <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent side="right" className="w-[380px] sm:w-[420px] overflow-y-auto" overlayClassName="bg-transparent">
+      <SheetContent side="right" className="w-[380px] sm:w-[420px] overflow-y-auto" overlayClassName="bg-transparent" container={container}>
+
         <SheetHeader>
           <SheetTitle className="uppercase tracking-widest text-sm">Audio reactivity</SheetTitle>
         </SheetHeader>

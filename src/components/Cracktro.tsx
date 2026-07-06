@@ -338,6 +338,18 @@ const Cracktro = ({
 
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const update = () => {
+      setPortalTarget(
+        (document.fullscreenElement as HTMLElement | null) ?? wrapRef.current,
+      );
+    };
+    update();
+    document.addEventListener("fullscreenchange", update);
+    return () => document.removeEventListener("fullscreenchange", update);
+  }, [stageEl]);
+
 
   const enterFullscreen = useCallback(() => {
     const el = wrapRef.current;
@@ -1267,7 +1279,7 @@ const Cracktro = ({
                       {v.label}
                     </button>
                   ))}
-                  <ReactivityDrawer>
+                  <ReactivityDrawer container={portalTarget}>
                     <button
                       type="button"
                       className="min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
