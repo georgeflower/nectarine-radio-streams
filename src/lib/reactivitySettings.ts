@@ -64,11 +64,11 @@ export const DEFAULT_MODE_BASE = {
 
 export const MODE_EFFECT_SPECS: Partial<Record<VisualizerStyle, EffectSpec[]>> = {
   starfield: [
-    { key: "starDensity", label: "Star density", min: 0.25, max: 2, step: 0.05, default: 1, suffix: "x" },
-    { key: "cometBeat", label: "Comets per beat", min: 0, max: 3, step: 0.1, default: 1, suffix: "x" },
-    { key: "cometRate", label: "Ambient comet rate", min: 0, max: 3, step: 0.05, default: 1, suffix: "x" },
-    { key: "sparkleDensity", label: "Sparkle density", min: 0, max: 3, step: 0.1, default: 1, suffix: "x" },
-    { key: "sparkleThresh", label: "Sparkle sensitivity", min: 0.6, max: 1.6, step: 0.05, default: 1, suffix: "x" },
+    { key: "starDensity", label: "Star density", min: 0.25, max: 2, step: 0.05, default: 0.5, suffix: "x" },
+    { key: "cometBeat", label: "Comets per beat", min: 0, max: 3, step: 0.05, default: 0.2, suffix: "x" },
+    { key: "cometRate", label: "Ambient comet rate", min: 0, max: 3, step: 0.05, default: 0.25, suffix: "x" },
+    { key: "sparkleDensity", label: "Sparkle density", min: 0, max: 3, step: 0.05, default: 0.3, suffix: "x" },
+    { key: "sparkleThresh", label: "Sparkle sensitivity", min: 0.6, max: 1.6, step: 0.05, default: 0.7, suffix: "x" },
   ],
   bars: [
     { key: "barCount", label: "Bar count", min: 0.5, max: 1.7, step: 0.05, default: 1, suffix: "x" },
