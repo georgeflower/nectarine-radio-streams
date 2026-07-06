@@ -338,6 +338,18 @@ const Cracktro = ({
 
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const update = () => {
+      setPortalTarget(
+        (document.fullscreenElement as HTMLElement | null) ?? wrapRef.current,
+      );
+    };
+    update();
+    document.addEventListener("fullscreenchange", update);
+    return () => document.removeEventListener("fullscreenchange", update);
+  }, [stageEl]);
+
 
   const enterFullscreen = useCallback(() => {
     const el = wrapRef.current;
