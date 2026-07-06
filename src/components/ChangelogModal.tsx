@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.8";
+export const APP_VERSION = "0.7.1";
 
 interface ChangelogEntry {
   version: string;
@@ -10,60 +10,6 @@ interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "0.7.8",
-    date: "2026-07-03",
-    changes: [
-      "Calmer default starfield reactivity (fewer comets, sparser stars & sparkles)",
-      "Confirmed reactivity settings persist across the main player and scroller mode (saved automatically to this browser)",
-    ],
-  },
-  {
-    version: "0.7.7",
-    date: "2026-07-03",
-    changes: [
-      "Reactivity drawer now opens correctly from scroller mode in both windowed and fullscreen, showing the full per-mode control set",
-    ],
-  },
-  {
-    version: "0.7.6",
-    date: "2026-07-03",
-    changes: [
-      "Reactivity settings are now accessible from scroller mode (Visuals → Effect row)",
-    ],
-  },
-  {
-    version: "0.7.5",
-    date: "2026-07-03",
-    changes: [
-      "Per-mode effect controls in the reactivity drawer: tune comets and sparkles (starfield), bar count/decay/hue spread (bars), plasma cell size/color speed/complexity, oscilloscope thickness/amplitude/trail, tunnel slices/sides/curve/twist, ring count/length/speed, and particle kick/friction/count",
-    ],
-  },
-  {
-    version: "0.7.4",
-    date: "2026-07-03",
-    changes: [
-      "Reactivity settings drawer now opens without dimming the page behind it",
-    ],
-  },
-  {
-    version: "0.7.3",
-    date: "2026-07-03",
-    changes: [
-      "Added Performance tips modal with browser recommendations, reactivity tuning guidance, and issue reporting links",
-      "Performance tips modal opens without dimming the page behind it",
-    ],
-  },
-  {
-    version: "0.7.2",
-    date: "2026-07-03",
-    changes: [
-      "Audio reactivity tuning: side drawer with tunable frequency ranges (bass/low-mid/mid/treble), beat and sparkle thresholds, and master intensity",
-      "Per-visualizer overrides: bass/mid/treble gain, motion and glow intensity for each mode with a one-click reset",
-      "Firefox performance warning banner and cracktro scroller notice",
-      "Settings persisted per browser; reset-to-defaults button",
-    ],
-  },
-  {
     version: "0.7.1",
     date: "2026-07-03",
     changes: [
@@ -71,6 +17,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Bass reactivity shifted to low-mids for tighter sync with kick drums",
       "Adaptive low-power quality mode: auto-downgrades rendering tier when FPS drops, upgrades when smooth",
       "Quality tiers (high / medium / low) scale star/particle counts, glow, and effect complexity automatically",
+      "Audio reactivity tuning: side drawer with tunable frequency ranges (bass/low-mid/mid/treble), beat and sparkle thresholds, and master intensity",
+      "Per-visualizer overrides: bass/mid/treble gain, motion and glow intensity for each mode with a one-click reset",
+      "Firefox performance warning banner and cracktro scroller notice",
+      "Settings persisted per browser; reset-to-defaults button",
+      "Added Performance tips modal with browser recommendations, reactivity tuning guidance, and issue reporting links",
+      "Performance tips modal and reactivity drawer open without dimming the page behind them",
+      "Per-mode effect controls in the reactivity drawer: tune comets and sparkles (starfield), bar count/decay/hue spread (bars), plasma cell size/color speed/complexity, oscilloscope thickness/amplitude/trail, tunnel slices/sides/curve/twist, ring count/length/speed, and particle kick/friction/count",
+      "Reactivity settings accessible from scroller mode (Visuals → Effect row) and open correctly in both windowed and fullscreen",
+      "Reactivity settings persist across the main player and scroller mode (saved automatically to this browser)",
+      "Calmer default starfield reactivity (fewer comets, sparser stars & sparkles)",
     ],
   },
   {
