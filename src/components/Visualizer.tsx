@@ -571,20 +571,22 @@ const Visualizer = ({ analyser, style }: Props) => {
       const w = canvas.width;
       const h = canvas.height;
       const { bass, mid, treble } = sampleAudio();
-      plasmaTRef.current += (0.005 + bass * 0.025) * modeMotionMul;
+      const colorSpeed = eff("colorSpeed", 1);
+      plasmaTRef.current += (0.005 + bass * 0.025) * modeMotionMul * colorSpeed;
       const t = plasmaTRef.current;
-      const cell = Math.max(8, Math.floor(12 * dpr));
+      const cell = Math.max(4, Math.floor(12 * dpr * eff("cellSize", 1)));
       const energy = 0.4 + bass * 0.6 + mid * 0.3;
+      const cx = eff("complexity", 1);
 
       for (let y = 0; y < h; y += cell) {
         for (let x = 0; x < w; x += cell) {
           const nx = x / w - 0.5;
           const ny = y / h - 0.5;
           const v =
-            Math.sin(nx * 8 + t) +
-            Math.sin(ny * 8 + t * 1.3) +
-            Math.sin((nx + ny) * 6 + t * 0.7) +
-            Math.sin(Math.sqrt(nx * nx + ny * ny) * 12 - t);
+            Math.sin(nx * 8 * cx + t) +
+            Math.sin(ny * 8 * cx + t * 1.3) +
+            Math.sin((nx + ny) * 6 * cx + t * 0.7) +
+            Math.sin(Math.sqrt(nx * nx + ny * ny) * 12 * cx - t);
           const hue = (v * 40 + t * 6 + treble * 60) % 360;
           ctx.fillStyle = `hsl(${(hue + 360) % 360}, 90%, ${40 + energy * 20}%)`;
           ctx.fillRect(x, y, cell, cell);
