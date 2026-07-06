@@ -492,8 +492,9 @@ const Visualizer = ({ analyser, style }: Props) => {
       ctx.shadowBlur = 0;
 
       // Sparkles on treble spikes
-      if (trebleSpike) {
-        const n = 2 + Math.floor(Math.random() * 3);
+      const sparkleMul = eff("sparkleDensity", 1);
+      if (trebleSpike && sparkleMul > 0) {
+        const n = Math.max(0, Math.floor((2 + Math.random() * 3) * sparkleMul));
         for (let i = 0; i < n; i++) spawnSparkle(w, h, (40 + treble * 200) % 360);
       }
       const sparkles = sparklesRef.current;
