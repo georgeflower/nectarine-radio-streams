@@ -5,8 +5,8 @@ import { Slider } from "@/components/ui/slider";
 import {
   reactivityStore,
   resolveMode,
-  DEFAULT_MODE,
   TUNABLE_STYLES,
+  MODE_EFFECT_SPECS,
   type BandName,
   type ModeReactivity,
 } from "@/lib/reactivitySettings";
@@ -78,6 +78,7 @@ const ModePanel = ({ style }: { style: VisualizerStyle }) => {
   const settings = useSyncExternalStore(reactivityStore.subscribe, reactivityStore.get);
   const mode: ModeReactivity = resolveMode(style, settings);
   const isOverridden = !!settings.perMode[style];
+  const effectSpecs = MODE_EFFECT_SPECS[style] ?? [];
   return (
     <div className="flex flex-col gap-3 py-2">
       <SliderRow
@@ -115,6 +116,23 @@ const ModePanel = ({ style }: { style: VisualizerStyle }) => {
         suffix="x"
         onChange={(v) => reactivityStore.setModeField(style, "glow", v)}
       />
+      {effectSpecs.length > 0 && (
+        <div className="flex flex-col gap-3 pt-2 mt-1 border-t border-border/60">
+          <h4 className="text-[10px] uppercase tracking-widest text-muted-foreground">Effects</h4>
+          {effectSpecs.map((spec) => (
+            <SliderRow
+              key={spec.key}
+              label={spec.label}
+              value={mode.effects[spec.key] ?? spec.default}
+              min={spec.min}
+              max={spec.max}
+              step={spec.step}
+              suffix={spec.suffix}
+              onChange={(v) => reactivityStore.setModeEffect(style, spec.key, v)}
+            />
+          ))}
+        </div>
+      )}
       {isOverridden && (
         <button
           type="button"

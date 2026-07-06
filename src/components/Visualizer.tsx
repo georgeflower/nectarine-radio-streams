@@ -166,6 +166,11 @@ const Visualizer = ({ analyser, style }: Props) => {
     // Per-mode intensity multipliers refreshed each rAF before dispatching.
     let modeGlowMul = 1;
     let modeMotionMul = 1;
+    let modeEffects: Record<string, number> = {};
+    const eff = (key: string, fallback = 1): number => {
+      const v = modeEffects[key];
+      return typeof v === "number" ? v : fallback;
+    };
     const glow = (px: number) => px * qState.profile.glowMul * modeGlowMul;
     // Mutable aliases updated in applyQuality() so the inline `dpr` /
     // MAX_COMETS / MAX_SPARKLES references throughout the render functions
@@ -378,10 +383,14 @@ const Visualizer = ({ analyser, style }: Props) => {
       const rms = hasAudio ? audio.rms : 0.05;
       const beat = hasAudio ? audio.beat : idleBeat;
 
+      // Dynamic star density
+      const starTarget = Math.max(20, Math.round(qState.profile.starCount * eff("starDensity", 1)));
+      if (starsRef.current.length !== starTarget) seedStars(starTarget);
+
       // Treble spike tracking for sparkles
       const tAvg = trebleAvgRef.current;
       trebleAvgRef.current = tAvg * 0.9 + treble * 0.1;
-      const sparkleT = Math.max(qState.profile.sparkleThreshold, settingsSnapshot.global.sparkleThreshold);
+      const sparkleT = Math.max(qState.profile.sparkleThreshold, settingsSnapshot.global.sparkleThreshold) * eff("sparkleThresh", 1);
       const trebleSpike = treble > tAvg * sparkleT && treble > 0.12;
 
       // Background trail
@@ -430,14 +439,17 @@ const Visualizer = ({ analyser, style }: Props) => {
       }
 
       // Comet spawns: on beats + ambient trickle driven by lowMid
-      if (beat) {
-        const n = 1 + Math.floor(drive * qState.profile.cometBeatMax);
+      const cometBeatMul = eff("cometBeat", 1);
+      const cometRateMul = eff("cometRate", 1);
+      if (beat && cometBeatMul > 0) {
+        const n = Math.max(0, Math.floor((1 + drive * qState.profile.cometBeatMax) * cometBeatMul));
         for (let i = 0; i < n; i++) spawnComet(w, h, drive, (28 + treble * 200) % 360);
       }
-      if (qState.profile.cometAmbientMs > 0) {
+      if (qState.profile.cometAmbientMs > 0 && cometRateMul > 0) {
+        const ambientMs = qState.profile.cometAmbientMs / cometRateMul;
         cometAccRef.current += dt * (0.7 + lowMid * 2.5);
-        while (cometAccRef.current > qState.profile.cometAmbientMs) {
-          cometAccRef.current -= qState.profile.cometAmbientMs;
+        while (cometAccRef.current > ambientMs) {
+          cometAccRef.current -= ambientMs;
           spawnComet(w, h, drive * 0.6 + 0.2, (200 + Math.random() * 160) % 360);
         }
       }
@@ -480,8 +492,9 @@ const Visualizer = ({ analyser, style }: Props) => {
       ctx.shadowBlur = 0;
 
       // Sparkles on treble spikes
-      if (trebleSpike) {
-        const n = 2 + Math.floor(Math.random() * 3);
+      const sparkleMul = eff("sparkleDensity", 1);
+      if (trebleSpike && sparkleMul > 0) {
+        const n = Math.max(0, Math.floor((2 + Math.random() * 3) * sparkleMul));
         for (let i = 0; i < n; i++) spawnSparkle(w, h, (40 + treble * 200) % 360);
       }
       const sparkles = sparklesRef.current;
@@ -510,15 +523,17 @@ const Visualizer = ({ analyser, style }: Props) => {
       const { bass, mid, treble, rms, freq } = sampleAudio();
       idleTRef.current += (0.03 + bass * 0.05) * modeMotionMul;
 
-      ctx.fillStyle = "hsla(20, 25%, 6%, 0.2)";
+      const barDecay = eff("decay", 0.2);
+      ctx.fillStyle = `hsla(20, 25%, 6%, ${barDecay})`;
       ctx.fillRect(0, 0, w, h);
 
-      const bins = 56;
+      const bins = Math.max(16, Math.min(96, Math.round(56 * eff("barCount", 1))));
       const barW = w / bins;
       const usable = freq?.length ?? 0;
       const step = Math.max(1, Math.floor(usable / bins));
       const energy = Math.max(rms * 4, bass * 1.2, mid, treble * 0.8);
       const baseline = h - 16 * dpr;
+      const hueSpread = eff("hueSpread", 1);
 
       ctx.shadowBlur = glow(18 * dpr);
       ctx.shadowColor = "hsl(28 100% 60%)";
@@ -534,11 +549,11 @@ const Visualizer = ({ analyser, style }: Props) => {
         const v = Math.max(raw, energy > 0.01 ? 0 : idlePulse);
         const shaped = Math.pow(Math.max(0, v), 0.65);
         const barH = Math.max(4 * dpr, shaped * h * 0.62);
-        const hue = 24 + (i / bins) * 70 + treble * 20;
+        const hue = 24 + (i / bins) * 70 * hueSpread + treble * 20;
         const grad = ctx.createLinearGradient(0, baseline, 0, baseline - barH);
         grad.addColorStop(0, `hsla(${hue}, 100%, 48%, 0.98)`);
-        grad.addColorStop(0.6, `hsla(${(hue + 18) % 360}, 100%, 62%, 0.95)`);
-        grad.addColorStop(1, `hsla(${(hue + 38) % 360}, 100%, 78%, 0.9)`);
+        grad.addColorStop(0.6, `hsla(${(hue + 18 * hueSpread) % 360}, 100%, 62%, 0.95)`);
+        grad.addColorStop(1, `hsla(${(hue + 38 * hueSpread) % 360}, 100%, 78%, 0.9)`);
         ctx.fillStyle = grad;
         ctx.fillRect(i * barW + 1.5 * dpr, baseline - barH, Math.max(2 * dpr, barW - 3 * dpr), barH);
       }
@@ -556,20 +571,22 @@ const Visualizer = ({ analyser, style }: Props) => {
       const w = canvas.width;
       const h = canvas.height;
       const { bass, mid, treble } = sampleAudio();
-      plasmaTRef.current += (0.005 + bass * 0.025) * modeMotionMul;
+      const colorSpeed = eff("colorSpeed", 1);
+      plasmaTRef.current += (0.005 + bass * 0.025) * modeMotionMul * colorSpeed;
       const t = plasmaTRef.current;
-      const cell = Math.max(8, Math.floor(12 * dpr));
+      const cell = Math.max(4, Math.floor(12 * dpr * eff("cellSize", 1)));
       const energy = 0.4 + bass * 0.6 + mid * 0.3;
+      const cx = eff("complexity", 1);
 
       for (let y = 0; y < h; y += cell) {
         for (let x = 0; x < w; x += cell) {
           const nx = x / w - 0.5;
           const ny = y / h - 0.5;
           const v =
-            Math.sin(nx * 8 + t) +
-            Math.sin(ny * 8 + t * 1.3) +
-            Math.sin((nx + ny) * 6 + t * 0.7) +
-            Math.sin(Math.sqrt(nx * nx + ny * ny) * 12 - t);
+            Math.sin(nx * 8 * cx + t) +
+            Math.sin(ny * 8 * cx + t * 1.3) +
+            Math.sin((nx + ny) * 6 * cx + t * 0.7) +
+            Math.sin(Math.sqrt(nx * nx + ny * ny) * 12 * cx - t);
           const hue = (v * 40 + t * 6 + treble * 60) % 360;
           ctx.fillStyle = `hsl(${(hue + 360) % 360}, 90%, ${40 + energy * 20}%)`;
           ctx.fillRect(x, y, cell, cell);
@@ -583,12 +600,15 @@ const Visualizer = ({ analyser, style }: Props) => {
       const { bass, treble, rms, time } = sampleAudio();
       idleTRef.current += 0.04 * modeMotionMul;
 
-      ctx.fillStyle = "hsla(20, 25%, 6%, 0.22)";
+      const trail = eff("trail", 0.22);
+      ctx.fillStyle = `hsla(20, 25%, 6%, ${trail})`;
       ctx.fillRect(0, 0, w, h);
 
       const centerY = h * 0.5;
+      const thick = eff("thickness", 1);
+      const ampMul = eff("amplitude", 1);
       ctx.strokeStyle = `hsla(${28 + treble * 60}, 100%, ${62 + bass * 16}%, 0.95)`;
-      ctx.lineWidth = (2 + bass * 2) * dpr;
+      ctx.lineWidth = (2 + bass * 2) * dpr * thick;
       ctx.shadowBlur = glow(14 * dpr);
       ctx.shadowColor = "hsl(28 100% 60%)";
       ctx.beginPath();
@@ -597,7 +617,7 @@ const Visualizer = ({ analyser, style }: Props) => {
         for (let i = 0; i < time.length; i++) {
           const x = (i / (time.length - 1)) * w;
           const centered = (time[i] - 128) / 128;
-          const y = centerY + centered * h * (0.18 + rms * 1.8);
+          const y = centerY + centered * h * (0.18 + rms * 1.8) * ampMul;
           if (i === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
@@ -635,12 +655,13 @@ const Visualizer = ({ analyser, style }: Props) => {
 
       const cx = w / 2;
       const cy = h / 2;
-      const slices = qState.quality === "low" ? 20 : qState.quality === "medium" ? 28 : 36;
+      const baseSlices = qState.quality === "low" ? 20 : qState.quality === "medium" ? 28 : 36;
+      const slices = Math.max(6, Math.min(80, Math.round(baseSlices * eff("sliceMult", 1))));
       const baseR = Math.min(w, h) * 0.55;
       // Tunnel curvature amplitude reacts to mid.
-      const curve = (60 + mid * 220) * dpr;
+      const curve = (60 + mid * 220) * dpr * eff("curve", 1);
       // Twist per unit z, reacts to treble.
-      const twist = 0.18 + treble * 0.5;
+      const twist = (0.18 + treble * 0.5) * eff("twist", 1);
 
       // Walk slices from far (z=slices) to near (z=0). Use phase offset so
       // slices feel like they're flying toward camera continuously.
@@ -659,7 +680,8 @@ const Visualizer = ({ analyser, style }: Props) => {
         sl.push({ x: cx + px, y: cy + py, r, roll, hue, depth });
       }
 
-      const sides = qState.profile.tunnelSides;
+      const sidesOverride = Math.round(eff("sides", 0));
+      const sides = sidesOverride >= 4 ? Math.min(16, sidesOverride) : qState.profile.tunnelSides;
       const ringCutoff = qState.profile.tunnelRingCutoff;
       const segCutoff = qState.profile.tunnelSegCutoff;
       ctx.lineCap = "round";
@@ -748,7 +770,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const w = canvas.width;
       const h = canvas.height;
       const { bass, mid, treble, rms, freq } = sampleAudio();
-      ringsTRef.current += (0.004 + rms * 0.08) * modeMotionMul;
+      ringsTRef.current += (0.004 + rms * 0.08) * modeMotionMul * eff("speed", 1);
       const t = ringsTRef.current;
 
       ctx.fillStyle = "hsla(20, 25%, 6%, 0.25)";
@@ -757,9 +779,10 @@ const Visualizer = ({ analyser, style }: Props) => {
       const cx = w / 2;
       const cy = h / 2;
       const baseR = Math.min(w, h) * 0.18 + bass * Math.min(w, h) * 0.08;
-      const bins = 96;
+      const bins = Math.max(24, Math.min(200, Math.round(96 * eff("bins", 1))));
       const usable = freq?.length ?? 0;
       const step = Math.max(1, Math.floor(usable / bins));
+      const lenMul = eff("length", 1);
 
       ctx.shadowBlur = glow(14 * dpr);
       ctx.lineCap = "round";
@@ -773,7 +796,7 @@ const Visualizer = ({ analyser, style }: Props) => {
           v = 0.15 + 0.1 * Math.sin(i * 0.4 + t * 4);
         }
         const angle = (i / bins) * Math.PI * 2 + t;
-        const len = (10 + v * Math.min(w, h) * 0.32) * 1;
+        const len = (10 + v * Math.min(w, h) * 0.32) * lenMul;
         const hue = (28 + (i / bins) * 120 + treble * 60) % 360;
         ctx.shadowColor = `hsl(${hue}, 100%, 60%)`;
         ctx.strokeStyle = `hsla(${hue}, 100%, ${55 + mid * 25}%, 0.95)`;
@@ -801,17 +824,23 @@ const Visualizer = ({ analyser, style }: Props) => {
       const h = canvas.height;
       const { bass, mid, treble, beat } = sampleAudio();
 
+      // Dynamic particle count
+      const pTarget = Math.max(10, Math.round(qState.profile.particleCount * eff("count", 1)));
+      if (particlesRef.current.length !== pTarget) seedParticles(pTarget);
+
       ctx.fillStyle = "hsla(20, 25%, 6%, 0.18)";
       ctx.fillRect(0, 0, w, h);
 
       const cx = w / 2;
       const cy = h / 2;
       const ps = particlesRef.current;
+      const kickMul = eff("kick", 1);
+      const friction = eff("friction", 0.96);
 
       for (const p of ps) {
         if (beat) {
           const a = Math.random() * Math.PI * 2;
-          const kick = (3 + bass * 12) * dpr * modeMotionMul;
+          const kick = (3 + bass * 12) * dpr * modeMotionMul * kickMul;
           p.vx += Math.cos(a) * kick * 0.3;
           p.vy += Math.sin(a) * kick * 0.3;
           p.life = 1;
@@ -820,8 +849,8 @@ const Visualizer = ({ analyser, style }: Props) => {
 
         p.x += p.vx;
         p.y += p.vy;
-        p.vx *= 0.96;
-        p.vy *= 0.96;
+        p.vx *= friction;
+        p.vy *= friction;
         p.life *= 0.985;
 
         const dx = p.x - cx;
@@ -883,6 +912,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const mR = currentMode();
       modeGlowMul = mR.glow;
       modeMotionMul = mR.motion;
+      modeEffects = mR.effects;
 
       switch (style) {
         case "bars": renderBars(); break;

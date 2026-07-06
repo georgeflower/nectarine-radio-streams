@@ -15,11 +15,31 @@ export type ModeReactivity = {
   trebleGain: number;
   motion: number;
   glow: number;
+  effects: Record<string, number>;
+};
+
+export type ModeReactivityOverride = {
+  bassGain?: number;
+  midGain?: number;
+  trebleGain?: number;
+  motion?: number;
+  glow?: number;
+  effects?: Record<string, number>;
 };
 
 export type ReactivitySettings = {
   global: GlobalReactivity;
-  perMode: Partial<Record<VisualizerStyle, Partial<ModeReactivity>>>;
+  perMode: Partial<Record<VisualizerStyle, ModeReactivityOverride>>;
+};
+
+export type EffectSpec = {
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  default: number;
+  suffix?: string;
 };
 
 export const DEFAULT_GLOBAL: GlobalReactivity = {
@@ -34,12 +54,58 @@ export const DEFAULT_GLOBAL: GlobalReactivity = {
   sparkleThreshold: 1.7,
 };
 
-export const DEFAULT_MODE: ModeReactivity = {
+export const DEFAULT_MODE_BASE = {
   bassGain: 1,
   midGain: 1,
   trebleGain: 1,
   motion: 1,
   glow: 1,
+};
+
+export const MODE_EFFECT_SPECS: Partial<Record<VisualizerStyle, EffectSpec[]>> = {
+  starfield: [
+    { key: "starDensity", label: "Star density", min: 0.25, max: 2, step: 0.05, default: 1, suffix: "x" },
+    { key: "cometBeat", label: "Comets per beat", min: 0, max: 3, step: 0.1, default: 1, suffix: "x" },
+    { key: "cometRate", label: "Ambient comet rate", min: 0, max: 3, step: 0.05, default: 1, suffix: "x" },
+    { key: "sparkleDensity", label: "Sparkle density", min: 0, max: 3, step: 0.1, default: 1, suffix: "x" },
+    { key: "sparkleThresh", label: "Sparkle sensitivity", min: 0.6, max: 1.6, step: 0.05, default: 1, suffix: "x" },
+  ],
+  bars: [
+    { key: "barCount", label: "Bar count", min: 0.5, max: 1.7, step: 0.05, default: 1, suffix: "x" },
+    { key: "decay", label: "Bar decay / trail", min: 0.05, max: 0.6, step: 0.01, default: 0.2 },
+    { key: "hueSpread", label: "Hue spread", min: 0, max: 2, step: 0.05, default: 1, suffix: "x" },
+  ],
+  plasma: [
+    { key: "cellSize", label: "Cell size", min: 0.5, max: 2.5, step: 0.05, default: 1, suffix: "x" },
+    { key: "colorSpeed", label: "Color speed", min: 0.25, max: 3, step: 0.05, default: 1, suffix: "x" },
+    { key: "complexity", label: "Wave complexity", min: 0.3, max: 1.7, step: 0.05, default: 1, suffix: "x" },
+  ],
+  oscilloscope: [
+    { key: "thickness", label: "Line thickness", min: 0.3, max: 3, step: 0.05, default: 1, suffix: "x" },
+    { key: "amplitude", label: "Wave amplitude", min: 0.3, max: 3, step: 0.05, default: 1, suffix: "x" },
+    { key: "trail", label: "Trail persistence", min: 0.05, max: 0.6, step: 0.01, default: 0.22 },
+  ],
+  tunnel: [
+    { key: "sliceMult", label: "Slice count", min: 0.4, max: 1.8, step: 0.05, default: 1, suffix: "x" },
+    { key: "sides", label: "Sides", min: 4, max: 16, step: 1, default: 0 }, // 0 = use profile
+    { key: "curve", label: "Curve amount", min: 0, max: 2, step: 0.05, default: 1, suffix: "x" },
+    { key: "twist", label: "Twist amount", min: 0, max: 2, step: 0.05, default: 1, suffix: "x" },
+  ],
+  rings: [
+    { key: "bins", label: "Ray count", min: 0.5, max: 1.7, step: 0.05, default: 1, suffix: "x" },
+    { key: "length", label: "Ray length", min: 0.3, max: 2, step: 0.05, default: 1, suffix: "x" },
+    { key: "speed", label: "Rotation speed", min: 0, max: 3, step: 0.05, default: 1, suffix: "x" },
+  ],
+  particles: [
+    { key: "kick", label: "Beat kick", min: 0, max: 3, step: 0.05, default: 1, suffix: "x" },
+    { key: "friction", label: "Friction", min: 0.9, max: 0.995, step: 0.005, default: 0.96 },
+    { key: "count", label: "Particle count", min: 0.3, max: 2, step: 0.05, default: 1, suffix: "x" },
+  ],
+};
+
+export const DEFAULT_MODE: ModeReactivity = {
+  ...DEFAULT_MODE_BASE,
+  effects: {},
 };
 
 export const DEFAULT_SETTINGS: ReactivitySettings = {
@@ -57,17 +123,26 @@ export const TUNABLE_STYLES: VisualizerStyle[] = [
   "particles",
 ];
 
+const buildDefaultEffects = (style: VisualizerStyle): Record<string, number> => {
+  const specs = MODE_EFFECT_SPECS[style] ?? [];
+  const out: Record<string, number> = {};
+  for (const s of specs) out[s.key] = s.default;
+  return out;
+};
+
 export const resolveMode = (
   style: VisualizerStyle,
   settings: ReactivitySettings,
 ): ModeReactivity => {
   const over = settings.perMode[style] ?? {};
+  const effDefaults = buildDefaultEffects(style);
   return {
-    bassGain: over.bassGain ?? DEFAULT_MODE.bassGain,
-    midGain: over.midGain ?? DEFAULT_MODE.midGain,
-    trebleGain: over.trebleGain ?? DEFAULT_MODE.trebleGain,
-    motion: over.motion ?? DEFAULT_MODE.motion,
-    glow: over.glow ?? DEFAULT_MODE.glow,
+    bassGain: over.bassGain ?? DEFAULT_MODE_BASE.bassGain,
+    midGain: over.midGain ?? DEFAULT_MODE_BASE.midGain,
+    trebleGain: over.trebleGain ?? DEFAULT_MODE_BASE.trebleGain,
+    motion: over.motion ?? DEFAULT_MODE_BASE.motion,
+    glow: over.glow ?? DEFAULT_MODE_BASE.glow,
+    effects: { ...effDefaults, ...(over.effects ?? {}) },
   };
 };
 
@@ -84,7 +159,10 @@ const clone = (s: ReactivitySettings): ReactivitySettings => ({
     },
   },
   perMode: Object.fromEntries(
-    Object.entries(s.perMode).map(([k, v]) => [k, { ...v }]),
+    Object.entries(s.perMode).map(([k, v]) => [
+      k,
+      { ...v, effects: v?.effects ? { ...v.effects } : undefined },
+    ]),
   ) as ReactivitySettings["perMode"],
 });
 
@@ -157,11 +235,27 @@ export const reactivityStore = {
     state = { ...state, global: { ...state.global, sparkleThreshold: v } };
     emit();
   },
-  setModeField: (style: VisualizerStyle, field: keyof ModeReactivity, v: number) => {
+  setModeField: (
+    style: VisualizerStyle,
+    field: "bassGain" | "midGain" | "trebleGain" | "motion" | "glow",
+    v: number,
+  ) => {
     const cur = state.perMode[style] ?? {};
     state = {
       ...state,
       perMode: { ...state.perMode, [style]: { ...cur, [field]: v } },
+    };
+    emit();
+  },
+  setModeEffect: (style: VisualizerStyle, key: string, v: number) => {
+    const cur = state.perMode[style] ?? {};
+    const curEff = cur.effects ?? {};
+    state = {
+      ...state,
+      perMode: {
+        ...state.perMode,
+        [style]: { ...cur, effects: { ...curEff, [key]: v } },
+      },
     };
     emit();
   },
