@@ -824,17 +824,23 @@ const Visualizer = ({ analyser, style }: Props) => {
       const h = canvas.height;
       const { bass, mid, treble, beat } = sampleAudio();
 
+      // Dynamic particle count
+      const pTarget = Math.max(10, Math.round(qState.profile.particleCount * eff("count", 1)));
+      if (particlesRef.current.length !== pTarget) seedParticles(pTarget);
+
       ctx.fillStyle = "hsla(20, 25%, 6%, 0.18)";
       ctx.fillRect(0, 0, w, h);
 
       const cx = w / 2;
       const cy = h / 2;
       const ps = particlesRef.current;
+      const kickMul = eff("kick", 1);
+      const friction = eff("friction", 0.96);
 
       for (const p of ps) {
         if (beat) {
           const a = Math.random() * Math.PI * 2;
-          const kick = (3 + bass * 12) * dpr * modeMotionMul;
+          const kick = (3 + bass * 12) * dpr * modeMotionMul * kickMul;
           p.vx += Math.cos(a) * kick * 0.3;
           p.vy += Math.sin(a) * kick * 0.3;
           p.life = 1;
@@ -843,8 +849,8 @@ const Visualizer = ({ analyser, style }: Props) => {
 
         p.x += p.vx;
         p.y += p.vy;
-        p.vx *= 0.96;
-        p.vy *= 0.96;
+        p.vx *= friction;
+        p.vy *= friction;
         p.life *= 0.985;
 
         const dx = p.x - cx;
