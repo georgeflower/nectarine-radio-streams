@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.7";
+export const APP_VERSION = "0.7.8";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,14 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.8",
+    date: "2026-07-03",
+    changes: [
+      "Calmer default starfield reactivity (fewer comets, sparser stars & sparkles)",
+      "Confirmed reactivity settings persist across the main player and scroller mode (saved automatically to this browser)",
+    ],
+  },
   {
     version: "0.7.7",
     date: "2026-07-03",
