@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.6";
+export const APP_VERSION = "0.7.7";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,13 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.7",
+    date: "2026-07-03",
+    changes: [
+      "Reactivity drawer now opens correctly from scroller mode in both windowed and fullscreen, showing the full per-mode control set",
+    ],
+  },
   {
     version: "0.7.6",
     date: "2026-07-03",
