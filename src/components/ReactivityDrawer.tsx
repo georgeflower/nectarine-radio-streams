@@ -5,8 +5,8 @@ import { Slider } from "@/components/ui/slider";
 import {
   reactivityStore,
   resolveMode,
-  DEFAULT_MODE,
   TUNABLE_STYLES,
+  MODE_EFFECT_SPECS,
   type BandName,
   type ModeReactivity,
 } from "@/lib/reactivitySettings";
