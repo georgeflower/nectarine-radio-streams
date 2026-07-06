@@ -770,7 +770,7 @@ const Visualizer = ({ analyser, style }: Props) => {
       const w = canvas.width;
       const h = canvas.height;
       const { bass, mid, treble, rms, freq } = sampleAudio();
-      ringsTRef.current += (0.004 + rms * 0.08) * modeMotionMul;
+      ringsTRef.current += (0.004 + rms * 0.08) * modeMotionMul * eff("speed", 1);
       const t = ringsTRef.current;
 
       ctx.fillStyle = "hsla(20, 25%, 6%, 0.25)";
@@ -779,9 +779,10 @@ const Visualizer = ({ analyser, style }: Props) => {
       const cx = w / 2;
       const cy = h / 2;
       const baseR = Math.min(w, h) * 0.18 + bass * Math.min(w, h) * 0.08;
-      const bins = 96;
+      const bins = Math.max(24, Math.min(200, Math.round(96 * eff("bins", 1))));
       const usable = freq?.length ?? 0;
       const step = Math.max(1, Math.floor(usable / bins));
+      const lenMul = eff("length", 1);
 
       ctx.shadowBlur = glow(14 * dpr);
       ctx.lineCap = "round";
@@ -795,7 +796,7 @@ const Visualizer = ({ analyser, style }: Props) => {
           v = 0.15 + 0.1 * Math.sin(i * 0.4 + t * 4);
         }
         const angle = (i / bins) * Math.PI * 2 + t;
-        const len = (10 + v * Math.min(w, h) * 0.32) * 1;
+        const len = (10 + v * Math.min(w, h) * 0.32) * lenMul;
         const hue = (28 + (i / bins) * 120 + treble * 60) % 360;
         ctx.shadowColor = `hsl(${hue}, 100%, 60%)`;
         ctx.strokeStyle = `hsla(${hue}, 100%, ${55 + mid * 25}%, 0.95)`;
