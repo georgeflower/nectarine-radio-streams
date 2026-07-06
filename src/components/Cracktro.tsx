@@ -1279,7 +1279,7 @@ const Cracktro = ({
                       {v.label}
                     </button>
                   ))}
-                  <ReactivityDrawer>
+                  <ReactivityDrawer container={portalTarget}>
                     <button
                       type="button"
                       className="min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
