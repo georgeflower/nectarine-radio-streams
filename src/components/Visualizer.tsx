@@ -655,12 +655,13 @@ const Visualizer = ({ analyser, style }: Props) => {
 
       const cx = w / 2;
       const cy = h / 2;
-      const slices = qState.quality === "low" ? 20 : qState.quality === "medium" ? 28 : 36;
+      const baseSlices = qState.quality === "low" ? 20 : qState.quality === "medium" ? 28 : 36;
+      const slices = Math.max(6, Math.min(80, Math.round(baseSlices * eff("sliceMult", 1))));
       const baseR = Math.min(w, h) * 0.55;
       // Tunnel curvature amplitude reacts to mid.
-      const curve = (60 + mid * 220) * dpr;
+      const curve = (60 + mid * 220) * dpr * eff("curve", 1);
       // Twist per unit z, reacts to treble.
-      const twist = 0.18 + treble * 0.5;
+      const twist = (0.18 + treble * 0.5) * eff("twist", 1);
 
       // Walk slices from far (z=slices) to near (z=0). Use phase offset so
       // slices feel like they're flying toward camera continuously.
