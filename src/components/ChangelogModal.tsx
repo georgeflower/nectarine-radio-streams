@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.4";
+export const APP_VERSION = "0.7.5";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,13 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.5",
+    date: "2026-07-03",
+    changes: [
+      "Per-mode effect controls in the reactivity drawer: tune comets and sparkles (starfield), bar count/decay/hue spread (bars), plasma cell size/color speed/complexity, oscilloscope thickness/amplitude/trail, tunnel slices/sides/curve/twist, ring count/length/speed, and particle kick/friction/count",
+    ],
+  },
   {
     version: "0.7.4",
     date: "2026-07-03",
