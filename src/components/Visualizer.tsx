@@ -600,12 +600,15 @@ const Visualizer = ({ analyser, style }: Props) => {
       const { bass, treble, rms, time } = sampleAudio();
       idleTRef.current += 0.04 * modeMotionMul;
 
-      ctx.fillStyle = "hsla(20, 25%, 6%, 0.22)";
+      const trail = eff("trail", 0.22);
+      ctx.fillStyle = `hsla(20, 25%, 6%, ${trail})`;
       ctx.fillRect(0, 0, w, h);
 
       const centerY = h * 0.5;
+      const thick = eff("thickness", 1);
+      const ampMul = eff("amplitude", 1);
       ctx.strokeStyle = `hsla(${28 + treble * 60}, 100%, ${62 + bass * 16}%, 0.95)`;
-      ctx.lineWidth = (2 + bass * 2) * dpr;
+      ctx.lineWidth = (2 + bass * 2) * dpr * thick;
       ctx.shadowBlur = glow(14 * dpr);
       ctx.shadowColor = "hsl(28 100% 60%)";
       ctx.beginPath();
@@ -614,7 +617,7 @@ const Visualizer = ({ analyser, style }: Props) => {
         for (let i = 0; i < time.length; i++) {
           const x = (i / (time.length - 1)) * w;
           const centered = (time[i] - 128) / 128;
-          const y = centerY + centered * h * (0.18 + rms * 1.8);
+          const y = centerY + centered * h * (0.18 + rms * 1.8) * ampMul;
           if (i === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
