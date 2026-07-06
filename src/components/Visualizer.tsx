@@ -680,7 +680,8 @@ const Visualizer = ({ analyser, style }: Props) => {
         sl.push({ x: cx + px, y: cy + py, r, roll, hue, depth });
       }
 
-      const sides = qState.profile.tunnelSides;
+      const sidesOverride = Math.round(eff("sides", 0));
+      const sides = sidesOverride >= 4 ? Math.min(16, sidesOverride) : qState.profile.tunnelSides;
       const ringCutoff = qState.profile.tunnelRingCutoff;
       const segCutoff = qState.profile.tunnelSegCutoff;
       ctx.lineCap = "round";
