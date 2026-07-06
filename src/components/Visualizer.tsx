@@ -523,15 +523,17 @@ const Visualizer = ({ analyser, style }: Props) => {
       const { bass, mid, treble, rms, freq } = sampleAudio();
       idleTRef.current += (0.03 + bass * 0.05) * modeMotionMul;
 
-      ctx.fillStyle = "hsla(20, 25%, 6%, 0.2)";
+      const barDecay = eff("decay", 0.2);
+      ctx.fillStyle = `hsla(20, 25%, 6%, ${barDecay})`;
       ctx.fillRect(0, 0, w, h);
 
-      const bins = 56;
+      const bins = Math.max(16, Math.min(96, Math.round(56 * eff("barCount", 1))));
       const barW = w / bins;
       const usable = freq?.length ?? 0;
       const step = Math.max(1, Math.floor(usable / bins));
       const energy = Math.max(rms * 4, bass * 1.2, mid, treble * 0.8);
       const baseline = h - 16 * dpr;
+      const hueSpread = eff("hueSpread", 1);
 
       ctx.shadowBlur = glow(18 * dpr);
       ctx.shadowColor = "hsl(28 100% 60%)";
@@ -547,11 +549,11 @@ const Visualizer = ({ analyser, style }: Props) => {
         const v = Math.max(raw, energy > 0.01 ? 0 : idlePulse);
         const shaped = Math.pow(Math.max(0, v), 0.65);
         const barH = Math.max(4 * dpr, shaped * h * 0.62);
-        const hue = 24 + (i / bins) * 70 + treble * 20;
+        const hue = 24 + (i / bins) * 70 * hueSpread + treble * 20;
         const grad = ctx.createLinearGradient(0, baseline, 0, baseline - barH);
         grad.addColorStop(0, `hsla(${hue}, 100%, 48%, 0.98)`);
-        grad.addColorStop(0.6, `hsla(${(hue + 18) % 360}, 100%, 62%, 0.95)`);
-        grad.addColorStop(1, `hsla(${(hue + 38) % 360}, 100%, 78%, 0.9)`);
+        grad.addColorStop(0.6, `hsla(${(hue + 18 * hueSpread) % 360}, 100%, 62%, 0.95)`);
+        grad.addColorStop(1, `hsla(${(hue + 38 * hueSpread) % 360}, 100%, 78%, 0.9)`);
         ctx.fillStyle = grad;
         ctx.fillRect(i * barW + 1.5 * dpr, baseline - barH, Math.max(2 * dpr, barW - 3 * dpr), barH);
       }
