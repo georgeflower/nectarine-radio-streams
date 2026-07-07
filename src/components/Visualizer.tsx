@@ -77,8 +77,8 @@ const makeProfile = (q: Quality, isFirefox: boolean): QualityProfile => {
       : {
           starCount: 400, particleCount: 220, maxComets: 24, maxSparkles: 40,
           dprCap: 2, glowMul: 1, nebula: false,
-
           tunnelSides: 14, tunnelRingCutoff: 0.05, tunnelSegCutoff: 0.02, tunnelHueBucket: 360,
+
           cometBeatMax: 3, cometAmbientMs: 400, sparkleThreshold: 1.4,
         };
   if (isFirefox) {
