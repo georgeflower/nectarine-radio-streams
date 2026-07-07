@@ -306,7 +306,10 @@
     touch-action: manipulation;
   }
   [data-theme="gem"] body,
-  [data-theme="workbench"] body {
+  [data-theme="workbench"] body,
+  [data-theme="goatgray"] body,
+  [data-theme="nostalgia-c"] body,
+  [data-theme="simple"] body {
     font-family: "Chicago", "Pixelated MS Sans Serif", Geneva, Verdana, sans-serif;
     background-image: none;
   }
