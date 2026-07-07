@@ -90,8 +90,6 @@ const PANELS: { id: PanelId; label: string }[] = [
   { id: "online", label: "Online" },
   { id: "queue", label: "Up Next" },
   { id: "history", label: "Recent" },
-  { id: "roster", label: "Geese" },
-  { id: "diag", label: "Diag" },
 ];
 const STORAGE_PANELS = "cracktro-panels-on";
 
