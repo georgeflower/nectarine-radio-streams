@@ -134,6 +134,153 @@
   --gradient-scanlines: none;
 }
 
+/* ─── Goat Gray — muted graphite desktop ─────────────────────────────────── */
+[data-theme="goatgray"] {
+  --background: 0 0% 22%;
+  --foreground: 0 0% 88%;
+  --card: 0 0% 30%;
+  --card-foreground: 0 0% 92%;
+  --popover: 0 0% 30%;
+  --popover-foreground: 0 0% 92%;
+  --primary: 190 30% 70%;
+  --primary-foreground: 0 0% 10%;
+  --secondary: 0 0% 36%;
+  --secondary-foreground: 0 0% 92%;
+  --muted: 0 0% 34%;
+  --muted-foreground: 0 0% 70%;
+  --accent: 190 40% 60%;
+  --accent-foreground: 0 0% 10%;
+  --border: 0 0% 45%;
+  --input: 0 0% 45%;
+  --ring: 190 40% 60%;
+  --radius: 0;
+  --glow-primary: none;
+  --glow-accent: none;
+  --gradient-scanlines: none;
+}
+
+/* ─── Pony — pink magenta on violet ──────────────────────────────────────── */
+[data-theme="pony"] {
+  --background: 300 40% 12%;
+  --foreground: 320 90% 88%;
+  --card: 300 35% 18%;
+  --card-foreground: 320 90% 92%;
+  --popover: 300 35% 18%;
+  --popover-foreground: 320 90% 92%;
+  --primary: 320 95% 68%;
+  --primary-foreground: 300 40% 10%;
+  --secondary: 300 30% 24%;
+  --secondary-foreground: 320 90% 92%;
+  --muted: 300 25% 20%;
+  --muted-foreground: 320 40% 70%;
+  --accent: 55 100% 70%;
+  --accent-foreground: 300 40% 10%;
+  --border: 320 60% 40%;
+  --input: 320 60% 40%;
+  --ring: 320 95% 68%;
+  --glow-primary: 0 0 12px hsl(320 95% 68% / 0.7), 0 0 30px hsl(320 95% 68% / 0.3);
+  --glow-accent: 0 0 12px hsl(55 100% 70% / 0.6);
+  --gradient-scanlines: none;
+}
+
+/* ─── Splash of Orange — warm amber on charcoal ──────────────────────────── */
+[data-theme="orange"] {
+  --background: 25 15% 10%;
+  --foreground: 30 40% 88%;
+  --card: 25 20% 15%;
+  --card-foreground: 30 40% 92%;
+  --popover: 25 20% 15%;
+  --popover-foreground: 30 40% 92%;
+  --primary: 28 100% 58%;
+  --primary-foreground: 25 20% 8%;
+  --secondary: 25 15% 20%;
+  --secondary-foreground: 30 40% 92%;
+  --muted: 25 12% 18%;
+  --muted-foreground: 30 20% 65%;
+  --accent: 40 100% 60%;
+  --accent-foreground: 25 20% 8%;
+  --border: 28 60% 35%;
+  --input: 28 60% 35%;
+  --ring: 28 100% 58%;
+  --glow-primary: 0 0 10px hsl(28 100% 58% / 0.5);
+  --glow-accent: 0 0 10px hsl(40 100% 60% / 0.5);
+  --gradient-scanlines: none;
+}
+
+/* ─── Nostalgia-C — cream/paper retro document ───────────────────────────── */
+[data-theme="nostalgia-c"] {
+  --background: 40 45% 88%;
+  --foreground: 25 40% 22%;
+  --card: 40 55% 94%;
+  --card-foreground: 25 40% 22%;
+  --popover: 40 55% 94%;
+  --popover-foreground: 25 40% 22%;
+  --primary: 20 55% 32%;
+  --primary-foreground: 40 55% 94%;
+  --secondary: 40 40% 82%;
+  --secondary-foreground: 25 40% 22%;
+  --muted: 40 35% 80%;
+  --muted-foreground: 25 25% 40%;
+  --accent: 15 70% 45%;
+  --accent-foreground: 40 55% 94%;
+  --border: 25 35% 55%;
+  --input: 25 35% 55%;
+  --ring: 15 70% 45%;
+  --radius: 0;
+  --glow-primary: none;
+  --glow-accent: none;
+  --gradient-scanlines: none;
+}
+
+/* ─── Original — classic Nectarine dark blue + lime ──────────────────────── */
+[data-theme="original"] {
+  --background: 220 40% 10%;
+  --foreground: 200 25% 82%;
+  --card: 220 35% 14%;
+  --card-foreground: 200 25% 88%;
+  --popover: 220 35% 14%;
+  --popover-foreground: 200 25% 88%;
+  --primary: 90 80% 55%;
+  --primary-foreground: 220 40% 10%;
+  --secondary: 220 30% 20%;
+  --secondary-foreground: 200 25% 88%;
+  --muted: 220 25% 18%;
+  --muted-foreground: 200 15% 60%;
+  --accent: 195 90% 60%;
+  --accent-foreground: 220 40% 10%;
+  --border: 220 40% 30%;
+  --input: 220 40% 30%;
+  --ring: 90 80% 55%;
+  --glow-primary: 0 0 10px hsl(90 80% 55% / 0.6), 0 0 24px hsl(90 80% 55% / 0.25);
+  --glow-accent: 0 0 10px hsl(195 90% 60% / 0.5);
+  --gradient-scanlines: none;
+}
+
+/* ─── Simple — minimal light ─────────────────────────────────────────────── */
+[data-theme="simple"] {
+  --background: 0 0% 98%;
+  --foreground: 220 15% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 15% 18%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 15% 18%;
+  --primary: 220 70% 45%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 15% 92%;
+  --secondary-foreground: 220 15% 18%;
+  --muted: 220 15% 94%;
+  --muted-foreground: 220 10% 45%;
+  --accent: 220 70% 45%;
+  --accent-foreground: 0 0% 100%;
+  --border: 220 15% 80%;
+  --input: 220 15% 80%;
+  --ring: 220 70% 45%;
+  --radius: 0.25rem;
+  --glow-primary: none;
+  --glow-accent: none;
+  --gradient-scanlines: none;
+}
+
 @layer base {
   * {
     @apply border-border;
