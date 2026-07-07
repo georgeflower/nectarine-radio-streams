@@ -1,33 +1,25 @@
-## Problem
+## Add more themes inspired by Nectarine/Demovibes
 
-In scroller mode, clicking "♪ Reactivity…" opens the Sheet, but the Sheet portals to `document.body` via Radix's default. When the Cracktro is in browser fullscreen, only the fullscreen element (`wrapRef`) is visible, so the drawer renders off-screen / behind the fullscreen surface and appears not to open. Even in windowed scroller mode, z-index/backdrop-filter stacking under the cracktro chrome can hide it.
+The app currently has 3 themes: **Blue blue** (workbench), **CRT** (legacy), **B & W** (gem). I'll add 6 more themes styled after ones from the scenestream.net demovibes gallery, wired through the same `[data-theme="..."]` mechanism already in `src/index.css` and the `THEMES` list in `src/pages/Index.tsx`.
 
-## Fix
+### New themes
 
-Portal the Sheet into the Cracktro container so it renders inside whatever surface is visible (fullscreen element or the in-page window), showing the same full reactivity control set as the main player.
+| ID | Label | Inspiration | Palette direction |
+|---|---|---|---|
+| `goatgray` | Goat Gray | goatgray | Neutral graphite panels, muted cyan accent |
+| `pony` | Pony | pony | Pink/magenta on dark violet, playful |
+| `orange` | Splash of Orange | Splash of Orange | Warm amber/orange accents on charcoal |
+| `nostalgia-c` | Nostalgia-C | Nostalgia-C | Cream/paper background, brown text, retro-doc feel |
+| `original` | Original | original theme (raina) | Classic Nectarine dark blue + lime accent |
+| `simple` | Simple | Nectarine - Simple | Minimal light theme, low chrome |
 
 ### Changes
 
-1. **`src/components/ui/sheet.tsx`**
-   - Add `container?: HTMLElement | null` to `SheetContentProps`.
-   - Pass it to `<SheetPortal container={container}>`. Radix accepts `container` on `Portal`; omitted → defaults to `document.body` (existing behavior for main player).
+1. **`src/index.css`** — add a `[data-theme="..."]` block for each new theme, overriding the semantic tokens already used by workbench/gem (background, foreground, panel, panel-heading, primary/accent, neon, neon-accent, scanline color). Reuse the existing panel/neon/crt selector patterns so no component code changes.
+2. **`src/pages/Index.tsx`** — extend `ThemeId` union and the `THEMES` array with the 6 new entries so they appear in the theme picker dropdown. Persistence via existing `THEME_STORAGE_KEY` works automatically.
 
-2. **`src/components/ReactivityDrawer.tsx`**
-   - Add optional `container?: HTMLElement | null` prop on `ReactivityDrawer`.
-   - Forward to `<SheetContent container={container} …>`.
+### Non-goals
 
-3. **`src/components/Cracktro.tsx`**
-   - Compute a portal target: `document.fullscreenElement as HTMLElement | null ?? wrapRef.current`.
-   - Track it in state, refreshed by the existing `fullscreenchange` listener, so it updates when the user toggles fullscreen while the drawer is closed.
-   - Pass it to the `<ReactivityDrawer container={portalTarget}>` in the Effect row.
-
-4. **Version + changelog**
-   - Bump `package.json` to `0.7.7`.
-   - `ChangelogModal.tsx`: `APP_VERSION = "0.7.7"` and new entry: "Reactivity drawer now opens correctly from scroller mode in both windowed and fullscreen, showing the full per-mode control set."
-
-### Files touched
-
-- `src/components/ui/sheet.tsx`
-- `src/components/ReactivityDrawer.tsx`
-- `src/components/Cracktro.tsx`
-- `package.json`, `src/components/ChangelogModal.tsx`
+- No version bump.
+- No new components, no changes to visualizer/plasma/tunnel defaults.
+- Not pixel-copying scenestream screenshots — these are palette-level tributes that fit the existing panel/neon system.
