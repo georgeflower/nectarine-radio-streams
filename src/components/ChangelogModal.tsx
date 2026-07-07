@@ -207,7 +207,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-06-04",
     changes: [
       "Fixed geese ball game physics",
-      "Improved oneliner smiley/emoji detection for goose reactions",
     ],
   },
   {
