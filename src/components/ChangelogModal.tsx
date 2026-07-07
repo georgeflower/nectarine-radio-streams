@@ -187,7 +187,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Exit button hides when settings chrome is hidden",
       "Removed Cracktro windowed fallback on fullscreen exit",
       "Enabled default visual widgets on cracktro startup",
-      "Goose chatter triggered by oneliners and social reactions",
     ],
   },
   {
