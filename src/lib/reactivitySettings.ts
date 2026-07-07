@@ -145,12 +145,13 @@ export const resolveMode = (
 ): ModeReactivity => {
   const over = settings.perMode[style] ?? {};
   const effDefaults = buildDefaultEffects(style);
+  const base = modeBaseFor(style);
   return {
-    bassGain: over.bassGain ?? DEFAULT_MODE_BASE.bassGain,
-    midGain: over.midGain ?? DEFAULT_MODE_BASE.midGain,
-    trebleGain: over.trebleGain ?? DEFAULT_MODE_BASE.trebleGain,
-    motion: over.motion ?? DEFAULT_MODE_BASE.motion,
-    glow: over.glow ?? DEFAULT_MODE_BASE.glow,
+    bassGain: over.bassGain ?? base.bassGain,
+    midGain: over.midGain ?? base.midGain,
+    trebleGain: over.trebleGain ?? base.trebleGain,
+    motion: over.motion ?? base.motion,
+    glow: over.glow ?? base.glow,
     effects: { ...effDefaults, ...(over.effects ?? {}) },
   };
 };
