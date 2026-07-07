@@ -86,8 +86,8 @@ export const MODE_EFFECT_SPECS: Partial<Record<VisualizerStyle, EffectSpec[]>> =
     { key: "hueSpread", label: "Hue spread", min: 0, max: 2, step: 0.05, default: 1, suffix: "x" },
   ],
   plasma: [
-    { key: "cellSize", label: "Cell size", min: 0.5, max: 2.5, step: 0.05, default: 1, suffix: "x" },
-    { key: "colorSpeed", label: "Color speed", min: 0.25, max: 3, step: 0.05, default: 1, suffix: "x" },
+    { key: "cellSize", label: "Cell size", min: 0.5, max: 2.5, step: 0.05, default: 1.75, suffix: "x" },
+    { key: "colorSpeed", label: "Color speed", min: 0.25, max: 3, step: 0.05, default: 3, suffix: "x" },
     { key: "complexity", label: "Wave complexity", min: 0.3, max: 1.7, step: 0.05, default: 1, suffix: "x" },
   ],
   oscilloscope: [
