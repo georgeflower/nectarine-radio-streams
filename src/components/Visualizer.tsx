@@ -397,20 +397,6 @@ const Visualizer = ({ analyser, style }: Props) => {
       ctx.fillStyle = `hsla(20, 25%, 6%, ${0.18 + bass * 0.08})`;
       ctx.fillRect(0, 0, w, h);
 
-      // Nebula shimmer (skipped on low tier / firefox)
-      if (qState.profile.nebula) {
-        const nebR = Math.max(w, h) * (0.35 + mid * 0.25 + rms * 0.2);
-        const neb = ctx.createRadialGradient(cx, cy, 0, cx, cy, nebR);
-        const nebHue = (260 + treble * 80) % 360;
-        neb.addColorStop(0, `hsla(${nebHue}, 90%, 55%, ${0.06 + mid * 0.12})`);
-        neb.addColorStop(0.5, `hsla(${(nebHue + 40) % 360}, 90%, 40%, ${0.03 + rms * 0.08})`);
-        neb.addColorStop(1, "hsla(20, 25%, 6%, 0)");
-        ctx.fillStyle = neb;
-        ctx.fillRect(0, 0, w, h);
-      } else {
-        ctx.fillStyle = `hsla(${(260 + treble * 80) % 360}, 90%, 50%, ${0.03 + mid * 0.05})`;
-        ctx.fillRect(0, 0, w, h);
-      }
 
       // Stars
       const baseSpeed = 1.4 * dpr;
