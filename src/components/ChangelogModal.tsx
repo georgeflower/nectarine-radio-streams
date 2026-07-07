@@ -112,7 +112,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     changes: [
       "Goose Amiga / Atari platform banter on track change (skips every second consecutive same-platform track)",
       "Periodic 'Have you seen Rapture?' goose routine every 10 minutes",
-      "Goose screams 'Rapture! <3 / Daddy / Mommy' when Rapture posts in oneliner (60-minute cooldown)",
       "Mobile screen wake lock keeps display active while the app is open",
     ],
   },
