@@ -294,7 +294,7 @@ const Index = () => {
     } catch {
       // ignore
     }
-    return "legacy";
+    return "orange";
   });
 
   const [scanlines, setScanlines] = usePersistedBool(SCANLINES_STORAGE_KEY, false);
