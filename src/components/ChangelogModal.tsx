@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.1";
+export const APP_VERSION = "0.7.2";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,18 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.2",
+    date: "2026-07-07",
+    changes: [
+      "Rapture Mode: master toggle in the cracktro settings that controls both geese and procreation at once",
+      "Cracktro settings reorganized: Geese section renamed to Rapture Mode, Goose Stats moved in, Boing and Diag moved to More",
+      "Removed purple nebula shimmer glow from the starfield visualizer for a cleaner look",
+      "Six new themes inspired by scenestream demovibes: Goat Gray, Pony, Splash of Orange, Nostalgia-C, Original, and Simple",
+      "Plasma visualizer default reactivity tuned to match the featured screenshot",
+      "Removed the goose lexicon database and stopped recording oneliner content",
+    ],
+  },
   {
     version: "0.7.1",
     date: "2026-07-03",
