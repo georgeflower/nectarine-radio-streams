@@ -1317,29 +1317,55 @@ const Cracktro = ({
 
             {/* ── Geese ─────────────────────────── */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">Geese</span>
+              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">Rapture Mode</span>
               <div className="flex flex-wrap items-center justify-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setRaptureOn((v) => !v)}
+                  className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                    raptureOn
+                      ? "border-primary bg-primary/30 text-foreground"
+                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-pressed={raptureOn}
+                  title="Master toggle for geese + procreation"
+                >
+                  Rapture: {raptureOn ? "ON" : "OFF"}
+                </button>
                 {[
                   { label: "Goose", state: gooseOn, toggle: () => setGooseOn((v) => !v), title: "Toggle flying goose" },
                   { label: "Brown", state: brownGooseOn, toggle: () => setBrownGooseOn((v) => !v), title: "Toggle brown flying goose" },
-                  { label: "Boing", state: boingOn, toggle: () => setBoingOn((v) => !v), title: "Toggle Amiga boing ball" },
                   { label: "Procreation", state: procreationOn, toggle: () => setProcreationOn((v) => !v), title: "Toggle goose procreation" },
                 ].map((it) => (
                   <button
                     key={it.label}
                     type="button"
                     onClick={it.toggle}
+                    disabled={!raptureOn}
                     className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                      it.state
+                      it.state && raptureOn
                         ? "border-primary bg-primary/20 text-foreground"
                         : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                    }`}
+                    } ${!raptureOn ? "opacity-40 cursor-not-allowed" : ""}`}
                     aria-pressed={it.state}
                     title={it.title}
                   >
                     {it.label}: {it.state ? "ON" : "OFF"}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => togglePanel("roster")}
+                  className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                    panelsOn.roster
+                      ? "border-primary bg-primary/20 text-foreground"
+                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-pressed={panelsOn.roster}
+                  title="Toggle Goose Stats panel"
+                >
+                  Goose Stats
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -1397,10 +1423,36 @@ const Cracktro = ({
 
             <div className="w-px self-stretch bg-border hidden sm:block" aria-hidden />
 
-            {/* ── Trailing: Last.fm + version ─────── */}
+            {/* ── Trailing: Boing + Diag + Last.fm + version ─────── */}
             <div className="flex flex-col gap-1.5">
               <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">More</span>
               <div className="flex flex-wrap items-center justify-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setBoingOn((v) => !v)}
+                  className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                    boingOn
+                      ? "border-primary bg-primary/20 text-foreground"
+                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-pressed={boingOn}
+                  title="Toggle Amiga boing ball"
+                >
+                  Boing: {boingOn ? "ON" : "OFF"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => togglePanel("diag")}
+                  className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                    panelsOn.diag
+                      ? "border-primary bg-primary/20 text-foreground"
+                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-pressed={panelsOn.diag}
+                  title="Toggle playback diagnostics panel"
+                >
+                  Diag
+                </button>
                 <LastfmButton compact />
                 <button
                   type="button"
@@ -1413,6 +1465,7 @@ const Cracktro = ({
               </div>
             </div>
           </div>
+
 
         </div>
       </StageProvider>
