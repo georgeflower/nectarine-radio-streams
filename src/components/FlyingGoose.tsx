@@ -23,7 +23,7 @@ import {
 import type { OnelinerEntry } from "@/lib/nectarine";
 import { detectOnelinerReaction } from "@/lib/onelinerReactions";
 import { detectGooseTriggerReaction } from "@/lib/gooseTriggerReactions";
-import { learnPhraseFromOneliner } from "@/lib/gooseLearnedPhrases";
+
 import {
   BASE_SPRITE_H,
   BASE_SPRITE_W,
@@ -191,7 +191,6 @@ const FlyingGoose = ({
 
     const text = top.text || "";
     if (variant === "white") {
-      learnPhraseFromOneliner(text, top.username);
       noteRecentOneliner(top.username, text);
     }
     const triggerReaction = detectGooseTriggerReaction(text);
