@@ -62,6 +62,15 @@ export const DEFAULT_MODE_BASE = {
   glow: 1,
 };
 
+export const MODE_BASE_OVERRIDES: Partial<Record<VisualizerStyle, Partial<typeof DEFAULT_MODE_BASE>>> = {
+  tunnel: { bassGain: 0.5, motion: 0.35, glow: 0.7 },
+};
+
+const modeBaseFor = (style: VisualizerStyle) => ({
+  ...DEFAULT_MODE_BASE,
+  ...(MODE_BASE_OVERRIDES[style] ?? {}),
+});
+
 export const MODE_EFFECT_SPECS: Partial<Record<VisualizerStyle, EffectSpec[]>> = {
   starfield: [
     { key: "starDensity", label: "Star density", min: 0.25, max: 2, step: 0.05, default: 0.5, suffix: "x" },
@@ -86,9 +95,9 @@ export const MODE_EFFECT_SPECS: Partial<Record<VisualizerStyle, EffectSpec[]>> =
     { key: "trail", label: "Trail persistence", min: 0.05, max: 0.6, step: 0.01, default: 0.22 },
   ],
   tunnel: [
-    { key: "sliceMult", label: "Slice count", min: 0.4, max: 1.8, step: 0.05, default: 1, suffix: "x" },
-    { key: "sides", label: "Sides", min: 4, max: 16, step: 1, default: 0 }, // 0 = use profile
-    { key: "curve", label: "Curve amount", min: 0, max: 2, step: 0.05, default: 1, suffix: "x" },
+    { key: "sliceMult", label: "Slice count", min: 0.4, max: 1.8, step: 0.05, default: 1.35, suffix: "x" },
+    { key: "sides", label: "Sides", min: 4, max: 16, step: 1, default: 8 },
+    { key: "curve", label: "Curve amount", min: 0, max: 2, step: 0.05, default: 0.55, suffix: "x" },
     { key: "twist", label: "Twist amount", min: 0, max: 2, step: 0.05, default: 1, suffix: "x" },
   ],
   rings: [
@@ -136,12 +145,13 @@ export const resolveMode = (
 ): ModeReactivity => {
   const over = settings.perMode[style] ?? {};
   const effDefaults = buildDefaultEffects(style);
+  const base = modeBaseFor(style);
   return {
-    bassGain: over.bassGain ?? DEFAULT_MODE_BASE.bassGain,
-    midGain: over.midGain ?? DEFAULT_MODE_BASE.midGain,
-    trebleGain: over.trebleGain ?? DEFAULT_MODE_BASE.trebleGain,
-    motion: over.motion ?? DEFAULT_MODE_BASE.motion,
-    glow: over.glow ?? DEFAULT_MODE_BASE.glow,
+    bassGain: over.bassGain ?? base.bassGain,
+    midGain: over.midGain ?? base.midGain,
+    trebleGain: over.trebleGain ?? base.trebleGain,
+    motion: over.motion ?? base.motion,
+    glow: over.glow ?? base.glow,
     effects: { ...effDefaults, ...(over.effects ?? {}) },
   };
 };
