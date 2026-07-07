@@ -62,6 +62,15 @@ export const DEFAULT_MODE_BASE = {
   glow: 1,
 };
 
+export const MODE_BASE_OVERRIDES: Partial<Record<VisualizerStyle, Partial<typeof DEFAULT_MODE_BASE>>> = {
+  tunnel: { bassGain: 0.5, motion: 0.35, glow: 0.7 },
+};
+
+const modeBaseFor = (style: VisualizerStyle) => ({
+  ...DEFAULT_MODE_BASE,
+  ...(MODE_BASE_OVERRIDES[style] ?? {}),
+});
+
 export const MODE_EFFECT_SPECS: Partial<Record<VisualizerStyle, EffectSpec[]>> = {
   starfield: [
     { key: "starDensity", label: "Star density", min: 0.25, max: 2, step: 0.05, default: 0.5, suffix: "x" },
