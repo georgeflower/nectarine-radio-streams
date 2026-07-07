@@ -64,6 +64,7 @@ export const DEFAULT_MODE_BASE = {
 
 export const MODE_BASE_OVERRIDES: Partial<Record<VisualizerStyle, Partial<typeof DEFAULT_MODE_BASE>>> = {
   tunnel: { bassGain: 0.5, motion: 0.35, glow: 0.7 },
+  plasma: { bassGain: 1, midGain: 2.15, trebleGain: 2.75, motion: 1.75, glow: 1.85 },
 };
 
 const modeBaseFor = (style: VisualizerStyle) => ({
