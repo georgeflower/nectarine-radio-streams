@@ -501,6 +501,29 @@ const Cracktro = ({
     }
     setProcreationEnabled(procreationOn);
   }, [procreationOn]);
+
+  const [raptureOn, setRaptureOn] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem("cracktro-rapture-mode");
+      return v === null ? true : v === "1";
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("cracktro-rapture-mode", raptureOn ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [raptureOn]);
+  // Effective flags — individual toggles are gated by the Rapture master switch.
+  const gooseActive = raptureOn && gooseOn;
+  const brownGooseActive = raptureOn && brownGooseOn;
+  const procreationActive = raptureOn && procreationOn;
+  useEffect(() => {
+    setProcreationEnabled(procreationActive);
+  }, [procreationActive]);
   const [changelogOpen, setChangelogOpen] = useState(false);
   // Clean up any leftover sim-mode storage keys from previous versions.
   useEffect(() => {
