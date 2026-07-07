@@ -7,11 +7,9 @@
 import {
   buildBirdUtterance,
   deriveOnelinerMood,
-  learnLexiconFromOneliner,
   type LexiconMood,
 } from "@/lib/gooseLearnedLexicon";
 import { findLearnedTrigger, pickLearnedPhrase } from "@/lib/gooseLearnedPhrases";
-import { queueOnelinerForCloud } from "@/lib/gooseLexiconCloud";
 import type { GooseSceneEra } from "@/lib/gooseSceneEra";
 import { GOOSE_DIALOGUES } from "@/lib/gooseDialogues";
 import {
@@ -103,8 +101,6 @@ export function noteRecentOneliner(username: string, text: string) {
   recentOneliner = { username, text: clean, at: Date.now() };
   recentOnelinerTrail.push({ username, text: clean });
   while (recentOnelinerTrail.length > MAX_ONELINER_TRAIL) recentOnelinerTrail.shift();
-  learnLexiconFromOneliner(clean, username);
-  queueOnelinerForCloud(clean);
   noteRaptureOnelinerIfMatch(username);
 }
 

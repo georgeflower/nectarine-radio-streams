@@ -32,7 +32,7 @@ import Flag from "@/components/Flag";
 import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
-import { hydrateCloudLexiconOnce } from "@/lib/gooseLexiconCloud";
+
 import LastfmButton from "@/components/LastfmButton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ReactivityDrawer from "@/components/ReactivityDrawer";
@@ -206,7 +206,6 @@ const Index = () => {
   }, [vizStyle]);
 
   useEffect(() => {
-    void hydrateCloudLexiconOnce();
     void (async () => {
       const result = await handleLastfmCallback();
       if (!result) return;
