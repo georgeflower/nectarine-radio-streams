@@ -18,7 +18,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Removed purple nebula shimmer glow from the starfield visualizer for a cleaner look",
       "Six new themes inspired by scenestream demovibes: Goat Gray, Pony, Splash of Orange, Nostalgia-C, Original, and Simple",
       "Plasma visualizer default reactivity tuned to match the featured screenshot",
-      "Removed the goose lexicon database and stopped recording oneliner content",
     ],
   },
   {
