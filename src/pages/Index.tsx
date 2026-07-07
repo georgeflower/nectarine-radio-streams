@@ -123,11 +123,26 @@ const VIZ_STYLES: VisualizerStyle[] = [
 ];
 const VIZ_STORAGE_KEY = "nectarine-viz";
 
-type ThemeId = "legacy" | "nectalift" | "nostalgia";
+type ThemeId =
+  | "legacy"
+  | "nectalift"
+  | "nostalgia"
+  | "goatgray"
+  | "pony"
+  | "orange"
+  | "nostalgia-c"
+  | "original"
+  | "simple";
 const THEMES: { id: ThemeId; label: string; attr: string | null }[] = [
   { id: "nostalgia", label: "Blue blue", attr: "workbench" },
   { id: "legacy", label: "CRT", attr: null },
   { id: "nectalift", label: "B & W", attr: "gem" },
+  { id: "goatgray", label: "Goat Gray", attr: "goatgray" },
+  { id: "pony", label: "Pony", attr: "pony" },
+  { id: "orange", label: "Splash of Orange", attr: "orange" },
+  { id: "nostalgia-c", label: "Nostalgia-C", attr: "nostalgia-c" },
+  { id: "original", label: "Original", attr: "original" },
+  { id: "simple", label: "Simple", attr: "simple" },
 ];
 const THEME_STORAGE_KEY = "nectarine-theme";
 const SCANLINES_STORAGE_KEY = "nectarine-scanlines";
