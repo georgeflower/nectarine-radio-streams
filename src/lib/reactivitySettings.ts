@@ -86,9 +86,9 @@ export const MODE_EFFECT_SPECS: Partial<Record<VisualizerStyle, EffectSpec[]>> =
     { key: "trail", label: "Trail persistence", min: 0.05, max: 0.6, step: 0.01, default: 0.22 },
   ],
   tunnel: [
-    { key: "sliceMult", label: "Slice count", min: 0.4, max: 1.8, step: 0.05, default: 1, suffix: "x" },
-    { key: "sides", label: "Sides", min: 4, max: 16, step: 1, default: 0 }, // 0 = use profile
-    { key: "curve", label: "Curve amount", min: 0, max: 2, step: 0.05, default: 1, suffix: "x" },
+    { key: "sliceMult", label: "Slice count", min: 0.4, max: 1.8, step: 0.05, default: 1.35, suffix: "x" },
+    { key: "sides", label: "Sides", min: 4, max: 16, step: 1, default: 8 },
+    { key: "curve", label: "Curve amount", min: 0, max: 2, step: 0.05, default: 0.55, suffix: "x" },
     { key: "twist", label: "Twist amount", min: 0, max: 2, step: 0.05, default: 1, suffix: "x" },
   ],
   rings: [
