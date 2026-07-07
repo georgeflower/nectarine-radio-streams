@@ -1,25 +1,30 @@
-## Add more themes inspired by Nectarine/Demovibes
+## Reorganize Cracktro settings bar
 
-The app currently has 3 themes: **Blue blue** (workbench), **CRT** (legacy), **B & W** (gem). I'll add 6 more themes styled after ones from the scenestream.net demovibes gallery, wired through the same `[data-theme="..."]` mechanism already in `src/index.css` and the `THEMES` list in `src/pages/Index.tsx`.
+Restructure the settings row in `src/components/Cracktro.tsx` (lines ~1297–1393).
 
-### New themes
+### Rapture mode section (renamed from "Geese")
+- Section label: **Rapture Mode**
+- New master toggle **Rapture Mode: ON/OFF** at the front. When toggled:
+  - OFF → forces `gooseOn=false`, `brownGooseOn=false`, `procreationOn=false` (remembers prior states)
+  - ON → restores prior states (default all ON on first activation)
+- Keep individual toggles: **Goose**, **Brown**, **Procreation** (disabled/greyed while Rapture Mode is OFF).
+- Move the **Goose Stats** button here — this is the current `roster` panel toggle (relabel from "Geese" to "Goose Stats") from the PANELS list.
+- Keep **Reset Family** button.
+- Remove **Boing** from this section.
 
-| ID | Label | Inspiration | Palette direction |
-|---|---|---|---|
-| `goatgray` | Goat Gray | goatgray | Neutral graphite panels, muted cyan accent |
-| `pony` | Pony | pony | Pink/magenta on dark violet, playful |
-| `orange` | Splash of Orange | Splash of Orange | Warm amber/orange accents on charcoal |
-| `nostalgia-c` | Nostalgia-C | Nostalgia-C | Cream/paper background, brown text, retro-doc feel |
-| `original` | Original | original theme (raina) | Classic Nectarine dark blue + lime accent |
-| `simple` | Simple | Nectarine - Simple | Minimal light theme, low chrome |
+### More section
+- Keep Last.fm + version button.
+- Add **Boing: ON/OFF** toggle (moved from Geese).
+- Add **Diag** toggle (moved from Panels — the `diag` PANELS entry that opens PlaybackDiagnostics).
 
-### Changes
+### Panels section
+- Remove `roster` (moved to Rapture) and `diag` (moved to More) from the PANELS array or filter them out of the Panels render loop.
+- Keep Info Bar and remaining panels (oneliner, users, upnext, history).
 
-1. **`src/index.css`** — add a `[data-theme="..."]` block for each new theme, overriding the semantic tokens already used by workbench/gem (background, foreground, panel, panel-heading, primary/accent, neon, neon-accent, scanline color). Reuse the existing panel/neon/crt selector patterns so no component code changes.
-2. **`src/pages/Index.tsx`** — extend `ThemeId` union and the `THEMES` array with the 6 new entries so they appear in the theme picker dropdown. Persistence via existing `THEME_STORAGE_KEY` works automatically.
+### Persistence
+- Add a new `localStorage` key `cracktro-rapture-mode` for the master toggle (default ON to preserve current behavior).
+- Existing keys for goose/brown/boing/procreation remain untouched.
 
-### Non-goals
-
-- No version bump.
-- No new components, no changes to visualizer/plasma/tunnel defaults.
-- Not pixel-copying scenestream screenshots — these are palette-level tributes that fit the existing panel/neon system.
+### Out of scope
+- No change to the `GooseDebugOverlay` (Shift+D dev HUD) — that's a separate dev overlay, not the "Geese" panel.
+- No visualizer/theme changes.
