@@ -112,7 +112,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     changes: [
       "Goose Amiga / Atari platform banter on track change (skips every second consecutive same-platform track)",
       "Periodic 'Have you seen Rapture?' goose routine every 10 minutes",
-      "Goose screams 'Rapture! <3 / Daddy / Mommy' when Rapture posts in oneliner (60-minute cooldown)",
       "Mobile screen wake lock keeps display active while the app is open",
     ],
   },
@@ -188,7 +187,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Exit button hides when settings chrome is hidden",
       "Removed Cracktro windowed fallback on fullscreen exit",
       "Enabled default visual widgets on cracktro startup",
-      "Goose chatter triggered by oneliners and social reactions",
     ],
   },
   {
@@ -209,7 +207,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-06-04",
     changes: [
       "Fixed geese ball game physics",
-      "Improved oneliner smiley/emoji detection for goose reactions",
     ],
   },
   {
