@@ -70,13 +70,14 @@ const makeProfile = (q: Quality, isFirefox: boolean): QualityProfile => {
       : q === "medium"
       ? {
           starCount: 240, particleCount: 130, maxComets: 14, maxSparkles: 22,
-          dprCap: 1.5, glowMul: 0.5, nebula: true,
+          dprCap: 1.5, glowMul: 0.5, nebula: false,
           tunnelSides: 12, tunnelRingCutoff: 0.10, tunnelSegCutoff: 0.05, tunnelHueBucket: 60,
           cometBeatMax: 2, cometAmbientMs: 700, sparkleThreshold: 1.7,
         }
       : {
           starCount: 400, particleCount: 220, maxComets: 24, maxSparkles: 40,
-          dprCap: 2, glowMul: 1, nebula: true,
+          dprCap: 2, glowMul: 1, nebula: false,
+
           tunnelSides: 14, tunnelRingCutoff: 0.05, tunnelSegCutoff: 0.02, tunnelHueBucket: 360,
           cometBeatMax: 3, cometAmbientMs: 400, sparkleThreshold: 1.4,
         };
