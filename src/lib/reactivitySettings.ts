@@ -63,8 +63,11 @@ export const DEFAULT_MODE_BASE = {
 };
 
 export const MODE_BASE_OVERRIDES: Partial<Record<VisualizerStyle, Partial<typeof DEFAULT_MODE_BASE>>> = {
-  tunnel: { bassGain: 0.5, motion: 0.35, glow: 0.7 },
+  tunnel: { bassGain: 0.5, midGain: 1, trebleGain: 1, motion: 0.35, glow: 0.5 },
   plasma: { bassGain: 1, midGain: 2.15, trebleGain: 2.75, motion: 1.75, glow: 1.85 },
+  bars: { motion: 1.2, glow: 0.7 },
+  oscilloscope: { motion: 0.65, glow: 1 },
+  rings: { motion: 0.25, glow: 0.75 },
 };
 
 const modeBaseFor = (style: VisualizerStyle) => ({
@@ -81,9 +84,9 @@ export const MODE_EFFECT_SPECS: Partial<Record<VisualizerStyle, EffectSpec[]>> =
     { key: "sparkleThresh", label: "Sparkle sensitivity", min: 0.6, max: 1.6, step: 0.05, default: 0.7, suffix: "x" },
   ],
   bars: [
-    { key: "barCount", label: "Bar count", min: 0.5, max: 1.7, step: 0.05, default: 1, suffix: "x" },
-    { key: "decay", label: "Bar decay / trail", min: 0.05, max: 0.6, step: 0.01, default: 0.2 },
-    { key: "hueSpread", label: "Hue spread", min: 0, max: 2, step: 0.05, default: 1, suffix: "x" },
+    { key: "barCount", label: "Bar count", min: 0.5, max: 1.7, step: 0.05, default: 1.55, suffix: "x" },
+    { key: "decay", label: "Bar decay / trail", min: 0.05, max: 0.6, step: 0.01, default: 0.6 },
+    { key: "hueSpread", label: "Hue spread", min: 0, max: 2, step: 0.05, default: 1.25, suffix: "x" },
   ],
   plasma: [
     { key: "cellSize", label: "Cell size", min: 0.5, max: 2.5, step: 0.05, default: 1.75, suffix: "x" },
@@ -91,27 +94,28 @@ export const MODE_EFFECT_SPECS: Partial<Record<VisualizerStyle, EffectSpec[]>> =
     { key: "complexity", label: "Wave complexity", min: 0.3, max: 1.7, step: 0.05, default: 1, suffix: "x" },
   ],
   oscilloscope: [
-    { key: "thickness", label: "Line thickness", min: 0.3, max: 3, step: 0.05, default: 1, suffix: "x" },
-    { key: "amplitude", label: "Wave amplitude", min: 0.3, max: 3, step: 0.05, default: 1, suffix: "x" },
-    { key: "trail", label: "Trail persistence", min: 0.05, max: 0.6, step: 0.01, default: 0.22 },
+    { key: "thickness", label: "Line thickness", min: 0.3, max: 3, step: 0.05, default: 1.15, suffix: "x" },
+    { key: "amplitude", label: "Wave amplitude", min: 0.3, max: 3, step: 0.05, default: 0.8, suffix: "x" },
+    { key: "trail", label: "Trail persistence", min: 0.05, max: 0.6, step: 0.01, default: 0.6 },
   ],
   tunnel: [
-    { key: "sliceMult", label: "Slice count", min: 0.4, max: 1.8, step: 0.05, default: 1.35, suffix: "x" },
-    { key: "sides", label: "Sides", min: 4, max: 16, step: 1, default: 8 },
-    { key: "curve", label: "Curve amount", min: 0, max: 2, step: 0.05, default: 0.55, suffix: "x" },
-    { key: "twist", label: "Twist amount", min: 0, max: 2, step: 0.05, default: 1, suffix: "x" },
+    { key: "sliceMult", label: "Slice count", min: 0.4, max: 1.8, step: 0.05, default: 1.15, suffix: "x" },
+    { key: "sides", label: "Sides", min: 4, max: 16, step: 1, default: 10 },
+    { key: "curve", label: "Curve amount", min: 0, max: 2, step: 0.05, default: 0.2, suffix: "x" },
+    { key: "twist", label: "Twist amount", min: 0, max: 2, step: 0.05, default: 0.2, suffix: "x" },
   ],
   rings: [
-    { key: "bins", label: "Ray count", min: 0.5, max: 1.7, step: 0.05, default: 1, suffix: "x" },
+    { key: "bins", label: "Ray count", min: 0.5, max: 1.7, step: 0.05, default: 0.75, suffix: "x" },
     { key: "length", label: "Ray length", min: 0.3, max: 2, step: 0.05, default: 1, suffix: "x" },
-    { key: "speed", label: "Rotation speed", min: 0, max: 3, step: 0.05, default: 1, suffix: "x" },
+    { key: "speed", label: "Rotation speed", min: 0, max: 3, step: 0.05, default: 1.45, suffix: "x" },
   ],
   particles: [
-    { key: "kick", label: "Beat kick", min: 0, max: 3, step: 0.05, default: 1, suffix: "x" },
-    { key: "friction", label: "Friction", min: 0.9, max: 0.995, step: 0.005, default: 0.96 },
-    { key: "count", label: "Particle count", min: 0.3, max: 2, step: 0.05, default: 1, suffix: "x" },
+    { key: "kick", label: "Beat kick", min: 0, max: 3, step: 0.05, default: 2.6, suffix: "x" },
+    { key: "friction", label: "Friction", min: 0.9, max: 0.995, step: 0.005, default: 0.97 },
+    { key: "count", label: "Particle count", min: 0.3, max: 2, step: 0.05, default: 1.2, suffix: "x" },
   ],
 };
+
 
 export const DEFAULT_MODE: ModeReactivity = {
   ...DEFAULT_MODE_BASE,
