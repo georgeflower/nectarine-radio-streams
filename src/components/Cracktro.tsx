@@ -158,6 +158,25 @@ const Cracktro = ({
       /* ignore */
     }
   }, [mode]);
+
+  // Lock viewport scroll while scroller mode is active so no scrollbar can appear.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevHtmlScrollbar = html.style.scrollbarWidth;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    html.style.scrollbarWidth = "none";
+    html.setAttribute("data-cracktro-active", "true");
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      html.style.scrollbarWidth = prevHtmlScrollbar;
+      html.removeAttribute("data-cracktro-active");
+    };
+  }, []);
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_INFOBAR, infobarOn ? "1" : "0");
@@ -819,7 +838,7 @@ const Cracktro = ({
 
   const scrollerBottomOffset = 40; // px, leaves room for the controls bar
   return (
-    <div ref={setWrap} className="fixed inset-0 z-[9999] bg-background overflow-hidden">
+    <div ref={setWrap} className="fixed inset-0 z-[9999] bg-background overflow-hidden overscroll-none">
       <StageProvider element={stageEl}>
         <Visualizer analyser={analyser} style={effectiveStyle} />
         <BeatOverlay analyser={analyser} enabled />

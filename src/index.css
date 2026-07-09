@@ -418,6 +418,19 @@
   background: hsl(var(--background) / 0.4);
 }
 
+/* ─── Scroller mode: never show scrollbars ─────────────────────────────── */
+html[data-cracktro-active],
+html[data-cracktro-active] body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  scrollbar-width: none;
+}
+html[data-cracktro-active]::-webkit-scrollbar,
+html[data-cracktro-active] body::-webkit-scrollbar,
+html[data-cracktro-active] *::-webkit-scrollbar {
+  display: none;
+}
+
 
 
 /* ─── BBCode silly tags ──────────────────────────────────────────────────── */
