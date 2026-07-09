@@ -838,7 +838,7 @@ const Cracktro = ({
 
   const scrollerBottomOffset = 40; // px, leaves room for the controls bar
   return (
-    <div ref={setWrap} className="fixed inset-0 z-[9999] bg-background overflow-hidden">
+    <div ref={setWrap} className="fixed inset-0 z-[9999] bg-background overflow-hidden overscroll-none">
       <StageProvider element={stageEl}>
         <Visualizer analyser={analyser} style={effectiveStyle} />
         <BeatOverlay analyser={analyser} enabled />
