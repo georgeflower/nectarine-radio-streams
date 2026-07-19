@@ -432,6 +432,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     if (!artist || !track) return;
     const key = currentSongId || `${artist}::${track}`;
     if (scrobbleStateRef.current?.songId === key) return;
+    const prev = scrobbleStateRef.current;
+    if (prev && !prev.scrobbled) {
+      const played = Math.floor(Date.now() / 1000) - prev.startedAt;
+      if (played >= 30 && played <= 1800) {
+        prev.scrobbled = true;
+        void sendScrobble(prev.artist, prev.track, prev.startedAt, played);
+      }
+    }
     scrobbleStateRef.current = {
       songId: key,
       startedAt: Math.floor(Date.now() / 1000),
