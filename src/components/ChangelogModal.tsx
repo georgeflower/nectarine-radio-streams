@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.2";
+export const APP_VERSION = "0.7.3";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,16 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.3",
+    date: "2026-07-23",
+    changes: [
+      "Fixed Last.fm scrobbling for tracks shorter than 240s: previous track is now scrobbled on track change if it reached 30–1800 seconds of play time",
+      "Fixed production version polling on the published site by removing the blanket .lovable.app preview-host check",
+      "Added cold-start freshness check that reloads once if a stale build is detected on launch, with a session-scoped guard to prevent infinite reload loops",
+      "Tuned default reactivity values for Tunnel, Bars, Oscilloscope, Rings, and Particles visualizers based on the latest screenshots",
+    ],
+  },
   {
     version: "0.7.2",
     date: "2026-07-07",
