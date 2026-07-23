@@ -38,13 +38,29 @@ if (isProd && !inIframe && !isPreviewHost) {
   // Cold-start freshness check: if the loaded bundle is already stale when
   // the user opens the app, reload immediately — but only within the first
   // 15s window so we can never interrupt an active listening session later.
+  const COLD_RELOAD_KEY = "nectarine-cold-reload";
   const startedAt = Date.now();
   void (async () => {
     try {
       const res = await checkForNewVersion();
       if (res.stale && Date.now() - startedAt < 15_000) {
-        console.info("[version] cold-start stale bundle, reloading", res);
-        void forceReloadForNewVersion();
+        let alreadyReloaded = false;
+        try {
+          alreadyReloaded = sessionStorage.getItem(COLD_RELOAD_KEY) === "1";
+        } catch {
+          // Private-mode or storage-disabled browsers: treat as not yet reloaded.
+        }
+        if (alreadyReloaded) {
+          console.warn("[version] cold-start still stale after reload, skipping to avoid loop", res);
+        } else {
+          console.info("[version] cold-start stale bundle, reloading", res);
+          try {
+            sessionStorage.setItem(COLD_RELOAD_KEY, "1");
+          } catch {
+            // Ignore storage failures; the reload itself is still allowed.
+          }
+          void forceReloadForNewVersion();
+        }
       }
     } catch {
       // ignore
