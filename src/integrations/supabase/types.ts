@@ -14,10 +14,87 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      stream_events: {
+        Row: {
+          bitrate: number | null
+          connection_type: string | null
+          created_at: string
+          downlink: number | null
+          effective_type: string | null
+          event: string
+          hidden: boolean | null
+          id: number
+          media_error_code: number | null
+          media_error_message: string | null
+          ms_since_connection_change: number | null
+          network_state: number | null
+          platform: string | null
+          played_sec: number | null
+          ready_state: number | null
+          reason: string | null
+          session_id: string
+          stream_name: string | null
+          stream_url: string
+        }
+        Insert: {
+          bitrate?: number | null
+          connection_type?: string | null
+          created_at?: string
+          downlink?: number | null
+          effective_type?: string | null
+          event: string
+          hidden?: boolean | null
+          id?: number
+          media_error_code?: number | null
+          media_error_message?: string | null
+          ms_since_connection_change?: number | null
+          network_state?: number | null
+          platform?: string | null
+          played_sec?: number | null
+          ready_state?: number | null
+          reason?: string | null
+          session_id: string
+          stream_name?: string | null
+          stream_url: string
+        }
+        Update: {
+          bitrate?: number | null
+          connection_type?: string | null
+          created_at?: string
+          downlink?: number | null
+          effective_type?: string | null
+          event?: string
+          hidden?: boolean | null
+          id?: number
+          media_error_code?: number | null
+          media_error_message?: string | null
+          ms_since_connection_change?: number | null
+          network_state?: number | null
+          platform?: string | null
+          played_sec?: number | null
+          ready_state?: number | null
+          reason?: string | null
+          session_id?: string
+          stream_name?: string | null
+          stream_url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      stream_reliability: {
+        Row: {
+          avg_played_sec_before_failure: number | null
+          bitrate: number | null
+          connects: number | null
+          failures: number | null
+          handover_events: number | null
+          last_seen_at: string | null
+          stream_name: string | null
+          stream_url: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
