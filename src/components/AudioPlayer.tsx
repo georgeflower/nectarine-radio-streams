@@ -752,7 +752,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       setError(null);
       reportReconnect(`force-${reason}`);
       logPlayback("warn", "recovery", "forced hard reload", { reason });
-      retryCountRef.current = 1;
+      
       retryTimerRef.current = window.setTimeout(() => {
         playUrl(currentUrl, true).catch((e) => {
           logPlayback("error", "recovery", "forced playUrl threw", { err: String(e) });
