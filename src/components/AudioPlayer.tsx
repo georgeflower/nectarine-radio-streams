@@ -29,6 +29,7 @@ import {
   reportStall,
   reportVisibility,
 } from "@/lib/playbackWatchdog";
+import { noteConnectionChange, recordStreamEvent, type StreamEventName } from "@/lib/streamTelemetry";
 
 type Props = {
   streams: StreamSource[];
@@ -163,7 +164,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const retryTimerRef = useRef<number | null>(null);
   const stallTimerRef = useRef<number | null>(null);
   const failedStreamsRef = useRef<Map<string, number>>(new Map());
-  const attemptRecoveryRef = useRef<(() => void) | null>(null);
+  const attemptRecoveryRef = useRef<((opts?: { force?: boolean; reason?: string }) => void) | null>(null);
   const loadingRef = useRef(false);
   const lastLoadAtRef = useRef(0);
   const currentTargetRef = useRef<string | null>(null);
@@ -172,6 +173,48 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const lastSoftResumeAtRef = useRef(0);
   const hiddenSinceRef = useRef<number | null>(null);
   const INITIAL_BUFFER_GRACE_MS = 8000;
+
+  // --- telemetry plumbing (fire-and-forget, never throws) -------------------
+  const selectedStreamRef = useRef<StreamSource | null>(null);
+  const selectedUrlRef = useRef<string | null>(null);
+  const playStartedAtRef = useRef<number | null>(null);
+  const connectOkSentRef = useRef(false);
+  const reconnectingRef = useRef(false);
+  const lastRecoveryReasonRef = useRef<string | null>(null);
+  const connectionInfoRef = useRef<{ type: string | null; effectiveType: string | null }>({
+    type: null,
+    effectiveType: null,
+  });
+  const connectionRecoveryTimerRef = useRef<number | null>(null);
+
+  const playedSec = useCallback((): number | null => {
+    const started = playStartedAtRef.current;
+    if (started === null) return null;
+    return Math.max(0, Math.round((Date.now() - started) / 1000));
+  }, []);
+
+  const telemetry = useCallback(
+    (
+      event: StreamEventName,
+      extra?: Omit<Parameters<typeof recordStreamEvent>[0], "event" | "stream_url">,
+    ) => {
+      try {
+        const s = selectedStreamRef.current;
+        const url = s?.url ?? selectedUrlRef.current;
+        if (!url) return;
+        recordStreamEvent({
+          event,
+          stream_url: url,
+          stream_name: s?.name ?? null,
+          bitrate: Number(s?.bitrate) || null,
+          ...extra,
+        });
+      } catch {
+        /* telemetry must never break playback */
+      }
+    },
+    [],
+  );
 
   // Auto-pick first playable stream when list arrives or selection becomes invalid
   useEffect(() => {
@@ -395,6 +438,15 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     () => playable.find((x) => x.url === selectedUrl) ?? null,
     [playable, selectedUrl],
   );
+
+  useEffect(() => {
+    selectedStreamRef.current = selectedStream;
+    selectedUrlRef.current = selectedUrl;
+  }, [selectedStream, selectedUrl]);
+
+  useEffect(() => {
+    reconnectingRef.current = reconnecting;
+  }, [reconnecting]);
 
   const stationConfig = useMemo(() => {
     if (!selectedStream?.url || !selectedStream.nowPlayingUrl) return null;
