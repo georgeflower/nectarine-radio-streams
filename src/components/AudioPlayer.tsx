@@ -406,6 +406,70 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     };
   }, [markPlaybackAlive, notePlaybackProgress, snapshot]);
 
+  // Network handover watchdog (wifi ↔ cellular). The old socket dies silently
+  // on the interface switch, so a hard reload is the only reliable recovery.
+  // The Network Information API is absent on iOS Safari — no-op there.
+  useEffect(() => {
+    type NavConnection = {
+      type?: string;
+      effectiveType?: string;
+      addEventListener?: (t: string, fn: () => void) => void;
+      removeEventListener?: (t: string, fn: () => void) => void;
+    };
+    let conn: NavConnection | null = null;
+    try {
+      const nav = navigator as unknown as Record<string, NavConnection | undefined>;
+      conn = nav.connection ?? nav.mozConnection ?? nav.webkitConnection ?? null;
+    } catch {
+      conn = null;
+    }
+    if (!conn || typeof conn.addEventListener !== "function") return;
+
+    connectionInfoRef.current = {
+      type: conn.type ?? null,
+      effectiveType: conn.effectiveType ?? null,
+    };
+
+    const onChange = () => {
+      try {
+        noteConnectionChange();
+        const prev = connectionInfoRef.current;
+        const nextType = conn?.type ?? null;
+        const nextEffective = conn?.effectiveType ?? null;
+        const from = prev.type ?? prev.effectiveType ?? "unknown";
+        const to = nextType ?? nextEffective ?? "unknown";
+        const reason = `${from}->${to}`;
+        connectionInfoRef.current = { type: nextType, effectiveType: nextEffective };
+        logPlayback("warn", "connection", `network change ${reason}`, snapshot());
+        telemetry("connection_change", { reason, played_sec: playedSec() });
+
+        if (connectionRecoveryTimerRef.current !== null) {
+          window.clearTimeout(connectionRecoveryTimerRef.current);
+          connectionRecoveryTimerRef.current = null;
+        }
+        if (!shouldPlayRef.current) return;
+        // The new interface is often not routable immediately.
+        connectionRecoveryTimerRef.current = window.setTimeout(() => {
+          connectionRecoveryTimerRef.current = null;
+          if (!shouldPlayRef.current) return;
+          reportReconnect(`connection-change-${reason}`);
+          attemptRecoveryRef.current?.({ force: true, reason: `connection-change-${reason}` });
+        }, 1200);
+      } catch {
+        /* never let a connection event break playback */
+      }
+    };
+
+    conn.addEventListener("change", onChange);
+    return () => {
+      if (connectionRecoveryTimerRef.current !== null) {
+        window.clearTimeout(connectionRecoveryTimerRef.current);
+        connectionRecoveryTimerRef.current = null;
+      }
+      conn?.removeEventListener?.("change", onChange);
+    };
+  }, [playedSec, snapshot, telemetry]);
+
 
   // Poll buffered-ahead while playing for UX visibility
   useEffect(() => {
@@ -600,6 +664,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       }
 
       currentTargetRef.current = target;
+      connectOkSentRef.current = false;
       loadingRef.current = true;
       lastLoadAtRef.current = Date.now();
 
@@ -669,13 +734,33 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     [playable],
   );
 
-  const attemptRecovery = useCallback(() => {
-    logPlayback("warn", "recovery", "attemptRecovery()", snapshot());
+  const attemptRecovery = useCallback((opts?: { force?: boolean; reason?: string }) => {
+    const force = opts?.force === true;
+    const reason = opts?.reason ?? (force ? "forced" : "stall");
+    logPlayback("warn", "recovery", `attemptRecovery(force=${force}, reason=${reason})`, snapshot());
     if (!shouldPlayRef.current) { logPlayback("info", "recovery", "skip: shouldPlay=false"); return; }
     clearTimers();
     const currentUrl = selectedUrl;
     if (!currentUrl) return;
+    lastRecoveryReasonRef.current = reason;
     const a = audioRef.current;
+    if (force) {
+      // The connection is definitively gone — a soft resume cannot revive a
+      // dead socket, so go straight to a cache-busted hard reload.
+      retryCountRef.current = 0;
+      setReconnecting(true);
+      setError(null);
+      reportReconnect(`force-${reason}`);
+      logPlayback("warn", "recovery", "forced hard reload", { reason });
+      retryCountRef.current = 1;
+      retryTimerRef.current = window.setTimeout(() => {
+        playUrl(currentUrl, true).catch((e) => {
+          logPlayback("error", "recovery", "forced playUrl threw", { err: String(e) });
+          attemptRecovery({ reason: `${reason}-retry` });
+        });
+      }, 0);
+      return;
+    }
     if (IS_MOBILE && a) {
       notePlaybackProgress(a);
       const now = Date.now();
@@ -718,20 +803,8 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       retryTimerRef.current = window.setTimeout(() => {
         playUrl(currentUrl, shouldCacheBust).catch((e) => {
           logPlayback("error", "recovery", "retry playUrl threw", { err: String(e) });
-          attemptRecovery();
+          attemptRecovery({ reason });
         });
-      }, delay);
-      return;
-    }
-
-    if (IS_MOBILE) {
-      retryCountRef.current = 0;
-      setReconnecting(false);
-      setError(null);
-      const delay = Math.max(10_000, getStallTimeoutMs());
-      logPlayback("warn", "recovery", `mobile: retries exhausted, backoff ${delay}ms`);
-      retryTimerRef.current = window.setTimeout(() => {
-        if (shouldPlayRef.current) attemptRecovery();
       }, delay);
       return;
     }
@@ -739,6 +812,19 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     failedStreamsRef.current.set(currentUrl, Date.now());
     const nextUrl = pickNextStream(currentUrl);
     if (!nextUrl || nextUrl === currentUrl) {
+      if (IS_MOBILE) {
+        // A phone that briefly loses connectivity should keep trying rather
+        // than giving up permanently.
+        retryCountRef.current = 0;
+        setReconnecting(false);
+        setError(null);
+        const delay = Math.max(10_000, getStallTimeoutMs());
+        logPlayback("warn", "recovery", `mobile: no alternative stream, backoff ${delay}ms`);
+        retryTimerRef.current = window.setTimeout(() => {
+          if (shouldPlayRef.current) attemptRecovery({ reason });
+        }, delay);
+        return;
+      }
       logPlayback("error", "recovery", "all streams unavailable");
       setReconnecting(false);
       setError("All streams unavailable");
@@ -746,14 +832,18 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       return;
     }
     logPlayback("warn", "recovery", "failover to next stream", { from: currentUrl, to: nextUrl });
+    telemetry("failover", {
+      reason: `${reason}: ${currentUrl} -> ${nextUrl}`,
+      played_sec: playedSec(),
+    });
     retryCountRef.current = 0;
     setSelectedUrl(nextUrl);
     setNowPlaying(null);
     setReconnecting(true);
     retryTimerRef.current = window.setTimeout(() => {
-      playUrl(nextUrl, true).catch(() => attemptRecovery());
+      playUrl(nextUrl, true).catch(() => attemptRecovery({ reason }));
     }, 500);
-  }, [clearTimers, markPlaybackAlive, notePlaybackProgress, pickNextStream, playUrl, selectedUrl, snapshot]);
+  }, [clearTimers, markPlaybackAlive, notePlaybackProgress, pickNextStream, playUrl, playedSec, selectedUrl, snapshot, telemetry]);
   useEffect(() => { attemptRecoveryRef.current = attemptRecovery; }, [attemptRecovery]);
 
   const scheduleStallCheck = useCallback((eventName: "waiting" | "stalled") => {
