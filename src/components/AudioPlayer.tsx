@@ -1274,7 +1274,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         onEnded={() => {
           logPlayback("warn", "media", "onEnded", snapshot());
           setPlaying(false);
-          if (shouldPlayRef.current) attemptRecovery();
+          const el = audioRef.current;
+          telemetry("ended", {
+            reason: "media-ended",
+            network_state: el?.networkState ?? null,
+            ready_state: el?.readyState ?? null,
+            played_sec: playedSec(),
+          });
+          if (shouldPlayRef.current) attemptRecovery({ reason: "media-ended" });
         }}
         onError={(e) => {
           const el = e.currentTarget;
@@ -1285,8 +1292,24 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           }));
           setPlaying(false);
           setLoading(false);
+          telemetry("error", {
+            reason: `media-error-${mediaErr?.code ?? "unknown"}`,
+            media_error_code: mediaErr?.code ?? null,
+            media_error_message: mediaErr?.message ?? null,
+            network_state: el.networkState ?? null,
+            ready_state: el.readyState ?? null,
+            played_sec: playedSec(),
+          });
           if (shouldPlayRef.current) {
-            attemptRecovery();
+            const code = mediaErr?.code ?? 0;
+            // 2 NETWORK / 3 DECODE / 4 SRC_NOT_SUPPORTED mean the socket is
+            // dead (typical of a wifi↔cellular handover) — force a reload.
+            // 1 ABORTED is usually just a superseded load.
+            if (code === 2 || code === 3 || code === 4) {
+              attemptRecovery({ force: true, reason: `media-error-${code}` });
+            } else {
+              attemptRecovery({ reason: `media-error-${code}` });
+            }
           } else {
             setError("Stream error");
           }
