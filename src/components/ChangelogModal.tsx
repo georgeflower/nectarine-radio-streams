@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.3";
+export const APP_VERSION = "0.7.4";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,18 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.4",
+    date: "2026-07-31",
+    changes: [
+      "Anonymous stream failure telemetry: connect, error, stall, failover and network-handover events are logged to the cloud to find flaky streams",
+      "Playback now survives wifi ↔ mobile data handovers: real media errors and connection changes trigger an immediate forced reconnect",
+      "Stream failover enabled on mobile, with a cooldown so a failing stream is not retried straight away",
+      "Streams are now ranked to always aim for 192 kbps, with unreliable streams pushed to the bottom",
+      "Chronically failing streams (5+ observations, under 50% success) are automatically deprioritised",
+      "New Stream reliability section in the playback diagnostics panel: connects, failures, success rate and average seconds played before failure, with manual refresh",
+    ],
+  },
   {
     version: "0.7.3",
     date: "2026-07-23",
