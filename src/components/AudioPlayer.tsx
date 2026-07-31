@@ -957,6 +957,12 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     async (url: string, autoplay = playing) => {
       // No-op if user re-picks the active stream and it's already playing.
       if (url === selectedUrl && autoplay && playing && !loadingRef.current) return;
+      if (url !== selectedUrl) {
+        telemetry("switch", {
+          reason: `user-switch: ${selectedUrl ?? "none"} -> ${url}`,
+          played_sec: playedSec(),
+        });
+      }
       clearTimers();
       retryCountRef.current = 0;
       setSelectedUrl(url);
