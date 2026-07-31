@@ -6,7 +6,10 @@ import type { StreamReliabilityRow } from "@/lib/streamTelemetry";
 export const TARGET_BITRATE = 192;
 
 const rawBitrate = (stream: StreamSource): number => {
-  const n = Number(stream?.bitrate);
+  const raw = stream?.bitrate;
+  if (raw === null || raw === undefined) return Number.NaN;
+  if (typeof raw === "string" && raw.trim() === "") return Number.NaN;
+  const n = Number(raw);
   return Number.isFinite(n) ? n : Number.NaN;
 };
 
