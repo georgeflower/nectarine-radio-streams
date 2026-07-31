@@ -134,19 +134,36 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const analyserRef = useRef<AnalyserNode | null>(null);
   const bufferedStreamRef = useRef<BufferedStreamHandle | null>(null);
 
+  const [reliabilityMap, setReliabilityMap] = useState<Map<string, StreamReliabilityRow>>(
+    () => new Map(),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await fetchStreamReliability();
+        if (cancelled || !rows?.length) return;
+        const map = new Map<string, StreamReliabilityRow>();
+        for (const r of rows) if (r?.stream_url) map.set(r.stream_url, r);
+        setReliabilityMap(map);
+      } catch {
+        /* ranking degrades to pure bitrate ordering */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const playable = useMemo(
     () =>
-      streams
-        .filter((s) => /^https?:\/\//i.test(s.url))
-        .sort((a, b) => {
-          if (IS_MOBILE) {
-            const aNeedsProxy = isMixedContentUrl(a.url);
-            const bNeedsProxy = isMixedContentUrl(b.url);
-            if (aNeedsProxy !== bNeedsProxy) return aNeedsProxy ? 1 : -1;
-          }
-          return (Number(b.bitrate) || 0) - (Number(a.bitrate) || 0);
-        }),
-    [streams],
+      rankStreams(
+        streams.filter((s) => /^https?:\/\//i.test(s.url)),
+        reliabilityMap,
+        { isMobile: IS_MOBILE, needsProxy: isMixedContentUrl },
+      ),
+    [streams, reliabilityMap],
   );
 
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
@@ -722,14 +739,13 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     (currentUrl: string | null): string | null => {
       if (!playable.length) return null;
       const now = Date.now();
-      const available = playable.filter((s) => {
+      const candidates = playable.filter((s) => s.url !== currentUrl);
+      if (!candidates.length) return null;
+      const fresh = candidates.filter((s) => {
         const failedAt = failedStreamsRef.current.get(s.url);
         return !failedAt || now - failedAt > FAILOVER_COOLDOWN_MS;
       });
-      const pool = available.length > 0 ? available : playable;
-      const idx = pool.findIndex((s) => s.url === currentUrl);
-      const next = pool[(idx + 1) % pool.length];
-      return next?.url ?? null;
+      return (fresh[0] ?? candidates[0])?.url ?? null;
     },
     [playable],
   );
