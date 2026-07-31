@@ -1,4 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getAudioControlState, subscribeAudioControl } from "@/lib/cracktroUi";
+import { fetchStreamReliability, type StreamReliabilityRow } from "@/lib/streamTelemetry";
+import { isUnreliable, rankStreams, reliabilityScore } from "@/lib/streamRanking";
+import type { StreamSource } from "@/lib/nectarine";
 import {
   DEFAULT_WATCHDOG_CONFIG,
   getWatchdogConfig,
@@ -60,7 +64,54 @@ const NumField = ({
   </label>
 );
 
+const pct = (n: number): string => `${Math.round(n * 100)}%`;
+
 const PlaybackDiagnostics = ({ onClose }: Props) => {
+  const [rows, setRows] = useState<StreamReliabilityRow[]>([]);
+  const [relLoading, setRelLoading] = useState(false);
+  const [selectedUrl, setSelectedUrl] = useState<string | null>(
+    () => getAudioControlState().selectedUrl,
+  );
+
+  useEffect(
+    () => subscribeAudioControl(() => setSelectedUrl(getAudioControlState().selectedUrl)),
+    [],
+  );
+
+  const loadReliability = useCallback(async (forceRefresh = false) => {
+    setRelLoading(true);
+    try {
+      const data = await fetchStreamReliability(forceRefresh);
+      setRows(Array.isArray(data) ? data.filter((r) => !!r?.stream_url) : []);
+    } catch {
+      setRows([]);
+    } finally {
+      setRelLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadReliability(false);
+  }, [loadReliability]);
+
+  const relMap = useMemo(() => {
+    const m = new Map<string, StreamReliabilityRow>();
+    for (const r of rows) if (r.stream_url) m.set(r.stream_url, r);
+    return m;
+  }, [rows]);
+
+  const rankedRows = useMemo(() => {
+    const asStreams: StreamSource[] = rows.map((r) => ({
+      name: r.stream_name ?? r.stream_url ?? "stream",
+      url: r.stream_url ?? "",
+      bitrate: r.bitrate === null || r.bitrate === undefined ? "" : String(r.bitrate),
+      type: "",
+    }));
+    return rankStreams(asStreams, relMap, { isMobile: false, needsProxy: () => false }).map(
+      (s) => ({ stream: s, row: relMap.get(s.url) }),
+    );
+  }, [rows, relMap]);
+
   const [cfg, setCfg] = useState<WatchdogConfig>(getWatchdogConfig());
   const [diag, setDiag] = useState<WatchdogDiagnostics>(getWatchdogDiagnostics());
   const [, force] = useState(0);
@@ -150,6 +201,58 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
           <NumField label="iOS" value={cfg.iosVisibilityResumeDelayMs} onChange={(n) => set({ iosVisibilityResumeDelayMs: n })} min={0} max={5000} step={50} suffix="ms" />
           <NumField label="Android" value={cfg.androidVisibilityResumeDelayMs} onChange={(n) => set({ androidVisibilityResumeDelayMs: n })} min={0} max={5000} step={50} suffix="ms" />
           <NumField label="Desktop" value={cfg.desktopVisibilityResumeDelayMs} onChange={(n) => set({ desktopVisibilityResumeDelayMs: n })} min={0} max={5000} step={50} suffix="ms" />
+        </div>
+
+        <div className="border-t border-border pt-2 space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Stream reliability
+            </span>
+            <button
+              type="button"
+              onClick={() => void loadReliability(true)}
+              disabled={relLoading}
+              className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-border hover:border-primary disabled:opacity-50"
+            >
+              {relLoading ? "…" : "Refresh"}
+            </button>
+          </div>
+          {rankedRows.length === 0 ? (
+            <div className="text-[10px] text-muted-foreground">No data yet</div>
+          ) : (
+            <div className="space-y-1">
+              {rankedRows.map(({ stream, row }) => {
+                const connects = Number(row?.connects) || 0;
+                const failures = Number(row?.failures) || 0;
+                const bad = isUnreliable(row);
+                const current = stream.url === selectedUrl;
+                const avg = row?.avg_played_sec_before_failure;
+                return (
+                  <div
+                    key={stream.url}
+                    className={`text-[10px] leading-tight px-1 py-0.5 rounded-sm border ${
+                      current ? "border-primary bg-primary/10" : "border-transparent"
+                    } ${bad ? "text-destructive" : ""}`}
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="truncate">
+                        {current ? "▶ " : ""}
+                        {stream.name}
+                      </span>
+                      <span className="text-muted-foreground shrink-0">
+                        {stream.bitrate ? `${stream.bitrate}k` : "?"}
+                      </span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      ok {connects} · fail {failures} · {pct(reliabilityScore(row))} · avg{" "}
+                      {avg === null || avg === undefined ? "—" : `${Math.round(Number(avg))}s`}
+                      {bad ? " · unreliable" : ""}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end pt-1 border-t border-border">

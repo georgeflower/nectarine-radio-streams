@@ -226,8 +226,8 @@ export type StreamReliabilityRow = {
 const RELIABILITY_TTL_MS = 10 * 60 * 1000;
 let reliabilityCache: { at: number; rows: StreamReliabilityRow[] } | null = null;
 
-export const fetchStreamReliability = async (): Promise<StreamReliabilityRow[]> => {
-  if (reliabilityCache && Date.now() - reliabilityCache.at < RELIABILITY_TTL_MS) {
+export const fetchStreamReliability = async (force = false): Promise<StreamReliabilityRow[]> => {
+  if (!force && reliabilityCache && Date.now() - reliabilityCache.at < RELIABILITY_TTL_MS) {
     return reliabilityCache.rows;
   }
   try {
