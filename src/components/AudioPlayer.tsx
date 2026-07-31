@@ -29,7 +29,14 @@ import {
   reportStall,
   reportVisibility,
 } from "@/lib/playbackWatchdog";
-import { noteConnectionChange, recordStreamEvent, type StreamEventName } from "@/lib/streamTelemetry";
+import {
+  fetchStreamReliability,
+  noteConnectionChange,
+  recordStreamEvent,
+  type StreamEventName,
+  type StreamReliabilityRow,
+} from "@/lib/streamTelemetry";
+import { rankStreams } from "@/lib/streamRanking";
 
 type Props = {
   streams: StreamSource[];
