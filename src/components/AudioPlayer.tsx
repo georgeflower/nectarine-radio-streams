@@ -1325,6 +1325,26 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         onPlaying={() => {
           logPlayback("info", "media", "onPlaying", snapshot());
           markPlaybackAlive();
+          const el = audioRef.current;
+          if (playStartedAtRef.current === null) playStartedAtRef.current = Date.now();
+          if (!connectOkSentRef.current) {
+            connectOkSentRef.current = true;
+            playStartedAtRef.current = Date.now();
+            telemetry("connect_ok", {
+              network_state: el?.networkState ?? null,
+              ready_state: el?.readyState ?? null,
+            });
+          }
+          if (reconnectingRef.current) {
+            reconnectingRef.current = false;
+            telemetry("recovered", {
+              reason: lastRecoveryReasonRef.current ?? "unknown",
+              network_state: el?.networkState ?? null,
+              ready_state: el?.readyState ?? null,
+              played_sec: playedSec(),
+            });
+            lastRecoveryReasonRef.current = null;
+          }
           if (stallTimerRef.current !== null) {
             window.clearTimeout(stallTimerRef.current);
             stallTimerRef.current = null;
