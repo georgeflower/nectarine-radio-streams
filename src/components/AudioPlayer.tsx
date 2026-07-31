@@ -876,7 +876,13 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
             reportStall();
             reportReconnect(`mobile-${eventName}-timeout`);
             logPlayback("warn", "stall", `mobile-${eventName}-timeout fired → recovery`);
-            attemptRecovery();
+            telemetry("stall", {
+              reason: `mobile-${eventName}-timeout`,
+              network_state: audio?.networkState ?? null,
+              ready_state: audio?.readyState ?? null,
+              played_sec: playedSec(),
+            });
+            attemptRecovery({ reason: `mobile-${eventName}-timeout` });
           }
         }, Math.max(1000, remaining));
         return;
@@ -884,7 +890,13 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       reportStall();
       reportReconnect(`mobile-${eventName}-timeout`);
       logPlayback("warn", "stall", `mobile-${eventName} immediate → recovery`);
-      attemptRecovery();
+      telemetry("stall", {
+        reason: `mobile-${eventName}-immediate`,
+        network_state: a?.networkState ?? null,
+        ready_state: a?.readyState ?? null,
+        played_sec: playedSec(),
+      });
+      attemptRecovery({ reason: `mobile-${eventName}-immediate` });
       return;
     }
     reportStall();
@@ -894,11 +906,18 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     stallTimerRef.current = window.setTimeout(() => {
       stallTimerRef.current = null;
       if (shouldPlayRef.current) {
+        const audio = audioRef.current;
         logPlayback("warn", "stall", "desktop stall timeout → recovery");
-        attemptRecovery();
+        telemetry("stall", {
+          reason: `desktop-${eventName}-timeout`,
+          network_state: audio?.networkState ?? null,
+          ready_state: audio?.readyState ?? null,
+          played_sec: playedSec(),
+        });
+        attemptRecovery({ reason: `desktop-${eventName}-timeout` });
       }
     }, getStallTimeoutMs());
-  }, [attemptRecovery, notePlaybackProgress, snapshot]);
+  }, [attemptRecovery, notePlaybackProgress, playedSec, snapshot, telemetry]);
 
   const pausePlayback = useCallback(() => {
     shouldPlayRef.current = false;
