@@ -119,6 +119,8 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
   const [cfg, setCfg] = useState<WatchdogConfig>(getWatchdogConfig());
   const [diag, setDiag] = useState<WatchdogDiagnostics>(getWatchdogDiagnostics());
   const [, force] = useState(0);
+  const netCounts = getNetChangeCounts();
+
 
   useEffect(() => {
     const u1 = subscribeWatchdogConfig(setCfg);
