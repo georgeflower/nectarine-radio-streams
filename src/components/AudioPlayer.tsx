@@ -169,12 +169,15 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const playable = useMemo(
     () =>
       rankStreams(
-        streams.filter((s) => /^https?:\/\//i.test(s.url)),
+        streams.filter(
+          (s) => /^https?:\/\//i.test(s.url) && !(IS_OGG_UNSUPPORTED && isOggUrl(s.url)),
+        ),
         reliabilityMap,
         { isMobile: IS_MOBILE, needsProxy: isMixedContentUrl },
       ),
     [streams, reliabilityMap],
   );
+
 
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
