@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAudioControlState, subscribeAudioControl } from "@/lib/cracktroUi";
-import { fetchStreamReliability, type StreamReliabilityRow } from "@/lib/streamTelemetry";
-import { isUnreliable, rankStreams, reliabilityScore } from "@/lib/streamRanking";
+import {
+  fetchStreamReliability,
+  getNetChangeCounts,
+  type StreamReliabilityRow,
+} from "@/lib/streamTelemetry";
+import { isShortRunner, isUnreliable, rankStreams, reliabilityScore } from "@/lib/streamRanking";
 import type { StreamSource } from "@/lib/nectarine";
 import {
   DEFAULT_WATCHDOG_CONFIG,
