@@ -60,6 +60,9 @@ const RETRY_DELAYS_MS = [1000, 2000, 4000];
 const FAILOVER_COOLDOWN_MS = 60_000;
 const BUFFER_POLL_MS = 2000;
 const MOBILE_SOFT_RESUME_COOLDOWN_MS = 3000;
+// At most one forced hard reload per real interface handover burst.
+const HANDOVER_FORCE_COOLDOWN_MS = 15_000;
+
 const PROGRESS_EPSILON_SEC = 0.2;
 
 // Mobile devices: route audio as plain HTML5 media (no Web Audio, no MSE) so
@@ -537,7 +540,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       }
       conn?.removeEventListener?.("change", onChange);
     };
-  }, [playedSec, snapshot, telemetry]);
+  }, [notePlaybackProgress, playedSec, snapshot, telemetry]);
 
 
   // Poll buffered-ahead while playing for UX visibility
