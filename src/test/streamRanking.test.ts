@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { StreamSource } from "@/lib/nectarine";
 import type { StreamReliabilityRow } from "@/lib/streamTelemetry";
-import { bitrateDistance, isUnreliable, rankStreams, reliabilityScore } from "@/lib/streamRanking";
+import {
+  bitrateDistance,
+  isShortRunner,
+  isUnreliable,
+  rankStreams,
+  reliabilityScore,
+} from "@/lib/streamRanking";
 
 const s = (name: string, bitrate: string): StreamSource => ({
   name,
@@ -67,4 +73,33 @@ describe("streamRanking", () => {
     expect(ranked[1].name).toBe("unknown");
     expect(bitrateDistance(unknown)).toBe(Number.POSITIVE_INFINITY);
   });
+
+  it("demotes a stream that always dies after a few seconds", () => {
+    const shortRun = { ...row("short", 1, 2), avg_played_sec_before_failure: 11 };
+    expect(isShortRunner(shortRun)).toBe(true);
+    expect(isUnreliable(shortRun)).toBe(true);
+
+    // healthy long runs are untouched
+    const longRun = { ...row("long", 16, 2), avg_played_sec_before_failure: 430 };
+    expect(isShortRunner(longRun)).toBe(false);
+    expect(isUnreliable(longRun)).toBe(false);
+
+    // one bad sample is not enough
+    const thin = { ...row("thin", 1, 1), avg_played_sec_before_failure: 5 };
+    expect(isShortRunner(thin)).toBe(false);
+  });
+
+  it("prefers a direct stream over a proxied one when all else is equal", () => {
+    const direct = s("direct", "192");
+    const proxied = s("proxied", "192");
+    const needsProxy = (url: string) => url === proxied.url;
+
+    expect(rankStreams([proxied, direct], new Map(), { isMobile: false, needsProxy })[0].name).toBe(
+      "direct",
+    );
+    expect(rankStreams([proxied, direct], new Map(), { isMobile: true, needsProxy })[0].name).toBe(
+      "direct",
+    );
+  });
 });
+

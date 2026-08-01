@@ -60,6 +60,9 @@ const RETRY_DELAYS_MS = [1000, 2000, 4000];
 const FAILOVER_COOLDOWN_MS = 60_000;
 const BUFFER_POLL_MS = 2000;
 const MOBILE_SOFT_RESUME_COOLDOWN_MS = 3000;
+// At most one forced hard reload per real interface handover burst.
+const HANDOVER_FORCE_COOLDOWN_MS = 15_000;
+
 const PROGRESS_EPSILON_SEC = 0.2;
 
 // Mobile devices: route audio as plain HTML5 media (no Web Audio, no MSE) so
@@ -78,6 +81,19 @@ const isMobileDevice = (): boolean => {
   return false;
 };
 const IS_MOBILE = isMobileDevice();
+
+// Safari / iOS ship no Ogg Vorbis or Opus decoder for <audio>.
+const isOggUrl = (url: string): boolean => /\.(ogg|opus)(\?|#|$)/i.test(url);
+const IS_OGG_UNSUPPORTED = ((): boolean => {
+  if (typeof document === "undefined") return false;
+  try {
+    const a = document.createElement("audio");
+    return !a.canPlayType("audio/ogg; codecs=vorbis") && !a.canPlayType("audio/ogg; codecs=opus");
+  } catch {
+    return false;
+  }
+})();
+
 
 const playbackUrl = (url: string, cacheBust = false): string => {
   // Mobile background playback is most reliable when the browser owns the
@@ -166,12 +182,15 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const playable = useMemo(
     () =>
       rankStreams(
-        streams.filter((s) => /^https?:\/\//i.test(s.url)),
+        streams.filter(
+          (s) => /^https?:\/\//i.test(s.url) && !(IS_OGG_UNSUPPORTED && isOggUrl(s.url)),
+        ),
         reliabilityMap,
         { isMobile: IS_MOBILE, needsProxy: isMixedContentUrl },
       ),
     [streams, reliabilityMap],
   );
+
 
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -210,6 +229,8 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     effectiveType: null,
   });
   const connectionRecoveryTimerRef = useRef<number | null>(null);
+  const lastForcedHandoverAtRef = useRef(0);
+
 
   const playedSec = useCallback((): number | null => {
     const started = playStartedAtRef.current;
@@ -454,17 +475,37 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       effectiveType: conn.effectiveType ?? null,
     };
 
+    const SLOW_TIERS = new Set(["slow-2g", "2g"]);
+    const tierOf = (e: string | null): string =>
+      e === null ? "unknown" : SLOW_TIERS.has(e) ? "slow" : "fast";
+
     const onChange = () => {
       try {
-        noteConnectionChange();
         const prev = connectionInfoRef.current;
         const nextType = conn?.type ?? null;
         const nextEffective = conn?.effectiveType ?? null;
         const from = prev.type ?? prev.effectiveType ?? "unknown";
         const to = nextType ?? nextEffective ?? "unknown";
         const reason = `${from}->${to}`;
+
+        // Telemetry showed ~93% of change events were same-network jitter
+        // (cellular->cellular / wifi->wifi). Forcing a hard reload on those
+        // tears down a perfectly healthy socket, which is what caused the
+        // mobile drop-outs. Only a real interface change — or a genuine
+        // effectiveType tier crossing when `type` is unavailable — qualifies.
+        const isHandover =
+          nextType !== null && prev.type !== null
+            ? nextType !== prev.type
+            : tierOf(nextEffective) !== tierOf(prev.effectiveType);
+
+        noteConnectionChange(isHandover);
         connectionInfoRef.current = { type: nextType, effectiveType: nextEffective };
-        logPlayback("warn", "connection", `network change ${reason}`, snapshot());
+        logPlayback(
+          "warn",
+          "connection",
+          `network change ${reason} (${isHandover ? "handover" : "same-net flap"})`,
+          snapshot(),
+        );
         telemetry("connection_change", { reason, played_sec: playedSec() });
 
         if (connectionRecoveryTimerRef.current !== null) {
@@ -472,6 +513,28 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           connectionRecoveryTimerRef.current = null;
         }
         if (!shouldPlayRef.current) return;
+
+        const now = Date.now();
+        if (!isHandover) {
+          // Cheap liveness check instead of a reload: if the media clock is
+          // still advancing, the socket survived and there is nothing to do.
+          const a = audioRef.current;
+          if (a) notePlaybackProgress(a);
+          if (now - lastProgressAtRef.current <= getStallTimeoutMs()) {
+            logPlayback("info", "connection", "same-net flap, playback alive — no-op");
+            return;
+          }
+          logPlayback("warn", "connection", "same-net flap with stalled clock — soft recovery");
+          attemptRecoveryRef.current?.({ reason: `net-flap-${reason}` });
+          return;
+        }
+
+        if (now - lastForcedHandoverAtRef.current < HANDOVER_FORCE_COOLDOWN_MS) {
+          logPlayback("info", "connection", "handover within cooldown — skipping forced reload");
+          return;
+        }
+        lastForcedHandoverAtRef.current = now;
+
         // The new interface is often not routable immediately.
         connectionRecoveryTimerRef.current = window.setTimeout(() => {
           connectionRecoveryTimerRef.current = null;
@@ -484,6 +547,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       }
     };
 
+
     conn.addEventListener("change", onChange);
     return () => {
       if (connectionRecoveryTimerRef.current !== null) {
@@ -492,7 +556,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       }
       conn?.removeEventListener?.("change", onChange);
     };
-  }, [playedSec, snapshot, telemetry]);
+  }, [notePlaybackProgress, playedSec, snapshot, telemetry]);
 
 
   // Poll buffered-ahead while playing for UX visibility

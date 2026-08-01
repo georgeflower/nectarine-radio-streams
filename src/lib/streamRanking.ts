@@ -26,8 +26,25 @@ export const reliabilityScore = (row: StreamReliabilityRow | undefined): number 
   return (connects + 1) / (connects + failures + 2);
 };
 
+// A stream that "works" but drops the socket after a few seconds is worse than
+// one that fails outright — the ratio maths alone cannot see that, so look at
+// how long playback actually survived before the failure.
+export const SHORT_RUN_SEC = 60;
+
+export const isShortRunner = (row: StreamReliabilityRow | undefined): boolean => {
+  if (!row) return false;
+  const connects = Number(row.connects) || 0;
+  const failures = Number(row.failures) || 0;
+  if (failures < 2 || connects + failures < 3) return false;
+  const avg = row.avg_played_sec_before_failure;
+  if (avg === null || avg === undefined) return false;
+  const n = Number(avg);
+  return Number.isFinite(n) && n < SHORT_RUN_SEC;
+};
+
 export const isUnreliable = (row: StreamReliabilityRow | undefined): boolean => {
   if (!row) return false;
+  if (isShortRunner(row)) return true;
   const connects = Number(row.connects) || 0;
   const failures = Number(row.failures) || 0;
   if (connects + failures < 5) return false;
@@ -40,11 +57,9 @@ export const rankStreams = (
   opts: { isMobile: boolean; needsProxy: (url: string) => boolean },
 ): StreamSource[] => {
   return [...streams].sort((a, b) => {
-    if (opts.isMobile) {
-      const ap = opts.needsProxy(a.url);
-      const bp = opts.needsProxy(b.url);
-      if (ap !== bp) return ap ? 1 : -1;
-    }
+    const ap = opts.needsProxy(a.url);
+    const bp = opts.needsProxy(b.url);
+    if (opts.isMobile && ap !== bp) return ap ? 1 : -1;
 
     const ar = reliability.get(a.url);
     const br = reliability.get(b.url);
@@ -61,6 +76,12 @@ export const rankStreams = (
     const bbr = Number(rawBitrate(b)) || 0;
     if (abr !== bbr) return bbr - abr;
 
-    return reliabilityScore(br) - reliabilityScore(ar);
+    const rs = reliabilityScore(br) - reliabilityScore(ar);
+    if (rs !== 0) return rs;
+
+    // Final tie-break everywhere: a direct connection beats a proxied hop.
+    if (ap !== bp) return ap ? 1 : -1;
+    return 0;
   });
 };
+

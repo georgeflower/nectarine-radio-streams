@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAudioControlState, subscribeAudioControl } from "@/lib/cracktroUi";
-import { fetchStreamReliability, type StreamReliabilityRow } from "@/lib/streamTelemetry";
-import { isUnreliable, rankStreams, reliabilityScore } from "@/lib/streamRanking";
+import {
+  fetchStreamReliability,
+  getNetChangeCounts,
+  type StreamReliabilityRow,
+} from "@/lib/streamTelemetry";
+import { isShortRunner, isUnreliable, rankStreams, reliabilityScore } from "@/lib/streamRanking";
 import type { StreamSource } from "@/lib/nectarine";
 import {
   DEFAULT_WATCHDOG_CONFIG,
@@ -115,6 +119,8 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
   const [cfg, setCfg] = useState<WatchdogConfig>(getWatchdogConfig());
   const [diag, setDiag] = useState<WatchdogDiagnostics>(getWatchdogDiagnostics());
   const [, force] = useState(0);
+  const netCounts = getNetChangeCounts();
+
 
   useEffect(() => {
     const u1 = subscribeWatchdogConfig(setCfg);
@@ -187,6 +193,10 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
           <div><span className="text-muted-foreground">Last stall:</span> {fmtTime(diag.lastStallAt)}</div>
           <div><span className="text-muted-foreground">Last visibility:</span> {fmtTime(diag.lastVisibilityAt)}</div>
           <div className="truncate"><span className="text-muted-foreground">Last event:</span> {diag.lastEvent ?? "—"}</div>
+          <div>
+            <span className="text-muted-foreground">Net changes:</span> {netCounts.handovers} handover
+            <span className="text-muted-foreground"> · {netCounts.flaps} same-net flap</span>
+          </div>
         </div>
 
         <div className="border-t border-border pt-2 space-y-1">
@@ -246,7 +256,7 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
                     <div className="text-muted-foreground">
                       ok {connects} · fail {failures} · {pct(reliabilityScore(row))} · avg{" "}
                       {avg === null || avg === undefined ? "—" : `${Math.round(Number(avg))}s`}
-                      {bad ? " · unreliable" : ""}
+                      {bad ? (isShortRunner(row) ? " · short-run" : " · unreliable") : ""}
                     </div>
                   </div>
                 );
