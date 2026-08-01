@@ -191,6 +191,10 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
           <div><span className="text-muted-foreground">Last stall:</span> {fmtTime(diag.lastStallAt)}</div>
           <div><span className="text-muted-foreground">Last visibility:</span> {fmtTime(diag.lastVisibilityAt)}</div>
           <div className="truncate"><span className="text-muted-foreground">Last event:</span> {diag.lastEvent ?? "—"}</div>
+          <div>
+            <span className="text-muted-foreground">Net changes:</span> {netCounts.handovers} handover
+            <span className="text-muted-foreground"> · {netCounts.flaps} same-net flap</span>
+          </div>
         </div>
 
         <div className="border-t border-border pt-2 space-y-1">
@@ -250,7 +254,7 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
                     <div className="text-muted-foreground">
                       ok {connects} · fail {failures} · {pct(reliabilityScore(row))} · avg{" "}
                       {avg === null || avg === undefined ? "—" : `${Math.round(Number(avg))}s`}
-                      {bad ? " · unreliable" : ""}
+                      {bad ? (isShortRunner(row) ? " · short-run" : " · unreliable") : ""}
                     </div>
                   </div>
                 );
