@@ -210,6 +210,8 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     effectiveType: null,
   });
   const connectionRecoveryTimerRef = useRef<number | null>(null);
+  const lastForcedHandoverAtRef = useRef(0);
+
 
   const playedSec = useCallback((): number | null => {
     const started = playStartedAtRef.current;

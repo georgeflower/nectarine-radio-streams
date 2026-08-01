@@ -110,15 +110,26 @@ export const getConnectionInfo = (): ConnectionInfo => {
 
 let lastConnectionChangeAt: number | null = null;
 
-export const noteConnectionChange = (): void => {
+// Same-network "flaps" (effectiveType jitter) vastly outnumber real interface
+// handovers on mobile; keeping them apart makes the noise visible in diag.
+const netChangeCounts = { flaps: 0, handovers: 0 };
+
+export const noteConnectionChange = (isHandover = false): void => {
   lastConnectionChangeAt = Date.now();
+  if (isHandover) netChangeCounts.handovers += 1;
+  else netChangeCounts.flaps += 1;
 };
+
+export const getNetChangeCounts = (): { flaps: number; handovers: number } => ({
+  ...netChangeCounts,
+});
 
 export const msSinceConnectionChange = (): number | null => {
   if (lastConnectionChangeAt === null) return null;
   const elapsed = Date.now() - lastConnectionChangeAt;
   return elapsed <= CONNECTION_CHANGE_WINDOW_MS ? elapsed : null;
 };
+
 
 // --- queue + flush ---------------------------------------------------------
 
