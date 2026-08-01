@@ -82,6 +82,19 @@ const isMobileDevice = (): boolean => {
 };
 const IS_MOBILE = isMobileDevice();
 
+// Safari / iOS ship no Ogg Vorbis or Opus decoder for <audio>.
+const isOggUrl = (url: string): boolean => /\.(ogg|opus)(\?|#|$)/i.test(url);
+const IS_OGG_UNSUPPORTED = ((): boolean => {
+  if (typeof document === "undefined") return false;
+  try {
+    const a = document.createElement("audio");
+    return !a.canPlayType("audio/ogg; codecs=vorbis") && !a.canPlayType("audio/ogg; codecs=opus");
+  } catch {
+    return false;
+  }
+})();
+
+
 const playbackUrl = (url: string, cacheBust = false): string => {
   // Mobile background playback is most reliable when the browser owns the
   // original live stream directly. The Supabase proxy is still required on
