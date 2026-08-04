@@ -92,6 +92,23 @@ const PerformanceTipsModal = ({ open, onClose }: Props) => {
           </ul>
         </section>
 
+        <section className="mb-4">
+          <h3 className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1">
+            Stream keeps reconnecting?
+          </h3>
+          <ul className="list-disc pl-5 space-y-1 text-foreground/90">
+            <li>
+              VPNs (including Proton VPN) can reset long-lived audio streams.
+              Try disconnecting the VPN or switching to a direct HTTPS mirror
+              in the stream selector.
+            </li>
+            <li>
+              On mobile, keep the app in the foreground or use the media controls
+              on the lock screen; background audio may be paused by the OS.
+            </li>
+          </ul>
+        </section>
+
         <section>
           <h3 className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1">
             Report issues
