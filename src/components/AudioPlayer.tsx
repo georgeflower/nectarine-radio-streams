@@ -96,11 +96,11 @@ const IS_OGG_UNSUPPORTED = ((): boolean => {
 
 
 const playbackUrl = (url: string, cacheBust = false): string => {
-  // Mobile background playback is most reliable when the browser owns the
-  // original live stream directly. The Supabase proxy is still required on
-  // desktop for CORS/WebAudio/MSE, and on mobile only if HTTPS mixed-content
-  // rules would block an http:// stream.
-  if (IS_MOBILE && !isMixedContentUrl(url)) return url;
+  // Both mobile and desktop can load a direct HTTPS stream. Doing so avoids
+  // an extra proxy hop that VPNs and flaky networks can reset, and it lets the
+  // browser use the origin's CORS headers for Web Audio / MSE. The proxy is
+  // only required for HTTP sources on an HTTPS page (mixed-content blocking).
+  if (!isMixedContentUrl(url)) return url;
   return proxiedUrl(url, cacheBust);
 };
 
