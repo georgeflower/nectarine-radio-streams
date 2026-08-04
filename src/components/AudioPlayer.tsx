@@ -96,11 +96,11 @@ const IS_OGG_UNSUPPORTED = ((): boolean => {
 
 
 const playbackUrl = (url: string, cacheBust = false): string => {
-  // Mobile background playback is most reliable when the browser owns the
-  // original live stream directly. The Supabase proxy is still required on
-  // desktop for CORS/WebAudio/MSE, and on mobile only if HTTPS mixed-content
-  // rules would block an http:// stream.
-  if (IS_MOBILE && !isMixedContentUrl(url)) return url;
+  // Both mobile and desktop can load a direct HTTPS stream. Doing so avoids
+  // an extra proxy hop that VPNs and flaky networks can reset, and it lets the
+  // browser use the origin's CORS headers for Web Audio / MSE. The proxy is
+  // only required for HTTP sources on an HTTPS page (mixed-content blocking).
+  if (!isMixedContentUrl(url)) return url;
   return proxiedUrl(url, cacheBust);
 };
 
@@ -230,6 +230,9 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   });
   const connectionRecoveryTimerRef = useRef<number | null>(null);
   const lastForcedHandoverAtRef = useRef(0);
+  // Track recent MEDIA_ERR_NETWORK (code 2) events per stream so a VPN-induced
+  // reset loop fails over to a different mirror instead of reloading forever.
+  const lastCode2AtRef = useRef<Map<string, number>>(new Map());
 
 
   const playedSec = useCallback((): number | null => {
@@ -1389,6 +1392,39 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           });
           if (shouldPlayRef.current) {
             const code = mediaErr?.code ?? 0;
+            const currentUrl = selectedUrl;
+            // A second NETWORK error (code 2) on the same desktop stream within
+            // the failover cooldown usually means the current path is broken
+            // (e.g. a VPN resetting the socket). Fail the stream and move on
+            // instead of force-reloading the same URL forever.
+            if (code === 2 && !IS_MOBILE && currentUrl) {
+              const lastCode2 = lastCode2AtRef.current.get(currentUrl) ?? 0;
+              if (Date.now() - lastCode2 < FAILOVER_COOLDOWN_MS) {
+                failedStreamsRef.current.set(currentUrl, Date.now());
+                const nextUrl = pickNextStream(currentUrl);
+                if (nextUrl && nextUrl !== currentUrl) {
+                  logPlayback("warn", "media", "desktop code-2 repeated → failover", {
+                    from: currentUrl,
+                    to: nextUrl,
+                  });
+                  telemetry("failover", {
+                    reason: `vpn-code2: ${currentUrl} -> ${nextUrl}`,
+                    played_sec: playedSec(),
+                  });
+                  retryCountRef.current = 0;
+                  setSelectedUrl(nextUrl);
+                  setNowPlaying(null);
+                  setReconnecting(true);
+                  retryTimerRef.current = window.setTimeout(() => {
+                    playUrl(nextUrl, true).catch(() =>
+                      attemptRecovery({ reason: "vpn-code2-failover" }),
+                    );
+                  }, 500);
+                  return;
+                }
+              }
+              lastCode2AtRef.current.set(currentUrl, Date.now());
+            }
             // 2 NETWORK / 3 DECODE / 4 SRC_NOT_SUPPORTED mean the socket is
             // dead (typical of a wifi↔cellular handover) — force a reload.
             // 1 ABORTED is usually just a superseded load.

@@ -59,7 +59,9 @@ export const rankStreams = (
   return [...streams].sort((a, b) => {
     const ap = opts.needsProxy(a.url);
     const bp = opts.needsProxy(b.url);
-    if (opts.isMobile && ap !== bp) return ap ? 1 : -1;
+    // Direct streams beat proxied streams on every platform. A proxy hop is an
+    // extra point of failure and is especially fragile under VPNs.
+    if (ap !== bp) return ap ? 1 : -1;
 
     const ar = reliability.get(a.url);
     const br = reliability.get(b.url);
