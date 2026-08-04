@@ -230,6 +230,9 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   });
   const connectionRecoveryTimerRef = useRef<number | null>(null);
   const lastForcedHandoverAtRef = useRef(0);
+  // Track recent MEDIA_ERR_NETWORK (code 2) events per stream so a VPN-induced
+  // reset loop fails over to a different mirror instead of reloading forever.
+  const lastCode2AtRef = useRef<Map<string, number>>(new Map());
 
 
   const playedSec = useCallback((): number | null => {
