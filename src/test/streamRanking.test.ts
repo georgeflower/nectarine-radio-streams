@@ -101,5 +101,18 @@ describe("streamRanking", () => {
       "direct",
     );
   });
+
+  it("prefers a direct 192 stream over a more reliable proxied 192 stream on desktop", () => {
+    const direct = s("direct", "192");
+    const proxied = s("proxied", "192");
+    const needsProxy = (url: string) => url === proxied.url;
+    const reliability = new Map<string, StreamReliabilityRow>([
+      [direct.url, { ...row(direct.url, 5, 5), avg_played_sec_before_failure: 30 }],
+      [proxied.url, { ...row(proxied.url, 50, 1), avg_played_sec_before_failure: 300 }],
+    ]);
+
+    const ranked = rankStreams([proxied, direct], reliability, { isMobile: false, needsProxy });
+    expect(ranked[0].name).toBe("direct");
+  });
 });
 
