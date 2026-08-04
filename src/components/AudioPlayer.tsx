@@ -1392,6 +1392,39 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           });
           if (shouldPlayRef.current) {
             const code = mediaErr?.code ?? 0;
+            const currentUrl = selectedUrl;
+            // A second NETWORK error (code 2) on the same desktop stream within
+            // the failover cooldown usually means the current path is broken
+            // (e.g. a VPN resetting the socket). Fail the stream and move on
+            // instead of force-reloading the same URL forever.
+            if (code === 2 && !IS_MOBILE && currentUrl) {
+              const lastCode2 = lastCode2AtRef.current.get(currentUrl) ?? 0;
+              if (Date.now() - lastCode2 < FAILOVER_COOLDOWN_MS) {
+                failedStreamsRef.current.set(currentUrl, Date.now());
+                const nextUrl = pickNextStream(currentUrl);
+                if (nextUrl && nextUrl !== currentUrl) {
+                  logPlayback("warn", "media", "desktop code-2 repeated → failover", {
+                    from: currentUrl,
+                    to: nextUrl,
+                  });
+                  telemetry("failover", {
+                    reason: `vpn-code2: ${currentUrl} -> ${nextUrl}`,
+                    played_sec: playedSec(),
+                  });
+                  retryCountRef.current = 0;
+                  setSelectedUrl(nextUrl);
+                  setNowPlaying(null);
+                  setReconnecting(true);
+                  retryTimerRef.current = window.setTimeout(() => {
+                    playUrl(nextUrl, true).catch(() =>
+                      attemptRecovery({ reason: "vpn-code2-failover" }),
+                    );
+                  }, 500);
+                  return;
+                }
+              }
+              lastCode2AtRef.current.set(currentUrl, Date.now());
+            }
             // 2 NETWORK / 3 DECODE / 4 SRC_NOT_SUPPORTED mean the socket is
             // dead (typical of a wifi↔cellular handover) — force a reload.
             // 1 ABORTED is usually just a superseded load.
