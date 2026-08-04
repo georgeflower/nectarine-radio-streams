@@ -1,43 +1,35 @@
-## Fix the recurring desktop stream failures
+## Make playback resilient to VPN-induced connection resets
 
 ### Confirmed diagnosis
 
-- Firefox reports `MediaError` code 2 (`MEDIA_ERR_NETWORK`) after roughly 9–10 seconds while audio is still progressing normally.
-- The active target is the backend `audio-proxy`, even for HTTPS streams that can be loaded directly.
-- Backend logs show the proxy response connection repeatedly closing before completion at the same cadence.
-- Direct checks of both the HTTP MP3 source and the HTTPS MP3 source remained open for the test duration. The HTTPS source also provides CORS, so it can feed the desktop Web Audio analyser without the proxy.
-- The Firefox privacy warning is only Firefox hiding the error-message text; it is not the cause. The meaningful signal is error code 2.
+- The recurring desktop failures were caused by Proton VPN, not the player or the backend proxy.
+- A VPN can reset or fragment long-lived HTTP/2 audio streams, producing `MEDIA_ERR_NETWORK` after roughly 9–10 seconds even though the stream itself is healthy.
+- The current player keeps retrying the same stream indefinitely, so the user hears a reconnect every few seconds while the VPN path keeps breaking.
 
 ## Changes
 
-### 1. Bypass the proxy for secure desktop streams
+### 1. Treat repeated `MEDIA_ERR_NETWORK` as a stream failure on desktop
 
-Update `AudioPlayer.tsx` so HTTPS audio streams are used directly on desktop as well as mobile. Keep the proxy only for HTTP streams that an HTTPS page cannot load because of mixed-content rules.
+In `AudioPlayer.tsx`, when a `MEDIA_ERR_NETWORK` (code 2) fires on desktop and the same URL has already been force-recovered recently, mark that stream as failed for the cooldown period and fail over to the next candidate instead of reloading the same URL again.
 
-This preserves Web Audio visualizer support because the tested HTTPS stream returns `Access-Control-Allow-Origin: *`.
+### 2. Prefer direct HTTPS streams on desktop
 
-### 2. Stop repeatedly reloading a broken proxy path
+Update `playbackUrl` so HTTPS streams are loaded directly on desktop (not routed through the proxy). This gives the VPN one less hop to reset and lets the browser use the origin’s CORS headers for Web Audio. Keep the proxy only for HTTP streams that mixed-content rules block.
 
-When a desktop `MEDIA_ERR_NETWORK` occurs on a proxied stream:
+### 3. Promote direct streams in ranking on desktop
 
-- do not cache-bust and reconnect to the same proxy endpoint indefinitely;
-- mark that stream failed for the existing cooldown and immediately fail over to the best direct HTTPS candidate;
-- retain same-stream forced recovery for genuine network handovers and direct-stream failures.
+In `streamRanking.ts`, prefer a direct (non-proxied) stream over a proxied one on desktop when reliability and bitrate are otherwise equal, matching the existing mobile behaviour.
 
-### 3. Prefer direct desktop streams before proxied streams
+### 4. Add a user-facing hint
 
-Adjust stream ranking so a usable direct HTTPS source ranks ahead of an HTTP source requiring the proxy on desktop, rather than using proxy status only as the final tie-break. Keep reliability and the 192 kbps target within each direct/proxied group.
-
-### 4. Make proxy cancellation non-noisy
-
-In `audio-proxy`, explicitly cancel the upstream response body when the downstream request is aborted. This will not make the function a preferred long-lived audio transport, but it will release resources cleanly when browsers disconnect or users switch streams.
+In `PerformanceTipsModal.tsx`, add a short note that VPNs can interrupt live streams and suggest disconnecting the VPN or switching to a direct HTTPS mirror if reconnects persist.
 
 ### 5. Verification
 
-- Add ranking coverage proving a direct HTTPS 192 kbps source wins over a proxied HTTP 192 kbps source even when the latter has better historical telemetry.
-- Verify Firefox uses a direct HTTPS target, remains playing beyond the prior 5–10 second failure window, and the analyser-driven visuals still receive audio.
-- Verify a proxied-stream code-2 error fails over instead of entering the repeated hard-reload loop.
+- Add ranking tests proving a direct HTTPS 192 kbps source wins over a proxied HTTP 192 kbps source on desktop.
+- Simulate a code-2 loop in unit logic: after two forced recoveries on the same URL, the next recovery should pick a different stream.
+- Confirm the player still uses the proxy for HTTP streams on HTTPS pages and that Web Audio analyser data continues to flow.
 
 ## Expected result
 
-Desktop playback should settle on the HTTPS MP3 stream without recurring proxy disconnects. HTTP mirrors remain selectable as fallbacks, but a proxy failure will move playback to a direct source rather than restarting every few seconds.
+When a VPN resets the current stream, the player will quickly move to a direct HTTPS mirror instead of looping on the broken path. Users without a VPN will also benefit from fewer proxy hops on desktop.
