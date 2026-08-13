@@ -368,6 +368,13 @@ const Index = () => {
     }
   }, [loadEndpoint]);
 
+  const audioPlayingRef = useRef(audioPlaying);
+  useEffect(() => {
+    audioPlayingRef.current = audioPlaying;
+  }, [audioPlaying]);
+
+
+
   useEffect(() => {
     document.title = "Nectarine Demoscene Radio · Compact API View";
     const meta = document.querySelector('meta[name="description"]');
