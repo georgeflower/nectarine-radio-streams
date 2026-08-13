@@ -646,8 +646,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       return;
     }
     if (pauseStartedAtRef.current !== null) {
-      const delta = Date.now() - pauseStartedAtRef.current;
-      if (scrobbleStateRef.current) scrobbleStateRef.current.pausedMs += delta;
+      const s = scrobbleStateRef.current;
+      if (s) {
+        const delta = Math.min(
+          Date.now() - pauseStartedAtRef.current,
+          Date.now() - s.startedAt * 1000,
+        );
+        s.pausedMs += Math.max(0, delta);
+      }
       pauseStartedAtRef.current = null;
     }
   }, [playing]);
@@ -655,7 +661,12 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const effectivePlayedSec = useCallback(
     (state: { startedAt: number; pausedMs: number }) => {
       const openPause =
-        pauseStartedAtRef.current === null ? 0 : Date.now() - pauseStartedAtRef.current;
+        pauseStartedAtRef.current === null
+          ? 0
+          : Math.min(
+              Date.now() - pauseStartedAtRef.current,
+              Date.now() - state.startedAt * 1000,
+            );
       return Math.max(
         0,
         Math.floor((Date.now() - state.startedAt * 1000 - state.pausedMs - openPause) / 1000),
@@ -687,8 +698,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       track,
       pausedMs: 0,
     };
-    void sendNowPlaying(artist, track);
-  }, [currentTrack, currentSongId, effectivePlayedSec]);
+    if (playing) {
+      void sendNowPlaying(artist, track);
+    }
+  }, [currentTrack, currentSongId, effectivePlayedSec, playing]);
 
   useEffect(() => {
     if (!playing) return;
