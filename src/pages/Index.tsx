@@ -5,6 +5,7 @@ import {
   ENDPOINTS,
   artistUrl,
   computeTimeLeft,
+  timeLeftMs,
   fetchEndpoint,
   formatDuration,
   formatOnelinerTime,
@@ -29,7 +30,6 @@ import Cracktro from "@/components/Cracktro";
 import ChangelogModal, { APP_VERSION } from "@/components/ChangelogModal";
 import WhatsNewPopup from "@/components/WhatsNewPopup";
 import Flag from "@/components/Flag";
-import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 
@@ -212,7 +212,7 @@ const Index = () => {
   const [perfTipsOpen, setPerfTipsOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
-  const [seekCount, setSeekCount] = useState(0);
+  const [audioPlaying, setAudioPlaying] = useState(false);
   const [firefoxWarnDismissed, setFirefoxWarnDismissed] = useState(() => {
     try { return localStorage.getItem("nectarine-firefox-warn") === "1"; } catch { return false; }
   });
@@ -357,6 +357,30 @@ const Index = () => {
     }
   }, [loadEndpoint]);
 
+  // Lightweight poll: only the queue endpoint (now/queue/history), no status churn.
+  const nowPlayingInFlight = useRef(false);
+  const refreshNowPlaying = useCallback(async () => {
+    if (nowPlayingInFlight.current) return;
+    nowPlayingInFlight.current = true;
+    try {
+      await loadEndpoint("queue");
+    } finally {
+      nowPlayingInFlight.current = false;
+    }
+  }, [loadEndpoint]);
+
+  const playlistRef = useRef(playlist);
+  useEffect(() => {
+    playlistRef.current = playlist;
+  }, [playlist]);
+
+  const audioPlayingRef = useRef(audioPlaying);
+  useEffect(() => {
+    audioPlayingRef.current = audioPlaying;
+  }, [audioPlaying]);
+
+
+
   useEffect(() => {
     document.title = "Nectarine Demoscene Radio · Compact API View";
     const meta = document.querySelector('meta[name="description"]');
@@ -368,9 +392,13 @@ const Index = () => {
     }
     refreshAll();
     const id = window.setInterval(() => {
-      // Skip polling while the tab is hidden — nobody is looking at the panels.
-      if (document.hidden) return;
-      void refreshAll();
+      if (!document.hidden) {
+        void refreshAll();
+        return;
+      }
+      // Hidden: keep metadata (MediaSession + scrobbler) alive with one request
+      // while audio is playing; otherwise poll nothing at all.
+      if (audioPlayingRef.current) void refreshNowPlaying();
     }, AUTO_REFRESH_INTERVAL_MS);
     const onVisible = () => {
       if (!document.hidden) void refreshAll();
@@ -380,12 +408,44 @@ const Index = () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refreshAll]);
+  }, [refreshAll, refreshNowPlaying]);
 
   const now = playlist.now;
-  const trackKey = now
-    ? `${now.artist ?? ""}||${now.song ?? ""}||${now.playstart ?? ""}||${seekCount}`
-    : `seek-${seekCount}`;
+
+  // Schedule a refresh for the moment the current track is due to end so the
+  // metadata pipeline updates instantly instead of waiting out the interval.
+  const nowKey = now ? now.songId || `${now.artist}||${now.song}` : "";
+  const nowPlaystart = now?.playstart ?? "";
+  const nowLength = now?.lengthSec ?? 0;
+  useEffect(() => {
+    if (!nowKey) return;
+    const left = timeLeftMs(nowPlaystart, nowLength);
+    if (left === null || left > 30 * 60 * 1000) return;
+
+    let timer: number | null = null;
+    let attempts = 0;
+
+    const currentKey = () => {
+      const n = playlistRef.current.now;
+      return n ? n.songId || `${n.artist}||${n.song}` : "";
+    };
+
+    const run = async () => {
+      timer = null;
+      await refreshNowPlaying();
+      if (currentKey() === nowKey && attempts < 3) {
+        attempts += 1;
+        timer = window.setTimeout(() => void run(), 3000);
+      }
+    };
+
+    timer = window.setTimeout(() => void run(), Math.max(left, 0) + 1500);
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [nowKey, nowPlaystart, nowLength, refreshNowPlaying]);
+
+
 
 
   return (
@@ -584,7 +644,7 @@ const Index = () => {
             currentTrack={now}
             currentSongId={now?.songId}
             onAnalyserReady={setAnalyser}
-            onSeek={() => setSeekCount((c) => c + 1)}
+            onPlayingChange={setAudioPlaying}
           />
         </div>
 
