@@ -646,8 +646,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       return;
     }
     if (pauseStartedAtRef.current !== null) {
-      const delta = Date.now() - pauseStartedAtRef.current;
-      if (scrobbleStateRef.current) scrobbleStateRef.current.pausedMs += delta;
+      const s = scrobbleStateRef.current;
+      if (s) {
+        const delta = Math.min(
+          Date.now() - pauseStartedAtRef.current,
+          Date.now() - s.startedAt * 1000,
+        );
+        s.pausedMs += Math.max(0, delta);
+      }
       pauseStartedAtRef.current = null;
     }
   }, [playing]);
