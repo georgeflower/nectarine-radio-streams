@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.5";
+export const APP_VERSION = "0.7.6";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,17 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.6",
+    date: "2026-08-13",
+    changes: [
+      "Fixed frozen track title and artist on car Bluetooth displays: metadata polling now continues while audio plays in the background instead of stopping when the app is hidden",
+      "Fixed background listening only scrobbling one track per session, caused by the same paused-polling bug",
+      "Track changes now update instantly — a refresh is scheduled for the moment the current track is due to end, rather than waiting out the 30-second interval",
+      "Background polling while hidden is now a single lightweight request instead of four, and stops entirely when playback is paused",
+      "Removed unused seek-tracking state and a leftover unused import",
+    ],
+  },
   {
     version: "0.7.5",
     date: "2026-08-13",
