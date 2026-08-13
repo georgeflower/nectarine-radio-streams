@@ -245,13 +245,20 @@ export function formatDuration(sec: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+/** Raw remaining milliseconds for the current track. May be negative when overdue.
+ *  Returns null when playstart is missing/unparseable or lengthSec is missing. */
+export function timeLeftMs(playstart: string, lengthSec: number): number | null {
+  if (!playstart || !lengthSec) return null;
+  const start = Date.parse(playstart);
+  if (!Number.isFinite(start)) return null;
+  return start + lengthSec * 1000 - Date.now();
+}
+
 export function computeTimeLeft(playstart: string, lengthSec: number): string {
   if (!playstart || !lengthSec) return "-";
-  const start = Date.parse(playstart);
-  if (!Number.isFinite(start)) return formatDuration(lengthSec);
-  const endMs = start + lengthSec * 1000;
-  const remaining = Math.max(0, Math.round((endMs - Date.now()) / 1000));
-  return formatDuration(remaining);
+  const ms = timeLeftMs(playstart, lengthSec);
+  if (ms === null) return formatDuration(lengthSec);
+  return formatDuration(Math.max(0, Math.round(ms / 1000)));
 }
 
 export function formatOnelinerTime(raw?: string) {
