@@ -1472,7 +1472,19 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
               ready_state: el?.readyState ?? null,
             });
           }
-          if (reconnectingRef.current) {
+          if (stablePlaybackTimerRef.current !== null) {
+            window.clearTimeout(stablePlaybackTimerRef.current);
+            stablePlaybackTimerRef.current = null;
+          }
+          stablePlaybackTimerRef.current = window.setTimeout(() => {
+            stablePlaybackTimerRef.current = null;
+            const audio = audioRef.current;
+            if (shouldPlayRef.current && audio && !audio.paused) {
+              retryCountRef.current = 0;
+            }
+          }, 10_000);
+          if (wasReconnectingRef.current || reconnectingRef.current) {
+            wasReconnectingRef.current = false;
             reconnectingRef.current = false;
             telemetry("recovered", {
               reason: lastRecoveryReasonRef.current ?? "unknown",
