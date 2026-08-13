@@ -43,7 +43,6 @@ type Props = {
   currentTrack?: { artist: string; song: string } | null;
   currentSongId?: string;
   onAnalyserReady?: (analyser: AnalyserNode) => void;
-  onSeek?: () => void;
   onPlayingChange?: (playing: boolean) => void;
 };
 
@@ -151,7 +150,7 @@ const sizedArtworkUrl = (url: string, size: number): string => {
 };
 
 
-const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, onSeek, onPlayingChange }: Props) => {
+const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, onPlayingChange }: Props) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -198,6 +197,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
+
+  useEffect(() => {
+    onPlayingChange?.(playing);
+  }, [playing, onPlayingChange]);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<NowPlayingTrack | null>(null);
@@ -1558,9 +1561,6 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
             window.clearTimeout(stallTimerRef.current);
             stallTimerRef.current = null;
           }
-        }}
-        onSeeked={() => {
-          onSeek?.();
         }}
         onTimeUpdate={(e) => {
           const el = e.currentTarget;

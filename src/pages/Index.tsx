@@ -29,7 +29,6 @@ import Cracktro from "@/components/Cracktro";
 import ChangelogModal, { APP_VERSION } from "@/components/ChangelogModal";
 import WhatsNewPopup from "@/components/WhatsNewPopup";
 import Flag from "@/components/Flag";
-import { renderWithSmileys } from "@/lib/smileys";
 import { renderBBCode } from "@/lib/bbcode";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 
@@ -212,7 +211,7 @@ const Index = () => {
   const [perfTipsOpen, setPerfTipsOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
-  const [seekCount, setSeekCount] = useState(0);
+  const [audioPlaying, setAudioPlaying] = useState(false);
   const [firefoxWarnDismissed, setFirefoxWarnDismissed] = useState(() => {
     try { return localStorage.getItem("nectarine-firefox-warn") === "1"; } catch { return false; }
   });
@@ -357,6 +356,18 @@ const Index = () => {
     }
   }, [loadEndpoint]);
 
+  // Lightweight poll: only the queue endpoint (now/queue/history), no status churn.
+  const nowPlayingInFlight = useRef(false);
+  const refreshNowPlaying = useCallback(async () => {
+    if (nowPlayingInFlight.current) return;
+    nowPlayingInFlight.current = true;
+    try {
+      await loadEndpoint("queue");
+    } finally {
+      nowPlayingInFlight.current = false;
+    }
+  }, [loadEndpoint]);
+
   useEffect(() => {
     document.title = "Nectarine Demoscene Radio · Compact API View";
     const meta = document.querySelector('meta[name="description"]');
@@ -368,9 +379,13 @@ const Index = () => {
     }
     refreshAll();
     const id = window.setInterval(() => {
-      // Skip polling while the tab is hidden — nobody is looking at the panels.
-      if (document.hidden) return;
-      void refreshAll();
+      if (!document.hidden) {
+        void refreshAll();
+        return;
+      }
+      // Hidden: keep metadata (MediaSession + scrobbler) alive with one request
+      // while audio is playing; otherwise poll nothing at all.
+      if (audioPlayingRef.current) void refreshNowPlaying();
     }, AUTO_REFRESH_INTERVAL_MS);
     const onVisible = () => {
       if (!document.hidden) void refreshAll();
@@ -380,12 +395,9 @@ const Index = () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refreshAll]);
+  }, [refreshAll, refreshNowPlaying]);
 
   const now = playlist.now;
-  const trackKey = now
-    ? `${now.artist ?? ""}||${now.song ?? ""}||${now.playstart ?? ""}||${seekCount}`
-    : `seek-${seekCount}`;
 
 
   return (
@@ -584,7 +596,7 @@ const Index = () => {
             currentTrack={now}
             currentSongId={now?.songId}
             onAnalyserReady={setAnalyser}
-            onSeek={() => setSeekCount((c) => c + 1)}
+            onPlayingChange={setAudioPlaying}
           />
         </div>
 
