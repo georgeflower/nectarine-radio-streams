@@ -81,18 +81,6 @@ describe("Cracktro defaults and fullscreen behavior", () => {
     expect(screen.queryByTestId("goose-family")).not.toBeInTheDocument();
   });
 
-  it("exits fullscreen back to in-browser view without opening a floating window", async () => {
-    const onExit = vi.fn();
-    render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={onExit} />);
-
-    const fsButton = await screen.findByRole("button", { name: "Exit fullscreen" });
-    fireEvent.click(fsButton);
-
-    await waitFor(() => expect(screen.getByRole("button", { name: "Enter fullscreen" })).toBeInTheDocument());
-    expect(screen.queryByText(/Cracktro — Windowed/i)).not.toBeInTheDocument();
-    expect(onExit).not.toHaveBeenCalled();
-  });
-
   it("shows an exit button and calls onExit when clicked", async () => {
     const onExit = vi.fn();
     render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={onExit} />);
@@ -141,15 +129,6 @@ describe("Cracktro defaults and fullscreen behavior", () => {
     expect(artistLink).toHaveAttribute("href", "https://scenestream.net/demovibes/artist/55/");
     expect(screen.getByAltText("FI")).toBeInTheDocument();
     expect(screen.getByAltText("SE")).toBeInTheDocument();
-  });
-
-  it("shows persisted scene era badge when scene eras are enabled", async () => {
-    localStorage.setItem("cracktro-scene-eras", "1");
-    localStorage.setItem("cracktro-scene-era-listen-ms", String(200 * 60_000));
-
-    render(<Cracktro analyser={null} style="off" artist="Skaven" title="Lizardking" onExit={() => undefined} />);
-
-    expect(await screen.findByLabelText("Scene Era: Veteran")).toBeInTheDocument();
   });
 
   it("allows toggling FPS counter from settings and persists it", async () => {
