@@ -289,6 +289,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     return () => {
       if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current);
       if (stallTimerRef.current !== null) window.clearTimeout(stallTimerRef.current);
+      if (stablePlaybackTimerRef.current !== null) window.clearTimeout(stablePlaybackTimerRef.current);
       if (bufferedStreamRef.current) {
         bufferedStreamRef.current.cleanup();
         bufferedStreamRef.current = null;
