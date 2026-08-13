@@ -1035,6 +1035,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     shouldPlayRef.current = false;
     clearTimers();
     setReconnecting(false);
+    wasReconnectingRef.current = false;
     if (bufferedStreamRef.current) {
       bufferedStreamRef.current.cleanup();
       bufferedStreamRef.current = null;
