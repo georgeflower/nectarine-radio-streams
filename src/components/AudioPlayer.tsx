@@ -698,8 +698,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       track,
       pausedMs: 0,
     };
-    void sendNowPlaying(artist, track);
-  }, [currentTrack, currentSongId, effectivePlayedSec]);
+    if (playing) {
+      void sendNowPlaying(artist, track);
+    }
+  }, [currentTrack, currentSongId, effectivePlayedSec, playing]);
 
   useEffect(() => {
     if (!playing) return;
