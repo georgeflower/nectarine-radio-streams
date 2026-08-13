@@ -170,6 +170,16 @@ const usePersistedBool = (key: string, initial: boolean): [boolean, React.Dispat
   return [value, setValue];
 };
 
+/** Owns its own 1s tick so only this node re-renders each second. */
+const TimeLeft = ({ playstart, lengthSec }: { playstart?: string | null; lengthSec?: number | null }) => {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  return <>{computeTimeLeft(playstart, lengthSec)}</>;
+};
+
 const Index = () => {
   const [playlist, setPlaylist] = useState<PlaylistData>(EMPTY_PLAYLIST);
   const [oneliners, setOneliners] = useState<OnelinerEntry[]>([]);
@@ -626,7 +636,7 @@ const Index = () => {
                       Length: <span className="text-foreground">{formatDuration(now.lengthSec)}</span>
                     </p>
                     <p className="text-sm">
-                      Time Left: <span className="text-foreground">{timeLeft}</span>
+                      Time Left: <span className="text-foreground"><TimeLeft playstart={now.playstart} lengthSec={now.lengthSec} /></span>
                     </p>
                   </>
                 ) : (
