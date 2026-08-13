@@ -44,6 +44,7 @@ type Props = {
   currentSongId?: string;
   onAnalyserReady?: (analyser: AnalyserNode) => void;
   onSeek?: () => void;
+  onPlayingChange?: (playing: boolean) => void;
 };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
@@ -150,7 +151,7 @@ const sizedArtworkUrl = (url: string, size: number): string => {
 };
 
 
-const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, onSeek }: Props) => {
+const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, onSeek, onPlayingChange }: Props) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
