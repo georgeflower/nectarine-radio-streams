@@ -406,6 +406,41 @@ const Index = () => {
 
   const now = playlist.now;
 
+  // Schedule a refresh for the moment the current track is due to end so the
+  // metadata pipeline updates instantly instead of waiting out the interval.
+  const nowKey = now ? now.songId || `${now.artist}||${now.song}` : "";
+  const nowPlaystart = now?.playstart ?? "";
+  const nowLength = now?.lengthSec ?? 0;
+  useEffect(() => {
+    if (!nowKey) return;
+    const left = timeLeftMs(nowPlaystart, nowLength);
+    if (left === null || left > 30 * 60 * 1000) return;
+
+    let timer: number | null = null;
+    let attempts = 0;
+
+    const currentKey = () => {
+      const n = playlistRef.current.now;
+      return n ? n.songId || `${n.artist}||${n.song}` : "";
+    };
+
+    const run = async () => {
+      timer = null;
+      await refreshNowPlaying();
+      if (currentKey() === nowKey && attempts < 3) {
+        attempts += 1;
+        timer = window.setTimeout(() => void run(), 3000);
+      }
+    };
+
+    timer = window.setTimeout(() => void run(), Math.max(left, 0) + 1500);
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [nowKey, nowPlaystart, nowLength, refreshNowPlaying]);
+
+
+
 
   return (
     <div className="crt min-h-screen relative overflow-x-hidden">
