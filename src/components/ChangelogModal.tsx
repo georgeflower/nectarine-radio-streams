@@ -10,6 +10,18 @@ interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.7.5",
+    date: "2026-08-13",
+    changes: [
+      "Made playback resilient to VPN-induced connection resets: direct HTTPS streams on desktop bypass the proxy, repeated MEDIA_ERR_NETWORK errors trigger failover, and direct streams rank higher",
+      "Last.fm scrobbling reliability fixes: the API key is now served from the edge function, paused time is excluded from scrobble duration, and the final track of a session is scrobbled on page close",
+      "Stopped scrobbling tracks that were never actually heard, and guarded now-playing updates so they only fire while audio is running",
+      "Isolated the one-second 'Time Left' countdown so it no longer re-renders the entire page every second",
+      "XML refresh now pauses while the tab is hidden and resumes immediately when the tab becomes visible",
+      "Removed unused react-router dependency and cleaned up stale scene-era persistence and tests",
+    ],
+  },
+  {
     version: "0.7.4",
     date: "2026-07-31",
     changes: [
