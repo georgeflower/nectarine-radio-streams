@@ -493,11 +493,12 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         const to = nextType ?? nextEffective ?? "unknown";
         const reason = `${from}->${to}`;
 
-        // Telemetry showed ~93% of change events were same-network jitter
+        // Telemetry showed ~86% of change events were same-network jitter
         // (cellular->cellular / wifi->wifi). Forcing a hard reload on those
         // tears down a perfectly healthy socket, which is what caused the
-        // mobile drop-outs. Only a real interface change — or a genuine
-        // effectiveType tier crossing when `type` is unavailable — qualifies.
+        // mobile drop-outs. The reload gate below requires a real interface
+        // switch (both old and new `type` are known and differ), not just a
+        // bandwidth estimate change.
         const isHandover =
           nextType !== null && prev.type !== null
             ? nextType !== prev.type
@@ -519,21 +520,21 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }
         if (!shouldPlayRef.current) return;
 
-        const now = Date.now();
-        if (!isHandover) {
-          // Cheap liveness check instead of a reload: if the media clock is
-          // still advancing, the socket survived and there is nothing to do.
-          const a = audioRef.current;
-          if (a) notePlaybackProgress(a);
-          if (now - lastProgressAtRef.current <= getStallTimeoutMs()) {
-            logPlayback("info", "connection", "same-net flap, playback alive — no-op");
-            return;
-          }
-          logPlayback("warn", "connection", "same-net flap with stalled clock — soft recovery");
-          attemptRecoveryRef.current?.({ reason: `net-flap-${reason}` });
+        const prevType = prev.type;
+        const shouldForceReload =
+          prevType !== null &&
+          prevType !== "" &&
+          nextType !== null &&
+          nextType !== "" &&
+          prevType !== nextType &&
+          nextType !== "none";
+
+        if (!shouldForceReload) {
+          logPlayback("info", "connection", "same-interface change, no reload", { reason });
           return;
         }
 
+        const now = Date.now();
         if (now - lastForcedHandoverAtRef.current < HANDOVER_FORCE_COOLDOWN_MS) {
           logPlayback("info", "connection", "handover within cooldown — skipping forced reload");
           return;
