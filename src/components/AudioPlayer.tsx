@@ -764,6 +764,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
 
       currentTargetRef.current = target;
       connectOkSentRef.current = false;
+      if (stablePlaybackTimerRef.current !== null) {
+        window.clearTimeout(stablePlaybackTimerRef.current);
+        stablePlaybackTimerRef.current = null;
+      }
       loadingRef.current = true;
       lastLoadAtRef.current = Date.now();
 
