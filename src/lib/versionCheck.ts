@@ -13,8 +13,6 @@ declare const __BUILD_ID__: string;
 export const CURRENT_BUILD_ID: string =
   typeof __BUILD_ID__ !== "undefined" ? __BUILD_ID__ : "dev";
 
-const KEY_LAST_SEEN = "nectarine-build-id";
-
 export type VersionCheckResult = {
   current: string;
   server: string | null;
@@ -64,9 +62,6 @@ export async function checkForNewVersion(): Promise<VersionCheckResult> {
   const clientFp = await getClientFingerprint();
   const current = clientFp ?? CURRENT_BUILD_ID;
   const stale = server !== null && current !== null && server !== current;
-  if (server) {
-    try { localStorage.setItem(KEY_LAST_SEEN, server); } catch { /* ignore */ }
-  }
   return { current, server, stale };
 }
 
