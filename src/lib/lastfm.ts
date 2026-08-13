@@ -102,7 +102,7 @@ export async function exchangeToken(token: string): Promise<LastfmAuthResult> {
   }
 }
 
-async function callScrobble(body: Record<string, unknown>) {
+async function callScrobble(body: Record<string, unknown>, keepalive = false) {
   if (!current) return null;
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/lastfm-scrobble`, {
@@ -113,6 +113,7 @@ async function callScrobble(body: Record<string, unknown>) {
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       },
       body: JSON.stringify({ ...body, sessionKey: current.sessionKey }),
+      keepalive,
     });
     return await res.json();
   } catch (e) {
@@ -126,10 +127,20 @@ export function sendNowPlaying(artist: string, track: string, duration?: number)
   return callScrobble({ action: "nowplaying", artist, track, duration });
 }
 
-export function sendScrobble(artist: string, track: string, timestamp: number, duration?: number) {
+export function sendScrobble(
+  artist: string,
+  track: string,
+  timestamp: number,
+  duration?: number,
+  opts?: { keepalive?: boolean },
+) {
   if (!current) return;
-  return callScrobble({ action: "scrobble", artist, track, timestamp, duration });
+  return callScrobble(
+    { action: "scrobble", artist, track, timestamp, duration },
+    opts?.keepalive ?? false,
+  );
 }
+
 
 export function useLastfm() {
   const [session, setSession] = useState<LastfmSession | null>(current);

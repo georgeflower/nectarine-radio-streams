@@ -47,7 +47,15 @@ Deno.serve(async (req) => {
   const meta = { apiKey: keyMeta(API_KEY), apiSecret: keyMeta(API_SECRET) };
 
   try {
-    const { token, diag } = await req.json().catch(() => ({}));
+    const { token, diag, config } = await req.json().catch(() => ({}));
+
+    // Public config: the Last.fm API key is public by design (it appears in
+    // the browser auth URL). The secret is never returned.
+    if (config === true) {
+      return new Response(JSON.stringify({ apiKey: API_KEY }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Diagnostic ping: returns config metadata (no secrets leaked) so the
     // client can verify the edge function has matching credentials loaded.
@@ -56,6 +64,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     if (!token || typeof token !== "string") {
       return new Response(JSON.stringify({ error: "missing token", meta }), {
