@@ -230,6 +230,8 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   });
   const connectionRecoveryTimerRef = useRef<number | null>(null);
   const lastForcedHandoverAtRef = useRef(0);
+  const stablePlaybackTimerRef = useRef<number | null>(null);
+  const wasReconnectingRef = useRef(false);
   // Track recent MEDIA_ERR_NETWORK (code 2) events per stream so a VPN-induced
   // reset loop fails over to a different mirror instead of reloading forever.
   const lastCode2AtRef = useRef<Map<string, number>>(new Map());
@@ -287,6 +289,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     return () => {
       if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current);
       if (stallTimerRef.current !== null) window.clearTimeout(stallTimerRef.current);
+      if (stablePlaybackTimerRef.current !== null) window.clearTimeout(stablePlaybackTimerRef.current);
       if (bufferedStreamRef.current) {
         bufferedStreamRef.current.cleanup();
         bufferedStreamRef.current = null;
@@ -491,11 +494,12 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         const to = nextType ?? nextEffective ?? "unknown";
         const reason = `${from}->${to}`;
 
-        // Telemetry showed ~93% of change events were same-network jitter
+        // Telemetry showed ~86% of change events were same-network jitter
         // (cellular->cellular / wifi->wifi). Forcing a hard reload on those
         // tears down a perfectly healthy socket, which is what caused the
-        // mobile drop-outs. Only a real interface change — or a genuine
-        // effectiveType tier crossing when `type` is unavailable — qualifies.
+        // mobile drop-outs. The reload gate below requires a real interface
+        // switch (both old and new `type` are known and differ), not just a
+        // bandwidth estimate change.
         const isHandover =
           nextType !== null && prev.type !== null
             ? nextType !== prev.type
@@ -517,21 +521,21 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }
         if (!shouldPlayRef.current) return;
 
-        const now = Date.now();
-        if (!isHandover) {
-          // Cheap liveness check instead of a reload: if the media clock is
-          // still advancing, the socket survived and there is nothing to do.
-          const a = audioRef.current;
-          if (a) notePlaybackProgress(a);
-          if (now - lastProgressAtRef.current <= getStallTimeoutMs()) {
-            logPlayback("info", "connection", "same-net flap, playback alive — no-op");
-            return;
-          }
-          logPlayback("warn", "connection", "same-net flap with stalled clock — soft recovery");
-          attemptRecoveryRef.current?.({ reason: `net-flap-${reason}` });
+        const prevType = prev.type;
+        const shouldForceReload =
+          prevType !== null &&
+          prevType !== "" &&
+          nextType !== null &&
+          nextType !== "" &&
+          prevType !== nextType &&
+          nextType !== "none";
+
+        if (!shouldForceReload) {
+          logPlayback("info", "connection", "same-interface change, no reload", { reason });
           return;
         }
 
+        const now = Date.now();
         if (now - lastForcedHandoverAtRef.current < HANDOVER_FORCE_COOLDOWN_MS) {
           logPlayback("info", "connection", "handover within cooldown — skipping forced reload");
           return;
@@ -719,6 +723,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       window.clearTimeout(stallTimerRef.current);
       stallTimerRef.current = null;
     }
+    if (stablePlaybackTimerRef.current !== null) {
+      window.clearTimeout(stablePlaybackTimerRef.current);
+      stablePlaybackTimerRef.current = null;
+    }
   }, []);
 
   const playUrl = useCallback(
@@ -756,6 +764,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
 
       currentTargetRef.current = target;
       connectOkSentRef.current = false;
+      if (stablePlaybackTimerRef.current !== null) {
+        window.clearTimeout(stablePlaybackTimerRef.current);
+        stablePlaybackTimerRef.current = null;
+      }
       loadingRef.current = true;
       lastLoadAtRef.current = Date.now();
 
@@ -1013,6 +1025,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     shouldPlayRef.current = false;
     clearTimers();
     setReconnecting(false);
+    wasReconnectingRef.current = false;
     const a = audioRef.current;
     if (!a) return;
     a.pause();
@@ -1022,6 +1035,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     shouldPlayRef.current = false;
     clearTimers();
     setReconnecting(false);
+    wasReconnectingRef.current = false;
     if (bufferedStreamRef.current) {
       bufferedStreamRef.current.cleanup();
       bufferedStreamRef.current = null;
@@ -1349,9 +1363,9 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         onPlay={() => {
           logPlayback("info", "media", "onPlay", snapshot());
           setPlaying(true);
+          if (reconnectingRef.current) wasReconnectingRef.current = true;
           setReconnecting(false);
           markPlaybackAlive();
-          retryCountRef.current = 0;
           if (stallTimerRef.current !== null) {
             window.clearTimeout(stallTimerRef.current);
             stallTimerRef.current = null;
@@ -1458,7 +1472,19 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
               ready_state: el?.readyState ?? null,
             });
           }
-          if (reconnectingRef.current) {
+          if (stablePlaybackTimerRef.current !== null) {
+            window.clearTimeout(stablePlaybackTimerRef.current);
+            stablePlaybackTimerRef.current = null;
+          }
+          stablePlaybackTimerRef.current = window.setTimeout(() => {
+            stablePlaybackTimerRef.current = null;
+            const audio = audioRef.current;
+            if (shouldPlayRef.current && audio && !audio.paused) {
+              retryCountRef.current = 0;
+            }
+          }, 10_000);
+          if (wasReconnectingRef.current || reconnectingRef.current) {
+            wasReconnectingRef.current = false;
             reconnectingRef.current = false;
             telemetry("recovered", {
               reason: lastRecoveryReasonRef.current ?? "unknown",
