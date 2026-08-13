@@ -184,7 +184,7 @@ const Index = () => {
   const [historyOpen, setHistoryOpen] = usePersistedBool("nectarine-history-open", true);
   const [nowOpen, setNowOpen] = usePersistedBool("nectarine-now-open", true);
   const [queueOpen, setQueueOpen] = usePersistedBool("nectarine-queue-open", true);
-  const [tick, setTick] = useState(0);
+  
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [vizStyle, setVizStyle] = useState<VisualizerStyle>(() => {
     try {
@@ -357,21 +357,26 @@ const Index = () => {
       );
     }
     refreshAll();
-    const id = window.setInterval(refreshAll, AUTO_REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(id);
+    const id = window.setInterval(() => {
+      // Skip polling while the tab is hidden — nobody is looking at the panels.
+      if (document.hidden) return;
+      void refreshAll();
+    }, AUTO_REFRESH_INTERVAL_MS);
+    const onVisible = () => {
+      if (!document.hidden) void refreshAll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [refreshAll]);
 
-  useEffect(() => {
-    const id = window.setInterval(() => setTick((t) => t + 1), 1000);
-    return () => window.clearInterval(id);
-  }, []);
-
   const now = playlist.now;
-  const timeLeft = now ? computeTimeLeft(now.playstart, now.lengthSec) : "-";
   const trackKey = now
     ? `${now.artist ?? ""}||${now.song ?? ""}||${now.playstart ?? ""}||${seekCount}`
     : `seek-${seekCount}`;
-  void tick;
+
 
   return (
     <div className="crt min-h-screen relative overflow-x-hidden">
