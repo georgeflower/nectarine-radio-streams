@@ -36,10 +36,39 @@ export function setLastfmSession(s: LastfmSession | null) {
   emit();
 }
 
-export function lastfmLoginUrl(): string {
-  const cb = encodeURIComponent(window.location.origin + window.location.pathname);
-  return `https://www.last.fm/api/auth/?api_key=${LASTFM_API_KEY}&cb=${cb}`;
+let cachedApiKey: string | null = null;
+
+/** Fetch the API key from the edge function so the auth URL and the
+ *  server-side signed calls can never diverge. Falls back to the
+ *  hardcoded publishable constant on any error. */
+async function getApiKey(): Promise<string> {
+  if (cachedApiKey) return cachedApiKey;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/lastfm-auth`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ config: true }),
+    });
+    const data = await res.json();
+    if (typeof data?.apiKey === "string" && data.apiKey.length > 0) {
+      cachedApiKey = data.apiKey;
+      return cachedApiKey;
+    }
+  } catch { /* fall through */ }
+  cachedApiKey = LASTFM_API_KEY;
+  return cachedApiKey;
 }
+
+export async function lastfmLoginUrl(): Promise<string> {
+  const apiKey = await getApiKey();
+  const cb = encodeURIComponent(window.location.origin + window.location.pathname);
+  return `https://www.last.fm/api/auth/?api_key=${apiKey}&cb=${cb}`;
+}
+
 
 export type LastfmAuthResult =
   | { ok: true; session: LastfmSession }
@@ -102,7 +131,7 @@ export async function exchangeToken(token: string): Promise<LastfmAuthResult> {
   }
 }
 
-async function callScrobble(body: Record<string, unknown>) {
+async function callScrobble(body: Record<string, unknown>, keepalive = false) {
   if (!current) return null;
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/lastfm-scrobble`, {
@@ -113,6 +142,7 @@ async function callScrobble(body: Record<string, unknown>) {
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       },
       body: JSON.stringify({ ...body, sessionKey: current.sessionKey }),
+      keepalive,
     });
     return await res.json();
   } catch (e) {
@@ -126,10 +156,20 @@ export function sendNowPlaying(artist: string, track: string, duration?: number)
   return callScrobble({ action: "nowplaying", artist, track, duration });
 }
 
-export function sendScrobble(artist: string, track: string, timestamp: number, duration?: number) {
+export function sendScrobble(
+  artist: string,
+  track: string,
+  timestamp: number,
+  duration?: number,
+  opts?: { keepalive?: boolean },
+) {
   if (!current) return;
-  return callScrobble({ action: "scrobble", artist, track, timestamp, duration });
+  return callScrobble(
+    { action: "scrobble", artist, track, timestamp, duration },
+    opts?.keepalive ?? false,
+  );
 }
+
 
 export function useLastfm() {
   const [session, setSession] = useState<LastfmSession | null>(current);
@@ -139,8 +179,11 @@ export function useLastfm() {
     return () => { listeners.delete(l); };
   }, []);
   const login = useCallback(() => {
-    window.location.href = lastfmLoginUrl();
+    void (async () => {
+      window.location.href = await lastfmLoginUrl();
+    })();
   }, []);
+
   const logout = useCallback(() => setLastfmSession(null), []);
   return { session, login, logout };
 }

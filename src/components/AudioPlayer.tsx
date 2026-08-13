@@ -635,7 +635,35 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     scrobbled: boolean;
     artist: string;
     track: string;
+    pausedMs: number;
   } | null>(null);
+  const pauseStartedAtRef = useRef<number | null>(null);
+
+  // Track paused wall-clock time so we never scrobble unheard tracks.
+  useEffect(() => {
+    if (!playing) {
+      pauseStartedAtRef.current = Date.now();
+      return;
+    }
+    if (pauseStartedAtRef.current !== null) {
+      const delta = Date.now() - pauseStartedAtRef.current;
+      if (scrobbleStateRef.current) scrobbleStateRef.current.pausedMs += delta;
+      pauseStartedAtRef.current = null;
+    }
+  }, [playing]);
+
+  const effectivePlayedSec = useCallback(
+    (state: { startedAt: number; pausedMs: number }) => {
+      const openPause =
+        pauseStartedAtRef.current === null ? 0 : Date.now() - pauseStartedAtRef.current;
+      return Math.max(
+        0,
+        Math.floor((Date.now() - state.startedAt * 1000 - state.pausedMs - openPause) / 1000),
+      );
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!getLastfmSession()) return;
     const artist = normalizeNowPlayingValue(currentTrack?.artist);
@@ -645,7 +673,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     if (scrobbleStateRef.current?.songId === key) return;
     const prev = scrobbleStateRef.current;
     if (prev && !prev.scrobbled) {
-      const played = Math.floor(Date.now() / 1000) - prev.startedAt;
+      const played = effectivePlayedSec(prev);
       if (played >= 30 && played <= 1800) {
         prev.scrobbled = true;
         void sendScrobble(prev.artist, prev.track, prev.startedAt, played);
@@ -657,9 +685,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       scrobbled: false,
       artist,
       track,
+      pausedMs: 0,
     };
     void sendNowPlaying(artist, track);
-  }, [currentTrack, currentSongId]);
+  }, [currentTrack, currentSongId, effectivePlayedSec]);
 
   useEffect(() => {
     if (!playing) return;
@@ -667,7 +696,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       const s = scrobbleStateRef.current;
       if (!s || s.scrobbled) return;
       if (!getLastfmSession()) return;
-      const played = Math.floor(Date.now() / 1000) - s.startedAt;
+      const played = effectivePlayedSec(s);
       // Nectarine is a live stream; browser-reported finite durations during
       // reconnects are proxy/chunk artifacts, not song lengths.
       const dur = 0;
@@ -678,7 +707,24 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       }
     }, 5000);
     return () => window.clearInterval(id);
-  }, [playing]);
+  }, [playing, effectivePlayedSec]);
+
+  // Flush the final track of the session on page unload.
+  useEffect(() => {
+    const onPageHide = () => {
+      const s = scrobbleStateRef.current;
+      if (!s || s.scrobbled) return;
+      if (!getLastfmSession()) return;
+      const played = effectivePlayedSec(s);
+      if (played >= 30 && played <= 1800) {
+        s.scrobbled = true;
+        void sendScrobble(s.artist, s.track, s.startedAt, played, { keepalive: true });
+      }
+    };
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
+  }, [effectivePlayedSec]);
+
 
   const ensureAudioGraph = useCallback(() => {
     // On mobile we intentionally skip Web Audio routing — once an
