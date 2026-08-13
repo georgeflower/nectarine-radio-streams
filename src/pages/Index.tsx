@@ -5,6 +5,7 @@ import {
   ENDPOINTS,
   artistUrl,
   computeTimeLeft,
+  timeLeftMs,
   fetchEndpoint,
   formatDuration,
   formatOnelinerTime,
@@ -367,6 +368,11 @@ const Index = () => {
       nowPlayingInFlight.current = false;
     }
   }, [loadEndpoint]);
+
+  const playlistRef = useRef(playlist);
+  useEffect(() => {
+    playlistRef.current = playlist;
+  }, [playlist]);
 
   const audioPlayingRef = useRef(audioPlaying);
   useEffect(() => {
