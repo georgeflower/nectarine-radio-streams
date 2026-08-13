@@ -179,8 +179,11 @@ export function useLastfm() {
     return () => { listeners.delete(l); };
   }, []);
   const login = useCallback(() => {
-    window.location.href = lastfmLoginUrl();
+    void (async () => {
+      window.location.href = await lastfmLoginUrl();
+    })();
   }, []);
+
   const logout = useCallback(() => setLastfmSession(null), []);
   return { session, login, logout };
 }
