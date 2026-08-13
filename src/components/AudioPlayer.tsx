@@ -1363,9 +1363,9 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         onPlay={() => {
           logPlayback("info", "media", "onPlay", snapshot());
           setPlaying(true);
+          if (reconnectingRef.current) wasReconnectingRef.current = true;
           setReconnecting(false);
           markPlaybackAlive();
-          retryCountRef.current = 0;
           if (stallTimerRef.current !== null) {
             window.clearTimeout(stallTimerRef.current);
             stallTimerRef.current = null;
