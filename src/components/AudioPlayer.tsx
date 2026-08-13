@@ -722,6 +722,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       window.clearTimeout(stallTimerRef.current);
       stallTimerRef.current = null;
     }
+    if (stablePlaybackTimerRef.current !== null) {
+      window.clearTimeout(stablePlaybackTimerRef.current);
+      stablePlaybackTimerRef.current = null;
+    }
   }, []);
 
   const playUrl = useCallback(
