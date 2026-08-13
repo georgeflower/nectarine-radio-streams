@@ -661,7 +661,12 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const effectivePlayedSec = useCallback(
     (state: { startedAt: number; pausedMs: number }) => {
       const openPause =
-        pauseStartedAtRef.current === null ? 0 : Date.now() - pauseStartedAtRef.current;
+        pauseStartedAtRef.current === null
+          ? 0
+          : Math.min(
+              Date.now() - pauseStartedAtRef.current,
+              Date.now() - state.startedAt * 1000,
+            );
       return Math.max(
         0,
         Math.floor((Date.now() - state.startedAt * 1000 - state.pausedMs - openPause) / 1000),
