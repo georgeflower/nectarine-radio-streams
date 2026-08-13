@@ -36,10 +36,39 @@ export function setLastfmSession(s: LastfmSession | null) {
   emit();
 }
 
-export function lastfmLoginUrl(): string {
-  const cb = encodeURIComponent(window.location.origin + window.location.pathname);
-  return `https://www.last.fm/api/auth/?api_key=${LASTFM_API_KEY}&cb=${cb}`;
+let cachedApiKey: string | null = null;
+
+/** Fetch the API key from the edge function so the auth URL and the
+ *  server-side signed calls can never diverge. Falls back to the
+ *  hardcoded publishable constant on any error. */
+async function getApiKey(): Promise<string> {
+  if (cachedApiKey) return cachedApiKey;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/lastfm-auth`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ config: true }),
+    });
+    const data = await res.json();
+    if (typeof data?.apiKey === "string" && data.apiKey.length > 0) {
+      cachedApiKey = data.apiKey;
+      return cachedApiKey;
+    }
+  } catch { /* fall through */ }
+  cachedApiKey = LASTFM_API_KEY;
+  return cachedApiKey;
 }
+
+export async function lastfmLoginUrl(): Promise<string> {
+  const apiKey = await getApiKey();
+  const cb = encodeURIComponent(window.location.origin + window.location.pathname);
+  return `https://www.last.fm/api/auth/?api_key=${apiKey}&cb=${cb}`;
+}
+
 
 export type LastfmAuthResult =
   | { ok: true; session: LastfmSession }
