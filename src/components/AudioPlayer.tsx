@@ -731,6 +731,23 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     }
   }, [currentTrack, currentSongId, effectivePlayedSec, playing]);
 
+  // Announce now-playing when the user resumes mid-track.
+  useEffect(() => {
+    if (!playing) return;
+    const session = getLastfmSession();
+    if (!session) {
+      announcedNowPlayingRef.current = null;
+      return;
+    }
+    const s = scrobbleStateRef.current;
+    if (!s) return;
+    if (s.songId && s.songId !== announcedNowPlayingRef.current) {
+      announcedNowPlayingRef.current = s.songId;
+      void sendNowPlaying(s.artist, s.track);
+    }
+  }, [playing]);
+
+
   useEffect(() => {
     if (!playing) return;
     const id = window.setInterval(() => {
