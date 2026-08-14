@@ -891,7 +891,12 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         isMseAudioSupported() &&
         (typeof document === "undefined" || document.visibilityState === "visible");
       if (canUseMse) {
-        bufferedStreamRef.current = attachBufferedStream(a, target, { targetBufferSec: 30 });
+        bufferedStreamRef.current = attachBufferedStream(a, target, {
+          targetBufferSec: 30,
+          onLiveSeek: () => {
+            lastLiveSeekAtRef.current = Date.now();
+          },
+        });
         reportPlaybackMode("mse");
         logPlayback("info", "playUrl", "mode=mse (attached buffered stream)");
       } else {
