@@ -664,6 +664,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     pausedMs: number;
   } | null>(null);
   const pauseStartedAtRef = useRef<number | null>(null);
+  const announcedNowPlayingRef = useRef<string | null>(null);
 
   // Track paused wall-clock time so we never scrobble unheard tracks.
   useEffect(() => {
