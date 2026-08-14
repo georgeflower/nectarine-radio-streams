@@ -227,6 +227,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const lastProgressAtRef = useRef(Date.now());
   const lastMediaTimeRef = useRef(0);
   const lastSoftResumeAtRef = useRef(0);
+  const lastLiveSeekAtRef = useRef(0);
   const hiddenSinceRef = useRef<number | null>(null);
   const INITIAL_BUFFER_GRACE_MS = 8000;
 
@@ -597,6 +598,27 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         const end = b.end(b.length - 1);
         const ahead = Math.max(0, end - a.currentTime);
         setBufferedAhead(ahead);
+
+        // Live-edge correction
+        if (!shouldPlayRef.current || loadingRef.current || a.readyState < 2 || a.paused) return;
+        if (ahead > LIVE_HARD_SEEK_LAG_SEC && Date.now() - lastLiveSeekAtRef.current > LIVE_SEEK_COOLDOWN_MS) {
+          lastLiveSeekAtRef.current = Date.now();
+          a.playbackRate = 1;
+          const targetTime = end - LIVE_EDGE_LEAD_SEC;
+          logPlayback("warn", "liveedge", "hard seek to live edge", { lagSec: Math.round(ahead), targetTime });
+          try {
+            if (targetTime > a.currentTime) a.currentTime = targetTime;
+          } catch (e) {
+            logPlayback("warn", "liveedge", "seek failed", { err: String(e) });
+          }
+        } else if (ahead > LIVE_SOFT_CATCHUP_LAG_SEC) {
+          a.playbackRate = LIVE_CATCHUP_RATE;
+          const anyA = a as HTMLAudioElement & { preservesPitch?: boolean; webkitPreservesPitch?: boolean };
+          if ("preservesPitch" in anyA) anyA.preservesPitch = true;
+          if ("webkitPreservesPitch" in anyA) anyA.webkitPreservesPitch = true;
+        } else if (ahead < LIVE_EDGE_LEAD_SEC + 1 && a.playbackRate !== 1) {
+          a.playbackRate = 1;
+        }
       } catch {
         // ignore
       }
@@ -823,6 +845,21 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           reportResume("same-src-play");
           logPlayback("info", "playUrl", "same-src fast-path play() ok");
           markPlaybackAlive(a);
+          try {
+            const b = a.buffered;
+            if (b.length > 0) {
+              const end = b.end(b.length - 1);
+              const lag = end - a.currentTime;
+              if (lag > LIVE_HARD_SEEK_LAG_SEC) {
+                lastLiveSeekAtRef.current = Date.now();
+                const targetTime = end - LIVE_EDGE_LEAD_SEC;
+                logPlayback("warn", "liveedge", "same-src resume seek to live edge", { lagSec: Math.round(lag) });
+                if (targetTime > a.currentTime) a.currentTime = targetTime;
+              }
+            }
+          } catch (e) {
+            logPlayback("warn", "liveedge", "same-src seek failed", { err: String(e) });
+          }
         } catch (e) {
           logPlayback("warn", "playUrl", "same-src play() rejected", { err: String(e) });
         }
@@ -1023,6 +1060,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const scheduleStallCheck = useCallback((eventName: "waiting" | "stalled") => {
     if (!shouldPlayRef.current) return;
     if (loadingRef.current) return;
+    if (Date.now() - lastLiveSeekAtRef.current < POST_SEEK_STALL_GRACE_MS) {
+      logPlayback("info", "stall", `${eventName} suppressed by post-seek grace`);
+      return;
+    }
     if (Date.now() - lastLoadAtRef.current < INITIAL_BUFFER_GRACE_MS) {
       logPlayback("info", "stall", `${eventName} suppressed by initial-buffer grace`);
       return;
@@ -1457,7 +1498,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
             ready_state: el?.readyState ?? null,
             played_sec: playedSec(),
           });
-          if (shouldPlayRef.current) attemptRecovery({ reason: "media-ended" });
+          if (shouldPlayRef.current) attemptRecovery({ force: true, reason: "media-ended" });
         }}
         onError={(e) => {
           const el = e.currentTarget;
