@@ -73,6 +73,8 @@ export const attachBufferedStream = (
   let sourceBuffer: SourceBuffer | null = null;
   const pendingChunks: Uint8Array[] = [];
   let appending = false;
+  let lastTrimAt = 0;
+  let skipToLiveOnNextAppend = false;
 
   const computeBufferedAhead = (): number => {
     if (!sourceBuffer) return 0;
@@ -86,10 +88,38 @@ export const attachBufferedStream = (
     }
   };
 
+  /** Trim old data. When paused, currentTime is frozen so trim against buffered end. */
+  const maybeTrim = (force = false) => {
+    if (!sourceBuffer || sourceBuffer.updating) return;
+    if (pendingChunks.length > 0) return;
+    const now = Date.now();
+    if (!force && now - lastTrimAt < TRIM_MIN_GAP_MS) return;
+    try {
+      const b = sourceBuffer.buffered;
+      if (b.length === 0) return;
+      const start = b.start(0);
+      let removeEnd: number | null = null;
+      if (audio.paused) {
+        const end = b.end(b.length - 1);
+        const target = end - KEEP_BEHIND_SEC * 2;
+        if (target > start) removeEnd = target;
+      } else if (audio.currentTime - start > KEEP_BEHIND_SEC * 2) {
+        removeEnd = audio.currentTime - KEEP_BEHIND_SEC;
+      }
+      if (removeEnd !== null && removeEnd > start) {
+        lastTrimAt = now;
+        sourceBuffer.remove(start, removeEnd);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const pumpAppend = () => {
     if (cancelled || !sourceBuffer || appending) return;
     if (sourceBuffer.updating) return;
     if (pendingChunks.length === 0) return;
+    if (mediaSource.readyState !== "open") return;
     const chunk = pendingChunks.shift()!;
     appending = true;
     try {
@@ -111,9 +141,16 @@ export const attachBufferedStream = (
         }
         // requeue the chunk
         pendingChunks.unshift(chunk);
+        return;
+      }
+      console.warn("[bufferedStream] appendBuffer failed", err);
+      if (mediaSource.readyState === "open") {
+        pendingChunks.unshift(chunk);
+        window.setTimeout(pumpAppend, 250);
       }
     }
   };
+
 
   const startFetchLoop = async () => {
     while (!cancelled) {
