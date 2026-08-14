@@ -242,6 +242,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const selectedUrlRef = useRef<string | null>(null);
   const playStartedAtRef = useRef<number | null>(null);
   const connectOkSentRef = useRef(false);
+  const pausedAtRef = useRef<number | null>(null);
   const reconnectingRef = useRef(false);
   const lastRecoveryReasonRef = useRef<string | null>(null);
   const connectionInfoRef = useRef<{ type: string | null; effectiveType: string | null }>({
