@@ -10,6 +10,8 @@ export type AttachOptions = {
   targetBufferSec?: number;
   /** Hint for the SourceBuffer MIME, otherwise sniffed from Content-Type. */
   mimeHint?: string;
+  /** Called right before an internal seek to the live edge after a reconnect. */
+  onLiveSeek?: () => void;
 };
 
 export type BufferedStreamHandle = {
@@ -19,6 +21,9 @@ export type BufferedStreamHandle = {
 const DEFAULT_TARGET_BUFFER_SEC = 30;
 const RESUME_RATIO = 0.7;
 const FETCH_RETRY_DELAY_MS = 1500;
+const KEEP_BEHIND_SEC = 20;
+const TRIM_MIN_GAP_MS = 10_000;
+
 
 const pickMime = (contentType: string | null, hint?: string): string | null => {
   const candidates: string[] = [];
