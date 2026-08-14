@@ -548,6 +548,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }
         lastForcedHandoverAtRef.current = now;
 
+        // The new interface is often not routable immediately.
         connectionRecoveryTimerRef.current = window.setTimeout(() => {
           connectionRecoveryTimerRef.current = null;
           if (!shouldPlayRef.current) return;
