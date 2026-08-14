@@ -180,17 +180,35 @@ export const attachBufferedStream = (
           sourceBuffer.mode = "sequence";
           sourceBuffer.addEventListener("updateend", () => {
             appending = false;
+            if (skipToLiveOnNextAppend && sourceBuffer) {
+              skipToLiveOnNextAppend = false;
+              try {
+                const b = sourceBuffer.buffered;
+                if (b.length > 0) {
+                  const end = b.end(b.length - 1);
+                  if (end - audio.currentTime > 12) {
+                    opts.onLiveSeek?.();
+                    audio.currentTime = end - 3;
+                  }
+                }
+              } catch {
+                // ignore
+              }
+            }
+            maybeTrim();
             pumpAppend();
           });
         }
 
         const reader = response.body.getReader();
         while (!cancelled) {
-          // Back-pressure: wait if buffered ahead exceeds target
-          if (computeBufferedAhead() >= targetBufferSec) {
+          // Back-pressure: wait if buffered ahead exceeds target.
+          // While paused, currentTime is frozen — keep reading so Icecast does
+          // not drop us as a slow client; memory is bounded by maybeTrim().
+          if (!audio.paused && computeBufferedAhead() >= targetBufferSec) {
             await new Promise<void>((resolve) => {
               const check = () => {
-                if (cancelled || computeBufferedAhead() < resumeBelow) {
+                if (cancelled || audio.paused || computeBufferedAhead() < resumeBelow) {
                   resolve();
                 } else {
                   window.setTimeout(check, 250);
@@ -200,6 +218,7 @@ export const attachBufferedStream = (
             });
             if (cancelled) return;
           }
+
 
           const { value, done } = await reader.read();
           if (done) break;
