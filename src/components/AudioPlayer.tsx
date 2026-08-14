@@ -1592,6 +1592,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           logPlayback("info", "media", "onPlaying", snapshot());
           markPlaybackAlive();
           const el = audioRef.current;
+          if (pausedAtRef.current !== null && playStartedAtRef.current !== null) {
+            playStartedAtRef.current += Date.now() - pausedAtRef.current;
+            pausedAtRef.current = null;
+          }
           if (playStartedAtRef.current === null) playStartedAtRef.current = Date.now();
           if (!connectOkSentRef.current) {
             connectOkSentRef.current = true;
