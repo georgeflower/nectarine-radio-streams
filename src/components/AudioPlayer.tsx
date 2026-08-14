@@ -501,10 +501,6 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       effectiveType: conn.effectiveType ?? null,
     };
 
-    const SLOW_TIERS = new Set(["slow-2g", "2g"]);
-    const tierOf = (e: string | null): string =>
-      e === null ? "unknown" : SLOW_TIERS.has(e) ? "slow" : "fast";
-
     const onChange = () => {
       try {
         const prev = connectionInfoRef.current;
@@ -514,23 +510,21 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         const to = nextType ?? nextEffective ?? "unknown";
         const reason = `${from}->${to}`;
 
-        // Telemetry showed ~86% of change events were same-network jitter
-        // (cellular->cellular / wifi->wifi). Forcing a hard reload on those
-        // tears down a perfectly healthy socket, which is what caused the
-        // mobile drop-outs. The reload gate below requires a real interface
-        // switch (both old and new `type` are known and differ), not just a
-        // bandwidth estimate change.
-        const isHandover =
-          nextType !== null && prev.type !== null
-            ? nextType !== prev.type
-            : tierOf(nextEffective) !== tierOf(prev.effectiveType);
+        const prevType = prev.type;
+        const shouldForceReload =
+          prevType !== null &&
+          prevType !== "" &&
+          nextType !== null &&
+          nextType !== "" &&
+          prevType !== nextType &&
+          nextType !== "none";
 
-        noteConnectionChange(isHandover);
+        noteConnectionChange(shouldForceReload);
         connectionInfoRef.current = { type: nextType, effectiveType: nextEffective };
         logPlayback(
           "warn",
           "connection",
-          `network change ${reason} (${isHandover ? "handover" : "same-net flap"})`,
+          `network change ${reason} (${shouldForceReload ? "interface handover" : "same-interface change"})`,
           snapshot(),
         );
         telemetry("connection_change", { reason, played_sec: playedSec() });
@@ -540,15 +534,6 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           connectionRecoveryTimerRef.current = null;
         }
         if (!shouldPlayRef.current) return;
-
-        const prevType = prev.type;
-        const shouldForceReload =
-          prevType !== null &&
-          prevType !== "" &&
-          nextType !== null &&
-          nextType !== "" &&
-          prevType !== nextType &&
-          nextType !== "none";
 
         if (!shouldForceReload) {
           logPlayback("info", "connection", "same-interface change, no reload", { reason });
@@ -562,7 +547,6 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         }
         lastForcedHandoverAtRef.current = now;
 
-        // The new interface is often not routable immediately.
         connectionRecoveryTimerRef.current = window.setTimeout(() => {
           connectionRecoveryTimerRef.current = null;
           if (!shouldPlayRef.current) return;
