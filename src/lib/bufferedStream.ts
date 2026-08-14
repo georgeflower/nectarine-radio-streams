@@ -230,14 +230,17 @@ export const attachBufferedStream = (
       } catch (err) {
         if (cancelled) return;
         // Network drop — buffer will keep playing; wait and retry silently
+        skipToLiveOnNextAppend = true;
         await new Promise((r) => window.setTimeout(r, FETCH_RETRY_DELAY_MS));
         if (cancelled) return;
         continue;
       }
       // Stream ended naturally — retry to keep live stream going
       if (!cancelled) {
+        skipToLiveOnNextAppend = true;
         await new Promise((r) => window.setTimeout(r, 500));
       }
+
     }
   };
 
