@@ -1502,6 +1502,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         onPause={() => {
           logPlayback("info", "media", "onPause", snapshot());
           setPlaying(false);
+          pausedAtRef.current = Date.now();
         }}
         onEnded={() => {
           logPlayback("warn", "media", "onEnded", snapshot());
