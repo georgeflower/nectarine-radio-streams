@@ -66,10 +66,16 @@ const HANDOVER_FORCE_COOLDOWN_MS = 15_000;
 const PROGRESS_EPSILON_SEC = 0.2;
 
 // Live-edge correction: keep playback near the end of the buffer so a stalled
-// or resumed connection never drifts minutes behind the live stream.
+// or resumed connection never drifts minutes behind the live stream. Desktop MSE
+// deliberately pre-buffers up to ~30s (see targetBufferSec in bufferedStream.ts),
+// so the soft and hard thresholds must sit above that ceiling or the watchdog
+// fights the intentional pre-buffer. These values only trigger on genuine drift,
+// such as a rewind to the start of the retained buffer, which shows up as many
+// seconds of lag rather than tens. If targetBufferSec is ever raised, these
+// constants must move with it.
 const LIVE_EDGE_LEAD_SEC = 2;
-const LIVE_SOFT_CATCHUP_LAG_SEC = 8;
-const LIVE_HARD_SEEK_LAG_SEC = 20;
+const LIVE_SOFT_CATCHUP_LAG_SEC = 35;
+const LIVE_HARD_SEEK_LAG_SEC = 45;
 const LIVE_CATCHUP_RATE = 1.03;
 const LIVE_SEEK_COOLDOWN_MS = 10_000;
 const POST_SEEK_STALL_GRACE_MS = 5000;
