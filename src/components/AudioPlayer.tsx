@@ -726,6 +726,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       pausedMs: 0,
     };
     if (playing) {
+      announcedNowPlayingRef.current = key;
       void sendNowPlaying(artist, track);
     }
   }, [currentTrack, currentSongId, effectivePlayedSec, playing]);
