@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.6";
+export const APP_VERSION = "0.7.7";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,18 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.7",
+    date: "2026-08-14",
+    changes: [
+      "Fixed playback suddenly jumping back several minutes to a track that already played: a stream that ends now forces a fresh reconnect at the live edge instead of resuming from the start of the buffered audio",
+      "Added a live-edge watchdog that quietly catches playback up when it drifts behind the live stream, with a gentle speed-up for small drift and a seek for large drift",
+      "Buffered streaming hardened: old audio is trimmed proactively, failed buffer appends now retry instead of silently stalling, the connection keeps reading while paused so the server does not drop it, and the replayed burst after a reconnect is skipped",
+      "Last.fm now-playing is announced when you press play in the middle of a track, instead of staying silent until the next song",
+      "Listening-time telemetry no longer counts paused time, so stream reliability figures reflect actual playback",
+      "Network-change logging now reports the decision actually taken, rather than a separate heuristic",
+    ],
+  },
   {
     version: "0.7.6",
     date: "2026-08-13",
