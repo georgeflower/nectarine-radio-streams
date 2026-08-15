@@ -24,6 +24,7 @@ export type Database = {
           event: string
           hidden: boolean | null
           id: number
+          lag_sec: number | null
           media_error_code: number | null
           media_error_message: string | null
           ms_since_connection_change: number | null
@@ -45,6 +46,7 @@ export type Database = {
           event: string
           hidden?: boolean | null
           id?: number
+          lag_sec?: number | null
           media_error_code?: number | null
           media_error_message?: string | null
           ms_since_connection_change?: number | null
@@ -66,6 +68,7 @@ export type Database = {
           event?: string
           hidden?: boolean | null
           id?: number
+          lag_sec?: number | null
           media_error_code?: number | null
           media_error_message?: string | null
           ms_since_connection_change?: number | null
@@ -84,12 +87,14 @@ export type Database = {
     Views: {
       stream_reliability: {
         Row: {
+          avg_live_seek_lag_sec: number | null
           avg_played_sec_before_failure: number | null
           bitrate: number | null
           connects: number | null
           failures: number | null
           handover_events: number | null
           last_seen_at: string | null
+          live_seeks: number | null
           stream_name: string | null
           stream_url: string | null
         }
