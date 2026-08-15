@@ -108,6 +108,21 @@ Deno.serve(async (req) => {
       return ok(0);
     }
 
+    // Probabilistic retention: ~1% of successful inserts prune rows older than
+    // 90 days. No pg_cron dependency; volume is low enough that this keeps up.
+    if (Math.random() < 0.01) {
+      try {
+        const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+        const { error: pruneError } = await supabase
+          .from("stream_events")
+          .delete()
+          .lt("created_at", cutoff);
+        if (pruneError) console.error("stream-telemetry prune failed", pruneError.message);
+      } catch (e) {
+        console.error("stream-telemetry prune error", e instanceof Error ? e.message : e);
+      }
+    }
+
     return ok(rows.length);
   } catch (e) {
     console.error("stream-telemetry error", e instanceof Error ? e.message : e);
