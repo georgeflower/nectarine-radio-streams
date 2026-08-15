@@ -364,11 +364,11 @@ const Index = () => {
 
   // Lightweight poll: only the queue endpoint (now/queue/history), no status churn.
   const nowPlayingInFlight = useRef(false);
-  const refreshNowPlaying = useCallback(async () => {
-    if (nowPlayingInFlight.current) return;
+  const refreshNowPlaying = useCallback(async (): Promise<PlaylistData | null> => {
+    if (nowPlayingInFlight.current) return null;
     nowPlayingInFlight.current = true;
     try {
-      await loadEndpoint("queue");
+      return await loadEndpoint("queue");
     } finally {
       nowPlayingInFlight.current = false;
     }
