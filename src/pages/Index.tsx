@@ -324,13 +324,17 @@ const Index = () => {
     document.documentElement.setAttribute("data-scanlines", scanlines ? "on" : "off");
   }, [scanlines]);
 
-  const loadEndpoint = useCallback(async (endpoint: Endpoint) => {
+  const loadEndpoint = useCallback(async (endpoint: Endpoint): Promise<PlaylistData | null> => {
     try {
       const text = await fetchEndpoint(endpoint);
       const xml = parseXml(text);
       if (xml.querySelector("parsererror")) throw new Error("Invalid XML response");
 
-      if (endpoint === "queue") setPlaylist(parsePlaylist(xml));
+      if (endpoint === "queue") {
+        const parsed = parsePlaylist(xml);
+        setPlaylist(parsed);
+        return parsed;
+      }
       if (endpoint === "oneliner") setOneliners(parseOneliners(xml));
       if (endpoint === "online") {
         const { users, total } = parseOnline(xml);
@@ -341,6 +345,7 @@ const Index = () => {
     } catch (e) {
       console.error(`Failed to load ${endpoint}:`, e);
     }
+    return null;
   }, []);
 
   const refreshAll = useCallback(async () => {
@@ -359,11 +364,11 @@ const Index = () => {
 
   // Lightweight poll: only the queue endpoint (now/queue/history), no status churn.
   const nowPlayingInFlight = useRef(false);
-  const refreshNowPlaying = useCallback(async () => {
-    if (nowPlayingInFlight.current) return;
+  const refreshNowPlaying = useCallback(async (): Promise<PlaylistData | null> => {
+    if (nowPlayingInFlight.current) return null;
     nowPlayingInFlight.current = true;
     try {
-      await loadEndpoint("queue");
+      return await loadEndpoint("queue");
     } finally {
       nowPlayingInFlight.current = false;
     }
@@ -425,15 +430,19 @@ const Index = () => {
     let timer: number | null = null;
     let attempts = 0;
 
-    const currentKey = () => {
-      const n = playlistRef.current.now;
+    const keyOf = (p: PlaylistData) => {
+      const n = p.now;
       return n ? n.songId || `${n.artist}||${n.song}` : "";
     };
 
     const run = async () => {
       timer = null;
-      await refreshNowPlaying();
-      if (currentKey() === nowKey && attempts < 3) {
+      // Compare against the freshly fetched playlist: playlistRef is only
+      // updated by an effect on a later tick, so reading it here would still
+      // show the old track and trigger a pointless retry every time.
+      const fetched = await refreshNowPlaying();
+      const key = keyOf(fetched ?? playlistRef.current);
+      if (key === nowKey && attempts < 3) {
         attempts += 1;
         timer = window.setTimeout(() => void run(), 3000);
       }

@@ -569,7 +569,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       }
       conn?.removeEventListener?.("change", onChange);
     };
-  }, [notePlaybackProgress, playedSec, snapshot, telemetry]);
+  }, [playedSec, snapshot, telemetry]);
 
 
   // Poll buffered-ahead while playing for UX visibility

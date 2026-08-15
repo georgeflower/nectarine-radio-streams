@@ -91,15 +91,38 @@ export function startVersionPolling(
   intervalMs = 5 * 60_000,
 ): () => void {
   const NOTIFIED_KEY = "nectarine-build-id-notified";
+  // Re-prompt for the same build after this long, in case the user missed or
+  // dismissed the first toast.
+  const RENOTIFY_AFTER_MS = 30 * 60_000;
   let cancelled = false;
   const tick = async () => {
     if (cancelled) return;
     const r = await checkForNewVersion();
     if (!r.stale || !r.server) return;
-    let alreadyNotified: string | null = null;
-    try { alreadyNotified = localStorage.getItem(NOTIFIED_KEY); } catch { /* ignore */ }
-    if (alreadyNotified === r.server) return;
-    try { localStorage.setItem(NOTIFIED_KEY, r.server); } catch { /* ignore */ }
+
+    let notifiedId: string | null = null;
+    let notifiedAt = 0;
+    try {
+      const raw = localStorage.getItem(NOTIFIED_KEY);
+      if (raw) {
+        if (raw.startsWith("{")) {
+          // New format: { id, at }. Tolerate anything malformed.
+          const parsed = JSON.parse(raw) as { id?: unknown; at?: unknown };
+          notifiedId = typeof parsed.id === "string" ? parsed.id : null;
+          notifiedAt = typeof parsed.at === "number" ? parsed.at : 0;
+        } else {
+          // Legacy format: the plain build id, no timestamp.
+          notifiedId = raw;
+          notifiedAt = 0;
+        }
+      }
+    } catch { /* ignore */ }
+
+    const now = Date.now();
+    if (notifiedId === r.server && now - notifiedAt < RENOTIFY_AFTER_MS) return;
+    try {
+      localStorage.setItem(NOTIFIED_KEY, JSON.stringify({ id: r.server, at: now }));
+    } catch { /* ignore */ }
     onStale(r);
   };
   const id = window.setInterval(tick, intervalMs);
