@@ -430,15 +430,19 @@ const Index = () => {
     let timer: number | null = null;
     let attempts = 0;
 
-    const currentKey = () => {
-      const n = playlistRef.current.now;
+    const keyOf = (p: PlaylistData) => {
+      const n = p.now;
       return n ? n.songId || `${n.artist}||${n.song}` : "";
     };
 
     const run = async () => {
       timer = null;
-      await refreshNowPlaying();
-      if (currentKey() === nowKey && attempts < 3) {
+      // Compare against the freshly fetched playlist: playlistRef is only
+      // updated by an effect on a later tick, so reading it here would still
+      // show the old track and trigger a pointless retry every time.
+      const fetched = await refreshNowPlaying();
+      const key = keyOf(fetched ?? playlistRef.current);
+      if (key === nowKey && attempts < 3) {
         attempts += 1;
         timer = window.setTimeout(() => void run(), 3000);
       }
