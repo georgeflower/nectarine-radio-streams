@@ -324,7 +324,7 @@ const Index = () => {
     document.documentElement.setAttribute("data-scanlines", scanlines ? "on" : "off");
   }, [scanlines]);
 
-  const loadEndpoint = useCallback(async (endpoint: Endpoint): Promise<Playlist | null> => {
+  const loadEndpoint = useCallback(async (endpoint: Endpoint): Promise<PlaylistData | null> => {
     try {
       const text = await fetchEndpoint(endpoint);
       const xml = parseXml(text);
