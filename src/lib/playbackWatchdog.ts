@@ -116,6 +116,12 @@ export type WatchdogDiagnostics = {
   reconnectCount: number;
   resumeCount: number;
   lastEvent: string | null;
+  /** Seconds of audio buffered ahead of the playhead. Under MSE this sits near
+   *  the configured target by design — it is not lag. */
+  bufferDepthSec: number;
+  playbackRate: number;
+  liveSeekCount: number;
+  lastLiveSeekAt: number | null;
 };
 
 let diag: WatchdogDiagnostics = {
@@ -128,6 +134,10 @@ let diag: WatchdogDiagnostics = {
   reconnectCount: 0,
   resumeCount: 0,
   lastEvent: null,
+  bufferDepthSec: 0,
+  playbackRate: 1,
+  liveSeekCount: 0,
+  lastLiveSeekAt: null,
 };
 
 const diagListeners = new Set<(d: WatchdogDiagnostics) => void>();
@@ -209,5 +219,21 @@ export const reportReconnect = (reason: string) => updateDiag({
   reconnectCount: diag.reconnectCount + 1,
   lastEvent: `reconnect:${reason}`,
 });
+/** Live-edge sampler. Called on every buffer poll; only pushes an update when
+ *  the rounded values actually change, so the diagnostics panel does not
+ *  re-render once per second for free. */
+export const reportLiveEdgeState = (bufferDepthSec: number, playbackRate: number) => {
+  const depth = Math.round(bufferDepthSec * 10) / 10;
+  const rate = Math.round(playbackRate * 100) / 100;
+  if (diag.bufferDepthSec === depth && diag.playbackRate === rate) return;
+  updateDiag({ bufferDepthSec: depth, playbackRate: rate });
+};
+
+export const reportLiveSeek = (reason: string) => updateDiag({
+  lastLiveSeekAt: Date.now(),
+  liveSeekCount: diag.liveSeekCount + 1,
+  lastEvent: `live-seek:${reason}`,
+});
+
 export const reportStall = () => updateDiag({ lastStallAt: Date.now(), lastEvent: "stall" });
 export const reportVisibility = (state: string) => updateDiag({ lastVisibilityAt: Date.now(), lastEvent: `visibility:${state}` });

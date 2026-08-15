@@ -200,6 +200,26 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
         </div>
 
         <div className="border-t border-border pt-2 space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Live edge</div>
+          <div className="text-[10px] leading-relaxed">
+            <div>
+              <span className="text-muted-foreground">Buffer depth:</span> {diag.bufferDepthSec.toFixed(1)}s
+              <span className="text-muted-foreground"> · rate {diag.playbackRate.toFixed(2)}x</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Live seeks:</span> {diag.liveSeekCount}
+              <span className="text-muted-foreground"> · last </span>
+              {diag.lastLiveSeekAt ? fmtTime(diag.lastLiveSeekAt) : "none"}
+            </div>
+            <div className="text-muted-foreground">
+              Buffer depth sits near the 30s MSE target by design — watch for spikes above it, not the steady value.
+            </div>
+          </div>
+        </div>
+
+
+
+        <div className="border-t border-border pt-2 space-y-1">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Stall timeout</div>
           <NumField label="iOS" value={cfg.iosStallTimeoutSec} onChange={(n) => set({ iosStallTimeoutSec: n })} min={3} max={120} suffix="s" />
           <NumField label="Android" value={cfg.androidStallTimeoutSec} onChange={(n) => set({ androidStallTimeoutSec: n })} min={3} max={120} suffix="s" />

@@ -18,6 +18,7 @@ const ALLOWED_EVENTS = new Set([
   "failover",
   "switch",
   "connection_change",
+  "live_seek",
 ]);
 
 const MAX_EVENTS = 50;
@@ -91,6 +92,7 @@ Deno.serve(async (req) => {
         downlink: num(e.downlink),
         ms_since_connection_change: int(e.ms_since_connection_change),
         played_sec: int(e.played_sec),
+        lag_sec: num(e.lag_sec),
         hidden: typeof e.hidden === "boolean" ? e.hidden : null,
       }));
 
