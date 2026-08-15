@@ -233,8 +233,8 @@ export type StreamReliabilityRow = {
   failures: number | null;
   handover_events: number | null;
   avg_played_sec_before_failure: number | null;
-  live_seeks: number | null;
-  avg_live_seek_lag_sec: number | null;
+  live_seeks?: number | null;
+  avg_live_seek_lag_sec?: number | null;
   last_seen_at: string | null;
 };
 
