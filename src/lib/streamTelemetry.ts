@@ -21,7 +21,8 @@ export type StreamEventName =
   | "recovered"
   | "failover"
   | "switch"
-  | "connection_change";
+  | "connection_change"
+  | "live_seek";
 
 export type StreamEventInput = {
   event: StreamEventName;
@@ -34,6 +35,7 @@ export type StreamEventInput = {
   network_state?: number | null;
   ready_state?: number | null;
   played_sec?: number | null;
+  lag_sec?: number | null;
 };
 
 type QueuedEvent = Record<string, unknown>;
@@ -231,6 +233,8 @@ export type StreamReliabilityRow = {
   failures: number | null;
   handover_events: number | null;
   avg_played_sec_before_failure: number | null;
+  live_seeks: number | null;
+  avg_live_seek_lag_sec: number | null;
   last_seen_at: string | null;
 };
 
