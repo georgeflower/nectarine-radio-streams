@@ -324,13 +324,17 @@ const Index = () => {
     document.documentElement.setAttribute("data-scanlines", scanlines ? "on" : "off");
   }, [scanlines]);
 
-  const loadEndpoint = useCallback(async (endpoint: Endpoint) => {
+  const loadEndpoint = useCallback(async (endpoint: Endpoint): Promise<Playlist | null> => {
     try {
       const text = await fetchEndpoint(endpoint);
       const xml = parseXml(text);
       if (xml.querySelector("parsererror")) throw new Error("Invalid XML response");
 
-      if (endpoint === "queue") setPlaylist(parsePlaylist(xml));
+      if (endpoint === "queue") {
+        const parsed = parsePlaylist(xml);
+        setPlaylist(parsed);
+        return parsed;
+      }
       if (endpoint === "oneliner") setOneliners(parseOneliners(xml));
       if (endpoint === "online") {
         const { users, total } = parseOnline(xml);
@@ -341,6 +345,7 @@ const Index = () => {
     } catch (e) {
       console.error(`Failed to load ${endpoint}:`, e);
     }
+    return null;
   }, []);
 
   const refreshAll = useCallback(async () => {
