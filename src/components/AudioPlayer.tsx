@@ -234,6 +234,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   const lastMediaTimeRef = useRef(0);
   const lastSoftResumeAtRef = useRef(0);
   const lastLiveSeekAtRef = useRef(0);
+  const liveSeekCountRef = useRef(0);
   const hiddenSinceRef = useRef<number | null>(null);
   const INITIAL_BUFFER_GRACE_MS = 8000;
 
@@ -590,11 +591,17 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         const end = b.end(b.length - 1);
         const ahead = Math.max(0, end - a.currentTime);
         setBufferedAhead(ahead);
+        reportLiveEdgeState(ahead, a.playbackRate);
 
         // Live-edge correction
         if (!shouldPlayRef.current || loadingRef.current || a.readyState < 2 || a.paused) return;
         if (ahead > LIVE_HARD_SEEK_LAG_SEC && Date.now() - lastLiveSeekAtRef.current > LIVE_SEEK_COOLDOWN_MS) {
           lastLiveSeekAtRef.current = Date.now();
+          liveSeekCountRef.current += 1;
+          reportLiveSeek("watchdog");
+          // Only actual seeks are recorded; the soft playbackRate catch-up
+          // below happens far too often to be a useful signal.
+          telemetry("live_seek", { reason: "watchdog", lag_sec: Math.round(ahead * 10) / 10 });
           a.playbackRate = 1;
           const targetTime = end - LIVE_EDGE_LEAD_SEC;
           logPlayback("warn", "liveedge", "hard seek to live edge", { lagSec: Math.round(ahead), targetTime });
@@ -618,7 +625,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     computeBuffered();
     const id = window.setInterval(computeBuffered, BUFFER_POLL_MS);
     return () => window.clearInterval(id);
-  }, [playing]);
+  }, [playing, telemetry]);
 
   const selectedStream = useMemo(
     () => playable.find((x) => x.url === selectedUrl) ?? null,
@@ -901,6 +908,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           targetBufferSec: 30,
           onLiveSeek: () => {
             lastLiveSeekAtRef.current = Date.now();
+            liveSeekCountRef.current += 1;
+            reportLiveSeek("reconnect-burst");
+            // Lag is unknown at reconnect time — leave lag_sec null.
+            telemetry("live_seek", { reason: "reconnect-burst" });
           },
         });
         reportPlaybackMode("mse");
