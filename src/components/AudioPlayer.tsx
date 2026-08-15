@@ -23,6 +23,8 @@ import {
   getStallTimeoutMs,
   getVisibilityResumeDelayMs,
   logPlayback,
+  reportLiveEdgeState,
+  reportLiveSeek,
   reportPlaybackMode,
   reportReconnect,
   reportResume,
