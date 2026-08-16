@@ -27,20 +27,21 @@ const scrobbleLabel: Record<LastfmActivity["scrobble"], string> = {
 };
 
 const lightClass = (state: string): string => {
-  if (state === "ok") return "bg-primary";
+  if (state === "ok") return "bg-current";
   if (state === "failed") return "bg-destructive";
-  if (state === "sending") return "bg-muted-foreground/25 motion-safe:animate-pulse";
-  return "bg-muted-foreground/25";
+  if (state === "sending") return "bg-current opacity-25 motion-safe:animate-pulse";
+  return "bg-current opacity-25";
 };
 
-const ActivityLights = () => {
+export const LastfmLights = () => {
+  const { session } = useLastfm();
   const [visible, setVisible] = useState(isLastfmStatusVisible);
   const [activity, setActivity] = useState<LastfmActivity>(getLastfmActivity);
 
   useEffect(() => subscribeLastfmStatusVisible(setVisible), []);
   useEffect(() => subscribeLastfmActivity(setActivity), []);
 
-  if (!visible) return null;
+  if (!session || !visible) return null;
 
   const label = `${announceLabel[activity.announce]} · ${scrobbleLabel[activity.scrobble]}`;
   const glow = { boxShadow: "var(--glow-primary)" };
@@ -81,7 +82,6 @@ const LastfmButton = ({ compact }: Props) => {
         >
           ♪ {session.username}
         </span>
-        <ActivityLights />
         <button
           type="button"
           onClick={logout}
