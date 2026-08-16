@@ -22,6 +22,7 @@ import {
   isLastfmStatusVisible,
   setLastfmStatusVisible,
   subscribeLastfmStatusVisible,
+  useLastfm,
 } from "@/lib/lastfm";
 
 type Props = { onClose: () => void };
