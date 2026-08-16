@@ -17,7 +17,7 @@ import {
   requestSongArtwork,
   subscribeSongArtwork,
 } from "@/lib/songArtwork";
-import { sendNowPlaying, sendScrobble, getLastfmSession, setLastfmAnnounceState, setLastfmScrobbleState } from "@/lib/lastfm";
+import { sendNowPlaying, sendScrobble, getLastfmSession, setLastfmAnnounceState, setLastfmScrobbleState, reportLastfmAuthFailure, reportLastfmConfigFailure, type LastfmCallResult } from "@/lib/lastfm";
 import {
   getLiveEdgeReloadAfterHiddenMs,
   getStallTimeoutMs,
