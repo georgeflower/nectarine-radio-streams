@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.8";
+export const APP_VERSION = "0.7.9";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,18 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.9",
+    date: "2026-08-16",
+    changes: [
+      "Added a ♥ button on the Currently Playing track to love it on your Last.fm account, showing whether the track is already loved",
+      "Last.fm errors are now identified properly instead of showing a bare error number, so a real problem can be told apart from a passing network hiccup",
+      "If your Last.fm session expires, a banner now appears explaining that scrobbling has stopped, with a button to reconnect",
+      "A separate warning appears if Last.fm rejects the app's own API key, since reconnecting would not help in that case",
+      "A warning is shown after two scrobbles fail in a row, rather than failing silently",
+      "The Last.fm indicator toggle in Playback Diagnostics is now disabled until a Last.fm account is connected",
+    ],
+  },
   {
     version: "0.7.8",
     date: "2026-08-16",
