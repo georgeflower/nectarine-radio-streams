@@ -103,9 +103,9 @@ function LoveButton({ songId, artist, track }: { songId: string; artist: string;
           ? "Waiting for track info before loving on Last.fm"
           : "Love this track on Last.fm. Note: demoscene track names often do not match Last.fm's catalog, so the loved track may point at a sparse Last.fm page."
       }
-      className={`inline-block align-baseline w-[1em] text-center leading-none ${
-        waiting ? "opacity-40 cursor-not-allowed" : "cursor-pointer hover:opacity-80"
-      } ${loved ? "text-primary" : "text-muted-foreground"}`}
+      className={`inline-block align-baseline w-[1em] text-center leading-none text-current ${
+        waiting ? "opacity-25 cursor-not-allowed" : "cursor-pointer hover:opacity-80"
+      } ${loved ? "" : "opacity-25"}`}
     >
       {loved ? "♥" : "♡"}
     </button>
@@ -814,15 +814,20 @@ const Index = () => {
                   : undefined,
             }}
           >
-            <button
-              type="button"
-              onClick={() => setNowOpen((o) => !o)}
-              className="panel-heading w-full !mb-0 flex items-center justify-between text-left hover:opacity-90"
-              aria-expanded={nowOpen}
-            >
-              <span>{nowOpen ? "▼" : "▶"} Currently Playing</span>
-              <LastfmLights />
-            </button>
+            <div className="panel-heading !mb-0 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setNowOpen((o) => !o)}
+                className="flex-1 text-left hover:opacity-90"
+                aria-expanded={nowOpen}
+              >
+                <span>{nowOpen ? "▼" : "▶"} Currently Playing</span>
+              </button>
+              <span className="flex items-center gap-1 shrink-0">
+                <LoveButton songId={now.songId} artist={now.artist} track={now.song} />
+                <LastfmLights />
+              </span>
+            </div>
             {nowOpen && (
               <div className="mt-3">
                 {now ? (
@@ -838,8 +843,7 @@ const Index = () => {
                       }
                     >
                       <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink> <SongPlatform songId={now.songId} />{" "}
-                      <SongRating songId={now.songId} />{" "}
-                      <LoveButton songId={now.songId} artist={now.artist} track={now.song} />
+                      <SongRating songId={now.songId} />
                     </p>
                     <p className="text-sm text-muted-foreground mb-3">
                       by <ExtLink href={artistUrl(now.artistId)}>{now.artist}</ExtLink>
