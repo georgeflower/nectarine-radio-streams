@@ -822,7 +822,9 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       const played = effectivePlayedSec(s);
       if (played >= 30 && played <= 1800) {
         s.scrobbled = true;
-        void sendScrobble(s.artist, s.track, s.startedAt, played, { keepalive: true });
+        void sendScrobble(s.artist, s.track, s.startedAt, played, { keepalive: true }).then((res) =>
+          setLastfmScrobbleState(s.songId ?? null, res.ok ? "ok" : "failed"),
+        );
       }
     };
     window.addEventListener("pagehide", onPageHide);
