@@ -755,6 +755,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     setLastfmAnnounceState(songId, "sending");
     void sendNowPlaying(artist, track).then((res) => {
       setLastfmAnnounceState(songId, res.ok ? "ok" : "failed");
+      handleLastfmResult(res, "nowplaying");
       if (res.ok) return;
       // One retry only — now-playing expires server-side anyway.
       if (announceRetryRef.current !== null) return;
@@ -763,12 +764,13 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         if (scrobbleStateRef.current?.songId !== songId) return;
         if (!shouldPlayRef.current) return;
         setLastfmAnnounceState(songId, "sending");
-        void sendNowPlaying(artist, track).then((r2) =>
-          setLastfmAnnounceState(songId, r2.ok ? "ok" : "failed"),
-        );
+        void sendNowPlaying(artist, track).then((r2) => {
+          setLastfmAnnounceState(songId, r2.ok ? "ok" : "failed");
+          handleLastfmResult(r2, "nowplaying");
+        });
       }, 5000);
     });
-  }, []);
+  }, [handleLastfmResult]);
 
   useEffect(() => () => {
     if (announceRetryRef.current !== null) window.clearTimeout(announceRetryRef.current);
@@ -792,8 +794,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         prev.scrobbled = true;
         const prevId = prev.songId ?? null;
         void sendScrobble(prev.artist, prev.track, prev.startedAt, played).then((res) =>
-          setLastfmScrobbleState(res.ok ? "ok" : "failed"),
-        );
+          {
+          setLastfmScrobbleState(res.ok ? "ok" : "failed");
+          handleLastfmResult(res, "scrobble");
+        });
       }
     }
     scrobbleStateRef.current = {
@@ -842,8 +846,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       if (played >= threshold) {
         s.scrobbled = true;
         void sendScrobble(s.artist, s.track, s.startedAt, dur || undefined).then((res) =>
-          setLastfmScrobbleState(res.ok ? "ok" : "failed"),
-        );
+          {
+          setLastfmScrobbleState(res.ok ? "ok" : "failed");
+          handleLastfmResult(res, "scrobble");
+        });
       }
     }, 5000);
     return () => window.clearInterval(id);
@@ -859,8 +865,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       if (played >= 30 && played <= 1800) {
         s.scrobbled = true;
         void sendScrobble(s.artist, s.track, s.startedAt, played, { keepalive: true }).then((res) =>
-          setLastfmScrobbleState(res.ok ? "ok" : "failed"),
-        );
+          {
+          setLastfmScrobbleState(res.ok ? "ok" : "failed");
+          handleLastfmResult(res, "scrobble");
+        });
       }
     };
     window.addEventListener("pagehide", onPageHide);
