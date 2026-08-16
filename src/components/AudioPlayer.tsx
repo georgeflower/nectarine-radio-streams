@@ -712,6 +712,43 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     [],
   );
 
+  // Consecutive scrobble failure tracking (scrobbles only — now-playing is transient).
+  const scrobbleFailStreakRef = useRef(0);
+  const scrobbleStreakToastedRef = useRef(false);
+
+  /**
+   * Route every Last.fm call result through here. `kind === "auth"` with no session is
+   * the normal never-connected state and must stay silent.
+   */
+  const handleLastfmResult = useCallback(
+    (res: LastfmCallResult, source: "scrobble" | "nowplaying") => {
+      const hasSession = getLastfmSession() !== null;
+      if (!res.ok) {
+        if (res.kind === "config") {
+          reportLastfmConfigFailure(res.message ?? "Last.fm API key rejected");
+        } else if (res.kind === "auth" && hasSession) {
+          reportLastfmAuthFailure(res.message ?? "Last.fm session expired");
+        }
+      }
+      if (source !== "scrobble" || !hasSession) return;
+      if (res.ok) {
+        scrobbleFailStreakRef.current = 0;
+        scrobbleStreakToastedRef.current = false;
+        return;
+      }
+      scrobbleFailStreakRef.current += 1;
+      if (scrobbleFailStreakRef.current >= 2 && !scrobbleStreakToastedRef.current) {
+        scrobbleStreakToastedRef.current = true;
+        void import("sonner").then(({ toast }) =>
+          toast.error("Scrobbling is failing", {
+            description: res.message ?? "Two scrobbles in a row could not be sent to Last.fm.",
+          }),
+        );
+      }
+    },
+    [],
+  );
+
   const announceRetryRef = useRef<number | null>(null);
 
   const announceNowPlaying = useCallback((songId: string, artist: string, track: string) => {
