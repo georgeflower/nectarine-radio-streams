@@ -125,6 +125,9 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
   const [diag, setDiag] = useState<WatchdogDiagnostics>(getWatchdogDiagnostics());
   const [, force] = useState(0);
   const netCounts = getNetChangeCounts();
+  const [lastfmVisible, setLastfmVisible] = useState(isLastfmStatusVisible);
+  useEffect(() => subscribeLastfmStatusVisible(setLastfmVisible), []);
+
 
 
   useEffect(() => {
