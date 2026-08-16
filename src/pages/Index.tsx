@@ -103,9 +103,9 @@ function LoveButton({ songId, artist, track }: { songId: string; artist: string;
           ? "Waiting for track info before loving on Last.fm"
           : "Love this track on Last.fm. Note: demoscene track names often do not match Last.fm's catalog, so the loved track may point at a sparse Last.fm page."
       }
-      className={`inline-block align-baseline w-[1em] text-center leading-none ${
-        waiting ? "opacity-40 cursor-not-allowed" : "cursor-pointer hover:opacity-80"
-      } ${loved ? "text-primary" : "text-muted-foreground"}`}
+      className={`inline-block align-baseline w-[1em] text-center leading-none text-current ${
+        waiting ? "opacity-25 cursor-not-allowed" : "cursor-pointer hover:opacity-80"
+      } ${loved ? "" : "opacity-25"}`}
     >
       {loved ? "♥" : "♡"}
     </button>
