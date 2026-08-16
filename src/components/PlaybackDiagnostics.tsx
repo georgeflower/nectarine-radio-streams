@@ -128,6 +128,8 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
   const netCounts = getNetChangeCounts();
   const [lastfmVisible, setLastfmVisible] = useState(isLastfmStatusVisible);
   useEffect(() => subscribeLastfmStatusVisible(setLastfmVisible), []);
+  const { session: lastfmSession } = useLastfm();
+
 
 
 
