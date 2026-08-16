@@ -289,8 +289,8 @@ export const clearLastfmAuthFailure = () => {
 export function reportLastfmAuthFailure(message: string) {
   const username = getLastfmSession()?.username ?? null;
   authFailure = { message, at: Date.now(), username };
-  setLastfmSession(null);
   emitAuthFailure();
+  setLastfmSession(null);
 }
 
 /** Config failures mean a bad/suspended API key: a deployment problem. Never clears the session. */
@@ -313,10 +313,12 @@ export const clearLastfmConfigFailure = () => {
   emitConfigFailure();
 };
 
+/** Captures username for shape consistency with auth failures; it is unused on this path. */
 export function reportLastfmConfigFailure(message: string) {
   configFailure = { message, at: Date.now(), username: getLastfmSession()?.username ?? null };
   emitConfigFailure();
 }
+
 
 /* ---------------- Visibility toggle ---------------- */
 
