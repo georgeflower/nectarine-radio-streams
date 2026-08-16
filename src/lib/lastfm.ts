@@ -151,13 +151,42 @@ async function callScrobble(body: Record<string, unknown>, keepalive = false) {
   }
 }
 
-export type LastfmCallResult = { ok: boolean; error?: string };
+export type LastfmFailureKind = "auth" | "config" | "transient";
+export type LastfmCallResult = {
+  ok: boolean;
+  code?: number;
+  message?: string;
+  kind?: LastfmFailureKind;
+};
+
+/** Last.fm error codes: 4 auth failed, 9 invalid session key,
+ *  14 token not authorized, 15 token expired → session unusable.
+ *  10 invalid API key, 26 suspended API key → deployment problem. */
+const AUTH_CODES = new Set([4, 9, 14, 15]);
+const CONFIG_CODES = new Set([10, 26]);
+
+const classify = (code: number | undefined): LastfmFailureKind => {
+  if (code !== undefined && AUTH_CODES.has(code)) return "auth";
+  if (code !== undefined && CONFIG_CODES.has(code)) return "config";
+  return "transient";
+};
 
 const resultOf = (data: unknown): LastfmCallResult => {
-  if (!data || typeof data !== "object") return { ok: false, error: "no response" };
+  if (!data || typeof data !== "object") {
+    return { ok: false, kind: "transient", message: "No response from Last.fm" };
+  }
   const d = data as Record<string, unknown>;
-  if (typeof d.error === "string" && d.error) return { ok: false, error: d.error };
-  if (d.error) return { ok: false, error: String(d.error) };
+  if (d.error !== undefined && d.error !== null && d.error !== false && d.error !== "") {
+    const n = Number(d.error);
+    const code = Number.isFinite(n) ? n : undefined;
+    const message =
+      typeof d.message === "string" && d.message
+        ? d.message
+        : typeof d.error === "string"
+          ? d.error
+          : `Last.fm error ${code ?? "unknown"}`;
+    return { ok: false, code, message, kind: classify(code) };
+  }
   return { ok: true };
 };
 
@@ -166,7 +195,7 @@ export async function sendNowPlaying(
   track: string,
   duration?: number,
 ): Promise<LastfmCallResult> {
-  if (!current) return { ok: false, error: "no session" };
+  if (!current) return { ok: false, kind: "auth", message: "No Last.fm session" };
   const data = await callScrobble({ action: "nowplaying", artist, track, duration });
   return resultOf(data);
 }
@@ -178,13 +207,14 @@ export async function sendScrobble(
   duration?: number,
   opts?: { keepalive?: boolean },
 ): Promise<LastfmCallResult> {
-  if (!current) return { ok: false, error: "no session" };
+  if (!current) return { ok: false, kind: "auth", message: "No Last.fm session" };
   const data = await callScrobble(
     { action: "scrobble", artist, track, timestamp, duration },
     opts?.keepalive ?? false,
   );
   return resultOf(data);
 }
+
 
 /* ---------------- Activity indicator store ---------------- */
 
