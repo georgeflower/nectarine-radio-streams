@@ -252,6 +252,11 @@ export const setLastfmAnnounceState = (songId: string | null, announce: LastfmAn
   emitActivity();
 };
 
+export function resetLastfmActivity() {
+  activity = { songId: null, announce: "idle", scrobble: "idle" };
+  emitActivity();
+}
+
 export const setLastfmScrobbleState = (scrobble: LastfmScrobbleState) => {
   activity = { ...activity, scrobble };
   emitActivity();
