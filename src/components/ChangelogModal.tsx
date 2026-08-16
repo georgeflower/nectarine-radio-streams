@@ -13,7 +13,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "0.7.8",
     date: "2026-08-16",
     changes: [
-      "Added two small indicator lights next to the Last.fm badge: the first lights when the current track's now-playing is sent, the second when a scrobble is accepted",
+      "Added two small indicator lights in the Currently Playing heading: the first lights when the current track's now-playing is sent to Last.fm, the second when a scrobble is accepted",
       "The now-playing announcement now retries once if it fails, instead of being silently dropped",
       "Last.fm failures are no longer swallowed, so a broken connection is visible instead of showing up days later as an empty profile",
       "Added a toggle in the Playback Diagnostics panel to hide the Last.fm indicator lights",
