@@ -793,8 +793,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       if (played >= 30 && played <= 1800) {
         prev.scrobbled = true;
         const prevId = prev.songId ?? null;
-        void sendScrobble(prev.artist, prev.track, prev.startedAt, played).then((res) =>
-          {
+        void sendScrobble(prev.artist, prev.track, prev.startedAt, played).then((res) => {
           setLastfmScrobbleState(res.ok ? "ok" : "failed");
           handleLastfmResult(res, "scrobble");
         });
@@ -812,7 +811,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       announcedNowPlayingRef.current = key;
       announceNowPlaying(key, artist, track);
     }
-  }, [currentTrack, currentSongId, effectivePlayedSec, playing, announceNowPlaying]);
+  }, [currentTrack, currentSongId, effectivePlayedSec, playing, announceNowPlaying, handleLastfmResult]);
 
   // Announce now-playing when the user resumes mid-track.
   useEffect(() => {
@@ -845,15 +844,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       const threshold = 240;
       if (played >= threshold) {
         s.scrobbled = true;
-        void sendScrobble(s.artist, s.track, s.startedAt, dur || undefined).then((res) =>
-          {
+        void sendScrobble(s.artist, s.track, s.startedAt, dur || undefined).then((res) => {
           setLastfmScrobbleState(res.ok ? "ok" : "failed");
           handleLastfmResult(res, "scrobble");
         });
       }
     }, 5000);
     return () => window.clearInterval(id);
-  }, [playing, effectivePlayedSec]);
+  }, [playing, effectivePlayedSec, handleLastfmResult]);
 
   // Flush the final track of the session on page unload.
   useEffect(() => {
@@ -864,8 +862,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       const played = effectivePlayedSec(s);
       if (played >= 30 && played <= 1800) {
         s.scrobbled = true;
-        void sendScrobble(s.artist, s.track, s.startedAt, played, { keepalive: true }).then((res) =>
-          {
+        void sendScrobble(s.artist, s.track, s.startedAt, played, { keepalive: true }).then((res) => {
           setLastfmScrobbleState(res.ok ? "ok" : "failed");
           handleLastfmResult(res, "scrobble");
         });
