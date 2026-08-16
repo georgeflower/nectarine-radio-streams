@@ -142,7 +142,11 @@ async function callScrobble(body: Record<string, unknown>, keepalive = false) {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       },
-      body: JSON.stringify({ ...body, sessionKey: current.sessionKey }),
+      body: JSON.stringify(
+        body.action === "getinfo"
+          ? body
+          : { ...body, sessionKey: current.sessionKey },
+      ),
       keepalive,
     });
     return await res.json();

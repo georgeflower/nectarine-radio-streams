@@ -52,7 +52,9 @@ Deno.serve(async (req) => {
         artist: String(artist),
         track: String(track),
         username: String(username),
-        autocorrect: "1",
+        // Match love/unlove exactly: those calls are unsigned and have no
+        // autocorrect, so the read must use the same raw strings.
+        autocorrect: "0",
         format: "json",
       });
       const res = await fetch(`${API_ROOT}?${q}`);
@@ -74,12 +76,8 @@ Deno.serve(async (req) => {
       params.timestamp = String(timestamp ?? Math.floor(Date.now() / 1000));
     } else if (action === "love") {
       params.method = "track.love";
-      delete params.album;
-      delete params.duration;
     } else if (action === "unlove") {
       params.method = "track.unlove";
-      delete params.album;
-      delete params.duration;
     } else {
       return json({ error: "bad action" }, 400);
     }
