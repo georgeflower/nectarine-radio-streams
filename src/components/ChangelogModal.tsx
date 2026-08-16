@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.7";
+export const APP_VERSION = "0.7.8";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,19 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.8",
+    date: "2026-08-16",
+    changes: [
+      "Added two small indicator lights next to the Last.fm badge: the first lights when the current track's now-playing is sent, the second when a scrobble is accepted",
+      "The now-playing announcement now retries once if it fails, instead of being silently dropped",
+      "Last.fm failures are no longer swallowed, so a broken connection is visible instead of showing up days later as an empty profile",
+      "Added a toggle in the Playback Diagnostics panel to hide the Last.fm indicator lights",
+      "Stream telemetry now records live-edge corrections, and old telemetry rows are pruned automatically after 90 days",
+      "Fixed a redundant metadata request on every track change",
+      "An available update is now offered again if the first notification is missed",
+    ],
+  },
   {
     version: "0.7.7",
     date: "2026-08-14",
