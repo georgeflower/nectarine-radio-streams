@@ -29,12 +29,36 @@ async function signedCall(params: Record<string, string>) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { action, sessionKey, artist, track, album, timestamp, duration } = await req.json();
-    if (!action || !sessionKey || !artist || !track) {
-      return new Response(JSON.stringify({ error: "missing fields" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const { action, sessionKey, artist, track, album, timestamp, duration, username } =
+      await req.json();
+
+    const json = (data: unknown, status = 200) =>
+      new Response(JSON.stringify(data), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+
+    // getinfo is an unsigned public read and needs a username instead of a session key.
+    const needsSession = action !== "getinfo";
+    if (!action || !artist || !track || (needsSession && !sessionKey) ||
+        (action === "getinfo" && !username)) {
+      return json({ error: "missing fields" }, 400);
     }
+
+    if (action === "getinfo") {
+      const q = new URLSearchParams({
+        method: "track.getInfo",
+        api_key: API_KEY,
+        artist: String(artist),
+        track: String(track),
+        username: String(username),
+        autocorrect: "1",
+        format: "json",
+      });
+      const res = await fetch(`${API_ROOT}?${q}`);
+      return json(await res.json());
+    }
+
     const params: Record<string, string> = {
       sk: String(sessionKey),
       artist: String(artist),
@@ -48,15 +72,19 @@ Deno.serve(async (req) => {
     } else if (action === "scrobble") {
       params.method = "track.scrobble";
       params.timestamp = String(timestamp ?? Math.floor(Date.now() / 1000));
+    } else if (action === "love") {
+      params.method = "track.love";
+      delete params.album;
+      delete params.duration;
+    } else if (action === "unlove") {
+      params.method = "track.unlove";
+      delete params.album;
+      delete params.duration;
     } else {
-      return new Response(JSON.stringify({ error: "bad action" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "bad action" }, 400);
     }
     const data = await signedCall(params);
-    return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json(data);
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
