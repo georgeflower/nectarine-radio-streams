@@ -216,6 +216,37 @@ export async function sendScrobble(
   return resultOf(data);
 }
 
+export async function setLoved(
+  artist: string,
+  track: string,
+  loved: boolean,
+): Promise<LastfmCallResult> {
+  if (!current) return { ok: false, kind: "auth", message: "No Last.fm session" };
+  const data = await callScrobble({ action: loved ? "love" : "unlove", artist, track });
+  return resultOf(data);
+}
+
+/** Public read of track.getInfo for the current user; userloves comes back as "0"/"1". */
+export async function getLovedState(
+  artist: string,
+  track: string,
+): Promise<{ ok: boolean; loved?: boolean }> {
+  if (!current) return { ok: false };
+  const data = await callScrobble({
+    action: "getinfo",
+    artist,
+    track,
+    username: current.username,
+  });
+  const info = (data as { track?: { userloves?: unknown } } | null)?.track;
+  if (!info || info.userloves === undefined || info.userloves === null) return { ok: false };
+  const raw = String(info.userloves);
+  if (raw !== "0" && raw !== "1") return { ok: false };
+  return { ok: true, loved: raw === "1" };
+}
+
+
+
 
 /* ---------------- Activity indicator store ---------------- */
 
