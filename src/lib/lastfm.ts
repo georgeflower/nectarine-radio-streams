@@ -262,6 +262,62 @@ export const setLastfmScrobbleState = (scrobble: LastfmScrobbleState) => {
   emitActivity();
 };
 
+/* ---------------- Auth / config failure stores ---------------- */
+
+export type LastfmAuthFailure = { message: string; at: number; username: string | null };
+
+let authFailure: LastfmAuthFailure | null = null;
+const authFailureListeners = new Set<(f: LastfmAuthFailure | null) => void>();
+
+export const getLastfmAuthFailure = (): LastfmAuthFailure | null => authFailure;
+
+export const subscribeLastfmAuthFailure = (
+  cb: (f: LastfmAuthFailure | null) => void,
+): (() => void) => {
+  authFailureListeners.add(cb);
+  return () => { authFailureListeners.delete(cb); };
+};
+
+const emitAuthFailure = () => authFailureListeners.forEach((l) => l(authFailure));
+
+export const clearLastfmAuthFailure = () => {
+  authFailure = null;
+  emitAuthFailure();
+};
+
+/** Capture the username BEFORE clearing the session — it is wiped by setLastfmSession(null). */
+export function reportLastfmAuthFailure(message: string) {
+  const username = getLastfmSession()?.username ?? null;
+  authFailure = { message, at: Date.now(), username };
+  setLastfmSession(null);
+  emitAuthFailure();
+}
+
+/** Config failures mean a bad/suspended API key: a deployment problem. Never clears the session. */
+let configFailure: LastfmAuthFailure | null = null;
+const configFailureListeners = new Set<(f: LastfmAuthFailure | null) => void>();
+
+export const getLastfmConfigFailure = (): LastfmAuthFailure | null => configFailure;
+
+export const subscribeLastfmConfigFailure = (
+  cb: (f: LastfmAuthFailure | null) => void,
+): (() => void) => {
+  configFailureListeners.add(cb);
+  return () => { configFailureListeners.delete(cb); };
+};
+
+const emitConfigFailure = () => configFailureListeners.forEach((l) => l(configFailure));
+
+export const clearLastfmConfigFailure = () => {
+  configFailure = null;
+  emitConfigFailure();
+};
+
+export function reportLastfmConfigFailure(message: string) {
+  configFailure = { message, at: Date.now(), username: getLastfmSession()?.username ?? null };
+  emitConfigFailure();
+}
+
 /* ---------------- Visibility toggle ---------------- */
 
 const VIS_KEY = "nectarine-lastfm-status-visible-v1";
