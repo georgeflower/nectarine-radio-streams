@@ -755,7 +755,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         prev.scrobbled = true;
         const prevId = prev.songId ?? null;
         void sendScrobble(prev.artist, prev.track, prev.startedAt, played).then((res) =>
-          setLastfmScrobbleState(prevId, res.ok ? "ok" : "failed"),
+          setLastfmScrobbleState(res.ok ? "ok" : "failed"),
         );
       }
     }
@@ -767,7 +767,6 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       track,
       pausedMs: 0,
     };
-    setLastfmScrobbleState(key, "pending");
     if (playing) {
       announcedNowPlayingRef.current = key;
       announceNowPlaying(key, artist, track);
@@ -806,7 +805,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       if (played >= threshold) {
         s.scrobbled = true;
         void sendScrobble(s.artist, s.track, s.startedAt, dur || undefined).then((res) =>
-          setLastfmScrobbleState(s.songId ?? null, res.ok ? "ok" : "failed"),
+          setLastfmScrobbleState(res.ok ? "ok" : "failed"),
         );
       }
     }, 5000);
@@ -823,7 +822,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       if (played >= 30 && played <= 1800) {
         s.scrobbled = true;
         void sendScrobble(s.artist, s.track, s.startedAt, played, { keepalive: true }).then((res) =>
-          setLastfmScrobbleState(s.songId ?? null, res.ok ? "ok" : "failed"),
+          setLastfmScrobbleState(res.ok ? "ok" : "failed"),
         );
       }
     };
