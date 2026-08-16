@@ -189,7 +189,8 @@ export async function sendScrobble(
 /* ---------------- Activity indicator store ---------------- */
 
 export type LastfmAnnounceState = "idle" | "sending" | "ok" | "failed";
-export type LastfmScrobbleState = "idle" | "pending" | "ok" | "failed";
+/** Unkeyed: result of the most recent scrobble attempt, whichever track. */
+export type LastfmScrobbleState = "idle" | "ok" | "failed";
 export type LastfmActivity = {
   songId: string | null;
   announce: LastfmAnnounceState;
@@ -206,20 +207,24 @@ export const subscribeLastfmActivity = (cb: (a: LastfmActivity) => void): (() =>
   return () => { activityListeners.delete(cb); };
 };
 
-const setActivity = (songId: string | null, patch: Partial<LastfmActivity>) => {
-  const base: LastfmActivity =
-    activity.songId === songId
-      ? activity
-      : { songId, announce: "idle", scrobble: "idle" };
-  activity = { ...base, ...patch, songId };
-  activityListeners.forEach((l) => l(activity));
+const emitActivity = () => activityListeners.forEach((l) => l(activity));
+
+export const setLastfmAnnounceState = (songId: string | null, announce: LastfmAnnounceState) => {
+  if (songId !== activity.songId) {
+    // A new track always starts with "sending"; anything else arriving with a
+    // stale songId is a late response and must not rewrite the store.
+    if (announce !== "sending") return;
+    activity = { ...activity, songId, announce };
+  } else {
+    activity = { ...activity, announce };
+  }
+  emitActivity();
 };
 
-export const setLastfmAnnounceState = (songId: string | null, announce: LastfmAnnounceState) =>
-  setActivity(songId, { announce });
-
-export const setLastfmScrobbleState = (songId: string | null, scrobble: LastfmScrobbleState) =>
-  setActivity(songId, { scrobble });
+export const setLastfmScrobbleState = (scrobble: LastfmScrobbleState) => {
+  activity = { ...activity, scrobble };
+  emitActivity();
+};
 
 /* ---------------- Visibility toggle ---------------- */
 
