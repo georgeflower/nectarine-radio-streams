@@ -21,8 +21,7 @@ const announceLabel: Record<LastfmActivity["announce"], string> = {
 };
 
 const scrobbleLabel: Record<LastfmActivity["scrobble"], string> = {
-  idle: "No scrobble pending",
-  pending: "Scrobble pending",
+  idle: "No scrobble sent yet",
   ok: "Scrobble accepted by Last.fm",
   failed: "Scrobble failed",
 };
@@ -30,8 +29,7 @@ const scrobbleLabel: Record<LastfmActivity["scrobble"], string> = {
 const lightClass = (state: string): string => {
   if (state === "ok") return "bg-primary";
   if (state === "failed") return "bg-destructive";
-  if (state === "sending" || state === "pending")
-    return "bg-muted-foreground/25 motion-safe:animate-pulse";
+  if (state === "sending") return "bg-muted-foreground/25 motion-safe:animate-pulse";
   return "bg-muted-foreground/25";
 };
 
