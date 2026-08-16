@@ -151,24 +151,102 @@ async function callScrobble(body: Record<string, unknown>, keepalive = false) {
   }
 }
 
-export function sendNowPlaying(artist: string, track: string, duration?: number) {
-  if (!current) return;
-  return callScrobble({ action: "nowplaying", artist, track, duration });
+export type LastfmCallResult = { ok: boolean; error?: string };
+
+const resultOf = (data: unknown): LastfmCallResult => {
+  if (!data || typeof data !== "object") return { ok: false, error: "no response" };
+  const d = data as Record<string, unknown>;
+  if (typeof d.error === "string" && d.error) return { ok: false, error: d.error };
+  if (d.error) return { ok: false, error: String(d.error) };
+  return { ok: true };
+};
+
+export async function sendNowPlaying(
+  artist: string,
+  track: string,
+  duration?: number,
+): Promise<LastfmCallResult> {
+  if (!current) return { ok: false, error: "no session" };
+  const data = await callScrobble({ action: "nowplaying", artist, track, duration });
+  return resultOf(data);
 }
 
-export function sendScrobble(
+export async function sendScrobble(
   artist: string,
   track: string,
   timestamp: number,
   duration?: number,
   opts?: { keepalive?: boolean },
-) {
-  if (!current) return;
-  return callScrobble(
+): Promise<LastfmCallResult> {
+  if (!current) return { ok: false, error: "no session" };
+  const data = await callScrobble(
     { action: "scrobble", artist, track, timestamp, duration },
     opts?.keepalive ?? false,
   );
+  return resultOf(data);
 }
+
+/* ---------------- Activity indicator store ---------------- */
+
+export type LastfmAnnounceState = "idle" | "sending" | "ok" | "failed";
+export type LastfmScrobbleState = "idle" | "pending" | "ok" | "failed";
+export type LastfmActivity = {
+  songId: string | null;
+  announce: LastfmAnnounceState;
+  scrobble: LastfmScrobbleState;
+};
+
+let activity: LastfmActivity = { songId: null, announce: "idle", scrobble: "idle" };
+const activityListeners = new Set<(a: LastfmActivity) => void>();
+
+export const getLastfmActivity = (): LastfmActivity => activity;
+
+export const subscribeLastfmActivity = (cb: (a: LastfmActivity) => void): (() => void) => {
+  activityListeners.add(cb);
+  return () => { activityListeners.delete(cb); };
+};
+
+const setActivity = (songId: string | null, patch: Partial<LastfmActivity>) => {
+  const base: LastfmActivity =
+    activity.songId === songId
+      ? activity
+      : { songId, announce: "idle", scrobble: "idle" };
+  activity = { ...base, ...patch, songId };
+  activityListeners.forEach((l) => l(activity));
+};
+
+export const setLastfmAnnounceState = (songId: string | null, announce: LastfmAnnounceState) =>
+  setActivity(songId, { announce });
+
+export const setLastfmScrobbleState = (songId: string | null, scrobble: LastfmScrobbleState) =>
+  setActivity(songId, { scrobble });
+
+/* ---------------- Visibility toggle ---------------- */
+
+const VIS_KEY = "nectarine-lastfm-status-visible-v1";
+let visible: boolean = (() => {
+  try {
+    const raw = localStorage.getItem(VIS_KEY);
+    return raw === null ? true : raw === "true";
+  } catch {
+    return true;
+  }
+})();
+const visListeners = new Set<(v: boolean) => void>();
+
+export const isLastfmStatusVisible = (): boolean => visible;
+
+export const setLastfmStatusVisible = (v: boolean) => {
+  visible = v;
+  try { localStorage.setItem(VIS_KEY, String(v)); } catch { /* ignore */ }
+  visListeners.forEach((l) => l(v));
+};
+
+export const subscribeLastfmStatusVisible = (cb: (v: boolean) => void): (() => void) => {
+  visListeners.add(cb);
+  return () => { visListeners.delete(cb); };
+};
+
 
 
 export function useLastfm() {
