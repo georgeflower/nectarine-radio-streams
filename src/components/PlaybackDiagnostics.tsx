@@ -230,11 +230,17 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
 
         <div className="border-t border-border pt-2 space-y-1">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Last.fm</div>
-          <label className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <label
+            aria-disabled={!lastfmSession}
+            className={`flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-muted-foreground ${
+              lastfmSession ? "" : "opacity-50 pointer-events-none"
+            }`}
+          >
             <span className="truncate">Show activity lights</span>
             <input
               type="checkbox"
               checked={lastfmVisible}
+              disabled={!lastfmSession}
               onChange={(e) => {
                 setLastfmStatusVisible(e.target.checked);
                 setLastfmVisible(e.target.checked);
@@ -242,7 +248,11 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
               className="h-3.5 w-3.5 accent-[hsl(var(--primary))]"
             />
           </label>
+          {!lastfmSession && (
+            <div className="text-[10px] text-muted-foreground">Connect Last.fm to enable</div>
+          )}
         </div>
+
 
         <div className="border-t border-border pt-2 space-y-1">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Stall timeout</div>
