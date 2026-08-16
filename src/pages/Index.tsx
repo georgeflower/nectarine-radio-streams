@@ -824,7 +824,7 @@ const Index = () => {
                 <span>{nowOpen ? "▼" : "▶"} Currently Playing</span>
               </button>
               <span className="flex items-center gap-1 shrink-0">
-                <LoveButton songId={now.songId} artist={now.artist} track={now.song} />
+                <LoveButton songId={now?.songId ?? ""} artist={now?.artist ?? ""} track={now?.song ?? ""} />
                 <LastfmLights />
               </span>
             </div>
