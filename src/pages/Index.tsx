@@ -229,9 +229,12 @@ function LastfmAuthBanner() {
 function LastfmConfigBanner() {
   const [failure, setFailure] = useState<LastfmAuthFailure | null>(() => getLastfmConfigFailure());
   const [dismissed, setDismissed] = useState(false);
+  const dismissedMessageRef = useRef<string | null>(null);
   useEffect(() => subscribeLastfmConfigFailure((f) => {
     setFailure(f);
-    if (f) setDismissed(false);
+    if (f && f.message !== dismissedMessageRef.current) {
+      setDismissed(false);
+    }
   }), []);
   if (!failure || dismissed) return null;
   return (
@@ -241,7 +244,11 @@ function LastfmConfigBanner() {
       </span>
       <button
         type="button"
-        onClick={() => { clearLastfmConfigFailure(); setDismissed(true); }}
+        onClick={() => {
+          dismissedMessageRef.current = failure.message;
+          clearLastfmConfigFailure();
+          setDismissed(true);
+        }}
         aria-label="Dismiss Last.fm configuration warning"
         className="shrink-0 hover:text-red-300 transition-colors"
       >
@@ -250,6 +257,7 @@ function LastfmConfigBanner() {
     </div>
   );
 }
+
 
 
 const Index = () => {
