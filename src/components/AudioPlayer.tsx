@@ -805,7 +805,9 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       const threshold = 240;
       if (played >= threshold) {
         s.scrobbled = true;
-        void sendScrobble(s.artist, s.track, s.startedAt, dur || undefined);
+        void sendScrobble(s.artist, s.track, s.startedAt, dur || undefined).then((res) =>
+          setLastfmScrobbleState(s.songId ?? null, res.ok ? "ok" : "failed"),
+        );
       }
     }, 5000);
     return () => window.clearInterval(id);
