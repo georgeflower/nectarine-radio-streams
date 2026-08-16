@@ -17,7 +17,7 @@ import {
   requestSongArtwork,
   subscribeSongArtwork,
 } from "@/lib/songArtwork";
-import { sendNowPlaying, sendScrobble, getLastfmSession, setLastfmAnnounceState, setLastfmScrobbleState } from "@/lib/lastfm";
+import { sendNowPlaying, sendScrobble, getLastfmSession, setLastfmAnnounceState, setLastfmScrobbleState, reportLastfmAuthFailure, reportLastfmConfigFailure, type LastfmCallResult } from "@/lib/lastfm";
 import {
   getLiveEdgeReloadAfterHiddenMs,
   getStallTimeoutMs,
@@ -712,12 +712,50 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     [],
   );
 
+  // Consecutive scrobble failure tracking (scrobbles only — now-playing is transient).
+  const scrobbleFailStreakRef = useRef(0);
+  const scrobbleStreakToastedRef = useRef(false);
+
+  /**
+   * Route every Last.fm call result through here. `kind === "auth"` with no session is
+   * the normal never-connected state and must stay silent.
+   */
+  const handleLastfmResult = useCallback(
+    (res: LastfmCallResult, source: "scrobble" | "nowplaying") => {
+      const hasSession = getLastfmSession() !== null;
+      if (!res.ok) {
+        if (res.kind === "config") {
+          reportLastfmConfigFailure(res.message ?? "Last.fm API key rejected");
+        } else if (res.kind === "auth" && hasSession) {
+          reportLastfmAuthFailure(res.message ?? "Last.fm session expired");
+        }
+      }
+      if (source !== "scrobble" || !hasSession) return;
+      if (res.ok) {
+        scrobbleFailStreakRef.current = 0;
+        scrobbleStreakToastedRef.current = false;
+        return;
+      }
+      scrobbleFailStreakRef.current += 1;
+      if (scrobbleFailStreakRef.current >= 2 && !scrobbleStreakToastedRef.current) {
+        scrobbleStreakToastedRef.current = true;
+        void import("sonner").then(({ toast }) =>
+          toast.error("Scrobbling is failing", {
+            description: res.message ?? "Two scrobbles in a row could not be sent to Last.fm.",
+          }),
+        );
+      }
+    },
+    [],
+  );
+
   const announceRetryRef = useRef<number | null>(null);
 
   const announceNowPlaying = useCallback((songId: string, artist: string, track: string) => {
     setLastfmAnnounceState(songId, "sending");
     void sendNowPlaying(artist, track).then((res) => {
       setLastfmAnnounceState(songId, res.ok ? "ok" : "failed");
+      handleLastfmResult(res, "nowplaying");
       if (res.ok) return;
       // One retry only — now-playing expires server-side anyway.
       if (announceRetryRef.current !== null) return;
@@ -726,12 +764,13 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         if (scrobbleStateRef.current?.songId !== songId) return;
         if (!shouldPlayRef.current) return;
         setLastfmAnnounceState(songId, "sending");
-        void sendNowPlaying(artist, track).then((r2) =>
-          setLastfmAnnounceState(songId, r2.ok ? "ok" : "failed"),
-        );
+        void sendNowPlaying(artist, track).then((r2) => {
+          setLastfmAnnounceState(songId, r2.ok ? "ok" : "failed");
+          handleLastfmResult(r2, "nowplaying");
+        });
       }, 5000);
     });
-  }, []);
+  }, [handleLastfmResult]);
 
   useEffect(() => () => {
     if (announceRetryRef.current !== null) window.clearTimeout(announceRetryRef.current);
@@ -754,9 +793,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       if (played >= 30 && played <= 1800) {
         prev.scrobbled = true;
         const prevId = prev.songId ?? null;
-        void sendScrobble(prev.artist, prev.track, prev.startedAt, played).then((res) =>
-          setLastfmScrobbleState(res.ok ? "ok" : "failed"),
-        );
+        void sendScrobble(prev.artist, prev.track, prev.startedAt, played).then((res) => {
+          setLastfmScrobbleState(res.ok ? "ok" : "failed");
+          handleLastfmResult(res, "scrobble");
+        });
       }
     }
     scrobbleStateRef.current = {
@@ -771,7 +811,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       announcedNowPlayingRef.current = key;
       announceNowPlaying(key, artist, track);
     }
-  }, [currentTrack, currentSongId, effectivePlayedSec, playing, announceNowPlaying]);
+  }, [currentTrack, currentSongId, effectivePlayedSec, playing, announceNowPlaying, handleLastfmResult]);
 
   // Announce now-playing when the user resumes mid-track.
   useEffect(() => {
@@ -804,13 +844,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       const threshold = 240;
       if (played >= threshold) {
         s.scrobbled = true;
-        void sendScrobble(s.artist, s.track, s.startedAt, dur || undefined).then((res) =>
-          setLastfmScrobbleState(res.ok ? "ok" : "failed"),
-        );
+        void sendScrobble(s.artist, s.track, s.startedAt, dur || undefined).then((res) => {
+          setLastfmScrobbleState(res.ok ? "ok" : "failed");
+          handleLastfmResult(res, "scrobble");
+        });
       }
     }, 5000);
     return () => window.clearInterval(id);
-  }, [playing, effectivePlayedSec]);
+  }, [playing, effectivePlayedSec, handleLastfmResult]);
 
   // Flush the final track of the session on page unload.
   useEffect(() => {
@@ -821,9 +862,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       const played = effectivePlayedSec(s);
       if (played >= 30 && played <= 1800) {
         s.scrobbled = true;
-        void sendScrobble(s.artist, s.track, s.startedAt, played, { keepalive: true }).then((res) =>
-          setLastfmScrobbleState(res.ok ? "ok" : "failed"),
-        );
+        void sendScrobble(s.artist, s.track, s.startedAt, played, { keepalive: true }).then((res) => {
+          setLastfmScrobbleState(res.ok ? "ok" : "failed");
+          handleLastfmResult(res, "scrobble");
+        });
       }
     };
     window.addEventListener("pagehide", onPageHide);

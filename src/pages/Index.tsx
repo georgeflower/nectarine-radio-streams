@@ -37,7 +37,17 @@ import LastfmButton, { LastfmLights } from "@/components/LastfmButton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ReactivityDrawer from "@/components/ReactivityDrawer";
 import PerformanceTipsModal from "@/components/PerformanceTipsModal";
-import { handleLastfmCallback } from "@/lib/lastfm";
+import {
+  handleLastfmCallback,
+  clearLastfmAuthFailure,
+  clearLastfmConfigFailure,
+  getLastfmAuthFailure,
+  getLastfmConfigFailure,
+  subscribeLastfmAuthFailure,
+  subscribeLastfmConfigFailure,
+  useLastfm,
+  type LastfmAuthFailure,
+} from "@/lib/lastfm";
 
 function SongRating({ songId }: { songId: string }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
@@ -179,6 +189,68 @@ const TimeLeft = ({ playstart, lengthSec }: { playstart?: string | null; lengthS
   }, []);
   return <>{computeTimeLeft(playstart, lengthSec)}</>;
 };
+
+
+/** Shown only when a previously working Last.fm connection was lost (never-connected users see nothing). */
+function LastfmAuthBanner() {
+  const [failure, setFailure] = useState<LastfmAuthFailure | null>(() => getLastfmAuthFailure());
+  const [dismissed, setDismissed] = useState(false);
+  const { login } = useLastfm();
+  useEffect(() => subscribeLastfmAuthFailure((f) => {
+    setFailure(f);
+    if (f) setDismissed(false);
+  }), []);
+  if (!failure || dismissed) return null;
+  return (
+    <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-sm border border-red-500/30 bg-red-950/20 text-red-400 text-xs uppercase tracking-wider">
+      <span className="flex-1">
+        Last.fm disconnected{failure.username ? ` (${failure.username})` : ""} — scrobbling has stopped. {failure.message}
+      </span>
+      <button
+        type="button"
+        onClick={login}
+        className="shrink-0 underline hover:text-red-300 transition-colors"
+      >
+        Reconnect
+      </button>
+      <button
+        type="button"
+        onClick={() => { clearLastfmAuthFailure(); setDismissed(true); }}
+        aria-label="Dismiss Last.fm disconnection warning"
+        className="shrink-0 hover:text-red-300 transition-colors"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+/** Server-side API key problem — reconnecting does not help, so no reconnect action. */
+function LastfmConfigBanner() {
+  const [failure, setFailure] = useState<LastfmAuthFailure | null>(() => getLastfmConfigFailure());
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => subscribeLastfmConfigFailure((f) => {
+    setFailure(f);
+    if (f) setDismissed(false);
+  }), []);
+  if (!failure || dismissed) return null;
+  return (
+    <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-sm border border-red-500/30 bg-red-950/20 text-red-400 text-xs uppercase tracking-wider">
+      <span className="flex-1">
+        Last.fm rejected this app's API key — scrobbling is disabled server-side. Reconnecting will not help. {failure.message}
+      </span>
+      <button
+        type="button"
+        onClick={() => { clearLastfmConfigFailure(); setDismissed(true); }}
+        aria-label="Dismiss Last.fm configuration warning"
+        className="shrink-0 hover:text-red-300 transition-colors"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
 
 const Index = () => {
   const [playlist, setPlaylist] = useState<PlaylistData>(EMPTY_PLAYLIST);
@@ -504,6 +576,8 @@ const Index = () => {
           paddingRight: "max(0.75rem, var(--safe-right))",
         }}
       >
+        <LastfmAuthBanner />
+        <LastfmConfigBanner />
         {isFirefox && !firefoxWarnDismissed && (
           <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-sm border border-red-500/30 bg-red-950/20 text-red-400 text-xs uppercase tracking-wider">
             <span className="flex-1">Known performance issues with Firefox for the effects. For best performance change to Chrome, Edge or Safari.</span>
