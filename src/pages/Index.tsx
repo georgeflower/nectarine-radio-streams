@@ -814,15 +814,20 @@ const Index = () => {
                   : undefined,
             }}
           >
-            <button
-              type="button"
-              onClick={() => setNowOpen((o) => !o)}
-              className="panel-heading w-full !mb-0 flex items-center justify-between text-left hover:opacity-90"
-              aria-expanded={nowOpen}
-            >
-              <span>{nowOpen ? "▼" : "▶"} Currently Playing</span>
-              <LastfmLights />
-            </button>
+            <div className="panel-heading !mb-0 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setNowOpen((o) => !o)}
+                className="flex-1 text-left hover:opacity-90"
+                aria-expanded={nowOpen}
+              >
+                <span>{nowOpen ? "▼" : "▶"} Currently Playing</span>
+              </button>
+              <span className="flex items-center gap-1 shrink-0">
+                <LoveButton songId={now.songId} artist={now.artist} track={now.song} />
+                <LastfmLights />
+              </span>
+            </div>
             {nowOpen && (
               <div className="mt-3">
                 {now ? (
@@ -838,8 +843,7 @@ const Index = () => {
                       }
                     >
                       <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink> <SongPlatform songId={now.songId} />{" "}
-                      <SongRating songId={now.songId} />{" "}
-                      <LoveButton songId={now.songId} artist={now.artist} track={now.song} />
+                      <SongRating songId={now.songId} />
                     </p>
                     <p className="text-sm text-muted-foreground mb-3">
                       by <ExtLink href={artistUrl(now.artistId)}>{now.artist}</ExtLink>
