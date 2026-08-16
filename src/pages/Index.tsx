@@ -33,7 +33,7 @@ import Flag from "@/components/Flag";
 import { renderBBCode } from "@/lib/bbcode";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 
-import LastfmButton from "@/components/LastfmButton";
+import LastfmButton, { LastfmLights } from "@/components/LastfmButton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ReactivityDrawer from "@/components/ReactivityDrawer";
 import PerformanceTipsModal from "@/components/PerformanceTipsModal";
@@ -674,6 +674,7 @@ const Index = () => {
               aria-expanded={nowOpen}
             >
               <span>{nowOpen ? "▼" : "▶"} Currently Playing</span>
+              <LastfmLights />
             </button>
             {nowOpen && (
               <div className="mt-3">
