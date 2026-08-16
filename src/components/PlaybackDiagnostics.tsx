@@ -18,6 +18,11 @@ import {
   type WatchdogConfig,
   type WatchdogDiagnostics,
 } from "@/lib/playbackWatchdog";
+import {
+  isLastfmStatusVisible,
+  setLastfmStatusVisible,
+  subscribeLastfmStatusVisible,
+} from "@/lib/lastfm";
 
 type Props = { onClose: () => void };
 
