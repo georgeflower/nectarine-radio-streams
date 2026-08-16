@@ -33,6 +33,7 @@ export function setLastfmSession(s: LastfmSession | null) {
     if (s) localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     else localStorage.removeItem(STORAGE_KEY);
   } catch { /* ignore */ }
+  if (!s) resetLastfmActivity();
   emit();
 }
 
