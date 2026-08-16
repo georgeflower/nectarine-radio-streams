@@ -1,8 +1,69 @@
-import { useLastfm } from "@/lib/lastfm";
+import { useEffect, useState } from "react";
+import {
+  getLastfmActivity,
+  isLastfmStatusVisible,
+  subscribeLastfmActivity,
+  subscribeLastfmStatusVisible,
+  useLastfm,
+  type LastfmActivity,
+} from "@/lib/lastfm";
 
 type Props = {
   /** Smaller pill style for the Cracktro settings row. */
   compact?: boolean;
+};
+
+const announceLabel: Record<LastfmActivity["announce"], string> = {
+  idle: "Now playing not sent",
+  sending: "Sending now playing",
+  ok: "Now playing sent",
+  failed: "Now playing failed",
+};
+
+const scrobbleLabel: Record<LastfmActivity["scrobble"], string> = {
+  idle: "No scrobble pending",
+  pending: "Scrobble pending",
+  ok: "Scrobble accepted by Last.fm",
+  failed: "Scrobble failed",
+};
+
+const lightClass = (state: string): string => {
+  if (state === "ok") return "bg-primary";
+  if (state === "failed") return "bg-destructive";
+  if (state === "sending" || state === "pending")
+    return "bg-muted-foreground/25 motion-safe:animate-pulse";
+  return "bg-muted-foreground/25";
+};
+
+const ActivityLights = () => {
+  const [visible, setVisible] = useState(isLastfmStatusVisible);
+  const [activity, setActivity] = useState<LastfmActivity>(getLastfmActivity);
+
+  useEffect(() => subscribeLastfmStatusVisible(setVisible), []);
+  useEffect(() => subscribeLastfmActivity(setActivity), []);
+
+  if (!visible) return null;
+
+  const label = `${announceLabel[activity.announce]} · ${scrobbleLabel[activity.scrobble]}`;
+  const glow = { boxShadow: "var(--glow-primary)" };
+
+  return (
+    <span
+      role="status"
+      aria-label={label}
+      title={label}
+      className="flex items-center gap-[3px] shrink-0"
+    >
+      <span
+        className={`w-1.5 h-1.5 rounded-[1px] ${lightClass(activity.announce)}`}
+        style={activity.announce === "ok" ? glow : undefined}
+      />
+      <span
+        className={`w-1.5 h-1.5 rounded-[1px] ${lightClass(activity.scrobble)}`}
+        style={activity.scrobble === "ok" ? glow : undefined}
+      />
+    </span>
+  );
 };
 
 const LastfmButton = ({ compact }: Props) => {
@@ -22,6 +83,7 @@ const LastfmButton = ({ compact }: Props) => {
         >
           ♪ {session.username}
         </span>
+        <ActivityLights />
         <button
           type="button"
           onClick={logout}

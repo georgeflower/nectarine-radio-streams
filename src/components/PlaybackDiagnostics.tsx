@@ -18,6 +18,11 @@ import {
   type WatchdogConfig,
   type WatchdogDiagnostics,
 } from "@/lib/playbackWatchdog";
+import {
+  isLastfmStatusVisible,
+  setLastfmStatusVisible,
+  subscribeLastfmStatusVisible,
+} from "@/lib/lastfm";
 
 type Props = { onClose: () => void };
 
@@ -120,6 +125,9 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
   const [diag, setDiag] = useState<WatchdogDiagnostics>(getWatchdogDiagnostics());
   const [, force] = useState(0);
   const netCounts = getNetChangeCounts();
+  const [lastfmVisible, setLastfmVisible] = useState(isLastfmStatusVisible);
+  useEffect(() => subscribeLastfmStatusVisible(setLastfmVisible), []);
+
 
 
   useEffect(() => {
@@ -217,7 +225,21 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
           </div>
         </div>
 
-
+        <div className="border-t border-border pt-2 space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Last.fm</div>
+          <label className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="truncate">Show activity lights</span>
+            <input
+              type="checkbox"
+              checked={lastfmVisible}
+              onChange={(e) => {
+                setLastfmStatusVisible(e.target.checked);
+                setLastfmVisible(e.target.checked);
+              }}
+              className="h-3.5 w-3.5 accent-[hsl(var(--primary))]"
+            />
+          </label>
+        </div>
 
         <div className="border-t border-border pt-2 space-y-1">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Stall timeout</div>
