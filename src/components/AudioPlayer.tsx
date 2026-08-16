@@ -712,6 +712,31 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     [],
   );
 
+  const announceRetryRef = useRef<number | null>(null);
+
+  const announceNowPlaying = useCallback((songId: string, artist: string, track: string) => {
+    setLastfmAnnounceState(songId, "sending");
+    void sendNowPlaying(artist, track).then((res) => {
+      setLastfmAnnounceState(songId, res.ok ? "ok" : "failed");
+      if (res.ok) return;
+      // One retry only — now-playing expires server-side anyway.
+      if (announceRetryRef.current !== null) return;
+      announceRetryRef.current = window.setTimeout(() => {
+        announceRetryRef.current = null;
+        if (scrobbleStateRef.current?.songId !== songId) return;
+        if (!shouldPlayRef.current) return;
+        setLastfmAnnounceState(songId, "sending");
+        void sendNowPlaying(artist, track).then((r2) =>
+          setLastfmAnnounceState(songId, r2.ok ? "ok" : "failed"),
+        );
+      }, 5000);
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (announceRetryRef.current !== null) window.clearTimeout(announceRetryRef.current);
+  }, []);
+
   useEffect(() => {
     if (!getLastfmSession()) return;
     const artist = normalizeNowPlayingValue(currentTrack?.artist);
@@ -719,12 +744,19 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     if (!artist || !track) return;
     const key = currentSongId || `${artist}::${track}`;
     if (scrobbleStateRef.current?.songId === key) return;
+    if (announceRetryRef.current !== null) {
+      window.clearTimeout(announceRetryRef.current);
+      announceRetryRef.current = null;
+    }
     const prev = scrobbleStateRef.current;
     if (prev && !prev.scrobbled) {
       const played = effectivePlayedSec(prev);
       if (played >= 30 && played <= 1800) {
         prev.scrobbled = true;
-        void sendScrobble(prev.artist, prev.track, prev.startedAt, played);
+        const prevId = prev.songId ?? null;
+        void sendScrobble(prev.artist, prev.track, prev.startedAt, played).then((res) =>
+          setLastfmScrobbleState(prevId, res.ok ? "ok" : "failed"),
+        );
       }
     }
     scrobbleStateRef.current = {
@@ -735,11 +767,12 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       track,
       pausedMs: 0,
     };
+    setLastfmScrobbleState(key, "pending");
     if (playing) {
       announcedNowPlayingRef.current = key;
-      void sendNowPlaying(artist, track);
+      announceNowPlaying(key, artist, track);
     }
-  }, [currentTrack, currentSongId, effectivePlayedSec, playing]);
+  }, [currentTrack, currentSongId, effectivePlayedSec, playing, announceNowPlaying]);
 
   // Announce now-playing when the user resumes mid-track.
   useEffect(() => {
@@ -753,9 +786,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     if (!s) return;
     if (s.songId && s.songId !== announcedNowPlayingRef.current) {
       announcedNowPlayingRef.current = s.songId;
-      void sendNowPlaying(s.artist, s.track);
+      announceNowPlaying(s.songId, s.artist, s.track);
     }
-  }, [playing]);
+  }, [playing, announceNowPlaying]);
+
 
 
   useEffect(() => {
