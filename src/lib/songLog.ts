@@ -44,3 +44,28 @@ export const logSongPlay = ({ songId, playstart, lengthSec, requester }: SongPla
     /* logging must never affect playback */
   }
 };
+
+// Song metadata enrichment. Same fire-and-forget contract as logSongPlay.
+const ingested = new Set<string>();
+
+export const ingestSong = (songId: string, doc: unknown): void => {
+  try {
+    if (!songId || !doc) return;
+    if (ingested.has(songId)) return;
+    ingested.add(songId);
+
+    void fetch(`${SUPABASE_URL}/functions/v1/song-ingest`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ song_id: songId, doc }),
+    }).catch(() => {
+      /* drop silently */
+    });
+  } catch {
+    /* enrichment must never affect the read path */
+  }
+};
