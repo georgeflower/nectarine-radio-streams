@@ -39,7 +39,7 @@ export function parseXml(text: string) {
 }
 
 // ─── Pretty printer (XML → JSON-ish) ───────────────────────────────────────────
-function xmlNodeToObject(node: Element): unknown {
+export function xmlNodeToObject(node: Element): unknown {
   const hasEl = Array.from(node.childNodes).some((c) => c.nodeType === Node.ELEMENT_NODE);
   const attrs: Record<string, string> = {};
   for (const a of Array.from(node.attributes)) attrs[`@${a.name}`] = a.value;

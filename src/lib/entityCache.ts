@@ -160,6 +160,14 @@ async function resolveOne(kind: EntityKind, id: string): Promise<EntityInfo> {
       const text = await fetchEndpoint(endpointPath(kind, id));
       const doc = parseXml(text);
       const info = extractInfo(kind, doc);
+      if (kind === "song" && info.title) {
+        // Keep the document we already fetched; never block or break resolve.
+        try {
+          ingestSong(id, xmlNodeToObject(doc.documentElement));
+        } catch {
+          /* ignore */
+        }
+      }
       if (info.title) {
         memCache[kind][id] = { info, fetchedAt: Date.now() };
         persist(kind);
