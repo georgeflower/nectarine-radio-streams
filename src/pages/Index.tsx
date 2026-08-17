@@ -31,6 +31,8 @@ import ChangelogModal, { APP_VERSION } from "@/components/ChangelogModal";
 import WhatsNewPopup from "@/components/WhatsNewPopup";
 import Flag from "@/components/Flag";
 import { renderBBCode } from "@/lib/bbcode";
+import { logSongPlay } from "@/lib/songLog";
+
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 
 import LastfmButton, { LastfmLights } from "@/components/LastfmButton";
@@ -561,6 +563,19 @@ const Index = () => {
   }, [refreshAll, refreshNowPlaying]);
 
   const now = playlist.now;
+
+  // Station play history: log what the STATION played, regardless of whether
+  // this client is actually playing audio. Write-only, fire-and-forget.
+  useEffect(() => {
+    if (!now || !now.songId || !now.playstart) return;
+    logSongPlay({
+      songId: now.songId,
+      playstart: now.playstart,
+      lengthSec: now.lengthSec,
+      requester: now.requester,
+    });
+  }, [now]);
+
 
   // Schedule a refresh for the moment the current track is due to end so the
   // metadata pipeline updates instantly instead of waiting out the interval.
