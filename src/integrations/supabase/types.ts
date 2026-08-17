@@ -14,6 +14,243 @@ export type Database = {
   }
   public: {
     Tables: {
+      song_artists: {
+        Row: {
+          artist_id: string
+          artist_name: string | null
+          position: number
+          song_id: string
+        }
+        Insert: {
+          artist_id: string
+          artist_name?: string | null
+          position?: number
+          song_id: string
+        }
+        Update: {
+          artist_id?: string
+          artist_name?: string | null
+          position?: number
+          song_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "song_artists_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "song_search"
+            referencedColumns: ["song_id"]
+          },
+          {
+            foreignKeyName: "song_artists_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["song_id"]
+          },
+        ]
+      }
+      song_groups: {
+        Row: {
+          group_id: string
+          group_name: string | null
+          song_id: string
+        }
+        Insert: {
+          group_id: string
+          group_name?: string | null
+          song_id: string
+        }
+        Update: {
+          group_id?: string
+          group_name?: string | null
+          song_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "song_groups_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "song_search"
+            referencedColumns: ["song_id"]
+          },
+          {
+            foreignKeyName: "song_groups_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["song_id"]
+          },
+        ]
+      }
+      song_links: {
+        Row: {
+          song_id: string
+          source_id: string
+          source_name: string | null
+          url: string | null
+        }
+        Insert: {
+          song_id: string
+          source_id: string
+          source_name?: string | null
+          url?: string | null
+        }
+        Update: {
+          song_id?: string
+          source_id?: string
+          source_name?: string | null
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "song_links_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "song_search"
+            referencedColumns: ["song_id"]
+          },
+          {
+            foreignKeyName: "song_links_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["song_id"]
+          },
+        ]
+      }
+      song_plays: {
+        Row: {
+          created_at: string
+          id: number
+          length_sec: number | null
+          playstart: string
+          requester: string | null
+          song_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          length_sec?: number | null
+          playstart: string
+          requester?: string | null
+          song_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          length_sec?: number | null
+          playstart?: string
+          requester?: string | null
+          song_id?: string
+        }
+        Relationships: []
+      }
+      song_tags: {
+        Row: {
+          song_id: string
+          tag: string
+          tag_norm: string | null
+        }
+        Insert: {
+          song_id: string
+          tag: string
+          tag_norm?: string | null
+        }
+        Update: {
+          song_id?: string
+          tag?: string
+          tag_norm?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "song_tags_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "song_search"
+            referencedColumns: ["song_id"]
+          },
+          {
+            foreignKeyName: "song_tags_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["song_id"]
+          },
+        ]
+      }
+      songs: {
+        Row: {
+          bitrate: number | null
+          extra: Json
+          first_seen_at: string
+          info: string | null
+          last_enriched_at: string
+          lastplayed: string | null
+          length_sec: number | null
+          platform_id: string | null
+          platform_name: string | null
+          pouet_id: string | null
+          rating: number | null
+          samplerate: number | null
+          song_id: string
+          status_text: string | null
+          status_v: string | null
+          title: string | null
+          type_id: string | null
+          type_name: string | null
+          votes: number | null
+          yt_id: string | null
+          yt_offset: number | null
+        }
+        Insert: {
+          bitrate?: number | null
+          extra?: Json
+          first_seen_at?: string
+          info?: string | null
+          last_enriched_at?: string
+          lastplayed?: string | null
+          length_sec?: number | null
+          platform_id?: string | null
+          platform_name?: string | null
+          pouet_id?: string | null
+          rating?: number | null
+          samplerate?: number | null
+          song_id: string
+          status_text?: string | null
+          status_v?: string | null
+          title?: string | null
+          type_id?: string | null
+          type_name?: string | null
+          votes?: number | null
+          yt_id?: string | null
+          yt_offset?: number | null
+        }
+        Update: {
+          bitrate?: number | null
+          extra?: Json
+          first_seen_at?: string
+          info?: string | null
+          last_enriched_at?: string
+          lastplayed?: string | null
+          length_sec?: number | null
+          platform_id?: string | null
+          platform_name?: string | null
+          pouet_id?: string | null
+          rating?: number | null
+          samplerate?: number | null
+          song_id?: string
+          status_text?: string | null
+          status_v?: string | null
+          title?: string | null
+          type_id?: string | null
+          type_name?: string | null
+          votes?: number | null
+          yt_id?: string | null
+          yt_offset?: number | null
+        }
+        Relationships: []
+      }
       stream_events: {
         Row: {
           bitrate: number | null
@@ -85,6 +322,48 @@ export type Database = {
       }
     }
     Views: {
+      song_play_counts: {
+        Row: {
+          first_played: string | null
+          last_played: string | null
+          plays: number | null
+          song_id: string | null
+        }
+        Relationships: []
+      }
+      song_search: {
+        Row: {
+          artists: Json | null
+          bitrate: number | null
+          extra: Json | null
+          first_played: string | null
+          first_seen_at: string | null
+          groups: Json | null
+          info: string | null
+          last_enriched_at: string | null
+          last_played: string | null
+          lastplayed: string | null
+          length_sec: number | null
+          links: Json | null
+          platform_id: string | null
+          platform_name: string | null
+          plays: number | null
+          pouet_id: string | null
+          rating: number | null
+          samplerate: number | null
+          song_id: string | null
+          status_text: string | null
+          status_v: string | null
+          tags: string[] | null
+          title: string | null
+          type_id: string | null
+          type_name: string | null
+          votes: number | null
+          yt_id: string | null
+          yt_offset: number | null
+        }
+        Relationships: []
+      }
       stream_reliability: {
         Row: {
           avg_live_seek_lag_sec: number | null
@@ -102,7 +381,8 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       [_ in never]: never
