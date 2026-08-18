@@ -33,9 +33,10 @@ describe("streamRanking", () => {
   it("prefers 192 over both 128 and 320", () => {
     const list = [s("a", "128"), s("b", "320"), s("c", "192")];
     const ranked = rankStreams(list, new Map(), opts);
-    expect(ranked[0].name).toBe("c");
-    expect(ranked[1].name).toBe("a"); // 64 away
-    expect(ranked[2].name).toBe("b"); // 128 away
+    expect(ranked[0].name).toBe("c"); // 192 always first
+    expect(ranked[1].name).toBe("b"); // then descending: 320
+    expect(ranked[2].name).toBe("a"); // then 128
+
 
     // ties on distance (64): higher raw bitrate first
     const tie = rankStreams([s("low", "128"), s("high", "256")], new Map(), opts);
