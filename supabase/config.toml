@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.stream-telemetry]
 verify_jwt = false
+
+[functions.song-play]
+verify_jwt = false
+
+[functions.song-ingest]
+verify_jwt = false
