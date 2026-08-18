@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.9";
+export const APP_VERSION = "0.7.10";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,17 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.10",
+    date: "2026-08-18",
+    changes: [
+      "Added a song database that remembers track metadata, tags, ratings and resource links, cutting how often the app needs to re-fetch song info from scenestream.net",
+      "The Currently Playing panel now shows an Extra Resources row (ModArchive, Demozoo, Pouet, YouTube, etc.) for tracks with known links, including a direct download when a ModArchive link is available",
+      "Stream ordering now puts the highest bitrate first, with a safety net that only demotes a stream once it has genuinely proven unreliable — and lets it recover automatically once it has run cleanly for a few days",
+      "Reduced background polling: the online-users list now refreshes every 10 minutes and the stream list every hour, instead of every 30 seconds, cutting unnecessary traffic to scenestream.net",
+      "Song lookups are capped in memory so long listening sessions can't grow the local cache without bound",
+    ],
+  },
   {
     version: "0.7.9",
     date: "2026-08-16",
