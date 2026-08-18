@@ -1,41 +1,52 @@
-Point the app at your own Supabase project
+Move the backend to your own Supabase project
 
-Target project: `https://asfcqlcwlaetbabikqny.supabase.co` (ref `asfcqlcwlaetbabikqny`) — this is the same project your MCP config already references.
+Target project: `https://asfcqlcwlaetbabikqny.supabase.co` (ref `asfcqlcwlaetbabikqny`) — the same project your MCP config already references.
 
-## Important caveats before we start
+## What is honestly possible from here
 
-- Lovable Cloud cannot be removed from this project. It stays provisioned; we are redirecting the app's client to your project instead.
-- Backend tooling in Lovable (migration tool, edge function deploys, secrets, logs) will keep targeting the Lovable-managed project. After this switch, schema changes and edge function deploys for your own project need to be done by you in your Supabase account.
-- The app depends on edge functions (`xml-proxy`, `audio-proxy`, `song-play`, `song-ingest`, `stream-telemetry`, `song-artwork`, `lastfm-auth`, `lastfm-scrobble`) and on tables (`songs`, `song_artists`, `song_groups`, `song_tags`, `song_links`, `song_plays`, `stream_events` and the `stream_reliability` / `song_search` views). None of these exist in your project yet, so playback proxying, song enrichment, extra resource links and Last.fm will break until they are deployed there.
-- Your key is a new-format publishable key (`sb_publishable_...`). It works with the current supabase-js client.
+- Lovable Cloud cannot be removed from this project; we redirect the app away from it. The Cloud project keeps existing but stops being used.
+- I can read everything out of the Cloud database and generate complete SQL (schema + data). I cannot write to your project directly — my database tooling only reaches the Cloud project. You will run the generated SQL in your own project's SQL editor, or I can walk you through the CLI.
+- Edge functions: the source lives in this repo and will point at your project via env vars, but Lovable's auto-deploy targets the Cloud project. Deploying to yours needs `supabase functions deploy` with your CLI login. I will prepare everything so it is a single command per function.
+- Secrets (`LASTFM_API_KEY`, `LASTFM_API_SECRET`, `LOVABLE_API_KEY`) must be re-added as secrets in your own project — I cannot read their values out of Cloud.
 
-## What I will change
+## Step 1 — Export schema
 
-1. `.env`
-   - `VITE_SUPABASE_URL="https://asfcqlcwlaetbabikqny.supabase.co"`
-   - `VITE_SUPABASE_PUBLISHABLE_KEY="sb_publishable_iK__ZqFMW9kIfDUZNP33jA_A3EwQ41f"`
-   - `VITE_SUPABASE_PROJECT_ID="asfcqlcwlaetbabikqny"`
+Generate `supabase/migrations/<timestamp>_full_schema.sql` containing, in correct order:
 
-2. `supabase/config.toml`
-   - `project_id = "asfcqlcwlaetbabikqny"`, keeping all existing `verify_jwt = false` function entries so they carry over when you deploy.
+- Tables: `songs`, `song_artists`, `song_groups`, `song_tags`, `song_links`, `song_plays`, `stream_events`
+- Sequences for `song_plays.id` and `stream_events.id`
+- All indexes, including the GIN search indexes
+- GRANTs for `anon` / `authenticated` / `service_role` matching current privileges (public read on song tables; no client access to `song_plays` and `stream_events`)
+- `ENABLE ROW LEVEL SECURITY` plus the existing public-read policies
+- Views: `song_search`, `stream_reliability`, and the aggregate views used for play/stream stats
+- Any functions and triggers currently present
 
-3. `.mcp.json`
-   - Already points at `asfcqlcwlaetbabikqny`; left unchanged.
+## Step 2 — Export data
 
-4. `src/integrations/supabase/client.ts`
-   - Left untouched. It reads the env vars, so it picks up the new project automatically.
+Dump current rows to `supabase/seed/` as SQL inserts, one file per table, in FK-safe order (`songs` first, then child tables, then `song_plays` / `stream_events`). Large tables are chunked so the SQL editor can accept them.
 
-5. Export the current schema
-   - Write the full SQL for all existing tables, views, grants and RLS policies to `supabase/migrations/` so you can apply it to your project with the Supabase CLI.
+## Step 3 — Repoint the app
 
-## Verification
+- `.env`: `VITE_SUPABASE_URL=https://asfcqlcwlaetbabikqny.supabase.co`, `VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_iK__ZqFMW9kIfDUZNP33jA_A3EwQ41f`, `VITE_SUPABASE_PROJECT_ID=asfcqlcwlaetbabikqny`
+- `supabase/config.toml`: `project_id = "asfcqlcwlaetbabikqny"`, keeping all existing `verify_jwt = false` entries
+- `.mcp.json`: already correct, unchanged
+- `src/integrations/supabase/client.ts`: untouched (reads env vars)
 
-- Restart the dev server and confirm the app boots without Supabase client errors.
-- Load the preview and check the network panel shows requests going to `asfcqlcwlaetbabikqny.supabase.co`.
-- Report which features are degraded until you deploy the functions and schema on your side.
+## Step 4 — Edge functions
 
-## Out of scope
+All eight functions (`xml-proxy`, `audio-proxy`, `song-artwork`, `song-play`, `song-ingest`, `stream-telemetry`, `lastfm-auth`, `lastfm-scrobble`) stay as-is in the repo — they read `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` from their own runtime environment, which your project supplies automatically.
 
-- Copying existing data out of the Lovable Cloud database.
-- Deploying edge functions to your project (needs your Supabase CLI login).
-- Configuring auth providers or secrets on your project.
+I will write `docs/self-hosting.md` with the exact deploy commands, the secrets to set, and the `verify_jwt` flags each function needs.
+
+## Step 5 — Verify
+
+- Restart the dev server and confirm it boots clean.
+- Check in the browser that requests go to `asfcqlcwlaetbabikqny.supabase.co`.
+- Confirm the song panel, Extra Resources links and telemetry work once you have applied the SQL and deployed the functions; report anything still degraded.
+
+## Your manual steps
+
+1. Run the generated schema SQL in your project.
+2. Run the seed SQL.
+3. `supabase login`, then deploy the functions using the documented commands.
+4. Add the Last.fm secrets in your project.
