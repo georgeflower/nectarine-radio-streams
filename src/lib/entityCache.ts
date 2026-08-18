@@ -111,6 +111,34 @@ function countChildren(root: Element, parentTag: string, childTag: string): numb
   return parent.getElementsByTagName(childTag).length;
 }
 
+// Shared formatting so DB-resolved and XML-resolved songs render identically.
+function formatLength(sec: number): string | undefined {
+  if (!Number.isFinite(sec) || sec <= 0) return undefined;
+  const m = Math.floor(sec / 60);
+  const s = String(sec % 60).padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+function formatRating(rating: number, votes: number): string | undefined {
+  if (!Number.isFinite(rating)) return undefined;
+  return `★ ${rating.toFixed(2)}${Number.isFinite(votes) ? ` (${votes})` : ""}`;
+}
+
+function buildSongMeta(
+  firstArtist: string | undefined,
+  lengthSec: number,
+  rating: number,
+  votes: number,
+): string | undefined {
+  const parts: string[] = [];
+  if (firstArtist) parts.push(`by ${firstArtist}`);
+  const len = formatLength(lengthSec);
+  if (len) parts.push(len);
+  const rat = formatRating(rating, votes);
+  if (rat) parts.push(rat);
+  return parts.join(" · ") || undefined;
+}
+
 function extractInfo(kind: EntityKind, xml: Document): EntityInfo {
   const root = xml.documentElement;
   switch (kind) {
@@ -124,31 +152,43 @@ function extractInfo(kind: EntityKind, xml: Document): EntityInfo {
       const ratingEl = root.getElementsByTagName("rating")[0];
       const ratingNum = ratingEl ? parseFloat(ratingEl.textContent || "") : NaN;
       const votesNum = ratingEl ? parseInt(ratingEl.getAttribute("votes") || "", 10) : NaN;
-      const parts: string[] = [];
-      if (firstArtist) parts.push(`by ${firstArtist}`);
-      if (length) {
-        const sec = parseInt(length, 10);
-        if (Number.isFinite(sec) && sec > 0) {
-          const m = Math.floor(sec / 60);
-          const s = String(sec % 60).padStart(2, "0");
-          parts.push(`${m}:${s}`);
-        }
-      }
-      if (Number.isFinite(ratingNum)) {
-        parts.push(`★ ${ratingNum.toFixed(2)}${Number.isFinite(votesNum) ? ` (${votesNum})` : ""}`);
-      }
       const platformEl = root.getElementsByTagName("platform")[0];
       const platformId = platformEl?.getAttribute("id") || "";
       const platformName = platformEl?.textContent?.trim() || "";
+
+      const tagsParent = root.getElementsByTagName("tags")[0];
+      const tags = tagsParent
+        ? Array.from(tagsParent.getElementsByTagName("tag"))
+            .map((t) => t.textContent?.trim() || "")
+            .filter(Boolean)
+        : [];
+
+      const linksParent = root.getElementsByTagName("links")[0];
+      const links = linksParent
+        ? Array.from(linksParent.getElementsByTagName("link"))
+            .map((l) => {
+              const typeEl = l.getElementsByTagName("type")[0];
+              const sourceId = typeEl?.getAttribute("id") || "";
+              const nameEl = l.getElementsByTagName("n")[0] || l.getElementsByTagName("name")[0];
+              const sourceName = nameEl?.textContent?.trim() || null;
+              const url = l.getElementsByTagName("url")[0]?.textContent?.trim() || "";
+              return { sourceId, sourceName, url };
+            })
+            .filter((l) => !!l.url)
+        : [];
+
       return {
         title,
-        meta: parts.join(" · ") || undefined,
+        meta: buildSongMeta(firstArtist, parseInt(length, 10), ratingNum, votesNum),
         rating: Number.isFinite(ratingNum) ? ratingNum : undefined,
         votes: Number.isFinite(votesNum) ? votesNum : undefined,
         platformId: platformId || undefined,
         platformName: platformName || undefined,
+        tags: tags.length ? tags : undefined,
+        links: links.length ? links : undefined,
       };
     }
+
     case "artist": {
       const title = firstText(root, "handle") || firstText(root, "name");
       const songCount = countChildren(root, "songs", "song");
