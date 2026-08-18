@@ -52,8 +52,17 @@ export const isShortRunner = (row: StreamReliabilityRow | undefined): boolean =>
 
 export const isUnreliable = (row: StreamReliabilityRow | undefined): boolean => {
   if (!row) return false;
+
+  // A stream that has proven itself in the last 3 days is not dead, whatever
+  // its older history says. New incidents inside that window re-demote it
+  // automatically, so this needs no stored state.
+  const recentConnects = Number(row.recent_connects) || 0;
+  const recentIncidents = Number(row.recent_incidents) || 0;
+  if (recentConnects >= 1 && recentIncidents === 0) return false;
+
   const connects = Number(row.connects) || 0;
   const failures = Number(row.failures) || 0;
+
 
   let flagged = false;
   if (isShortRunner(row)) flagged = true;
