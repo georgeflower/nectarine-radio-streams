@@ -356,6 +356,12 @@ const Index = () => {
     return "starfield";
   });
   const inFlight = useRef(false);
+  const lastFetchAtRef = useRef<Record<Endpoint, number>>({
+    queue: 0,
+    oneliner: 0,
+    online: 0,
+    streams: 0,
+  });
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
