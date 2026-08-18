@@ -219,12 +219,71 @@ function extractInfo(kind: EntityKind, xml: Document): EntityInfo {
   }
 }
 
+type SongRow = {
+  title: string | null;
+  rating: number | string | null;
+  votes: number | null;
+  length_sec: number | null;
+  platform_id: string | null;
+  platform_name: string | null;
+  last_enriched_at: string;
+  song_artists?: { artist_name: string | null; position: number | null }[] | null;
+  song_tags?: { tag: string | null }[] | null;
+  song_links?: { source_id: string; source_name: string | null; url: string | null }[] | null;
+};
+
+function infoFromRow(row: SongRow): EntityInfo {
+  const artists = [...(row.song_artists ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  const firstArtist = artists[0]?.artist_name?.trim() || undefined;
+  const ratingNum = row.rating === null || row.rating === undefined ? NaN : Number(row.rating);
+  const votesNum = row.votes === null || row.votes === undefined ? NaN : Number(row.votes);
+  const tags = (row.song_tags ?? []).map((t) => t.tag?.trim() || "").filter(Boolean);
+  const links = (row.song_links ?? [])
+    .filter((l) => !!l.url)
+    .map((l) => ({ sourceId: l.source_id, sourceName: l.source_name, url: l.url as string }));
+  return {
+    title: row.title || "",
+    meta: buildSongMeta(firstArtist, Number(row.length_sec), ratingNum, votesNum),
+    rating: Number.isFinite(ratingNum) ? ratingNum : undefined,
+    votes: Number.isFinite(votesNum) ? votesNum : undefined,
+    platformId: row.platform_id || undefined,
+    platformName: row.platform_name || undefined,
+    tags: tags.length ? tags : undefined,
+    links: links.length ? links : undefined,
+  };
+}
+
 async function resolveOne(kind: EntityKind, id: string): Promise<EntityInfo> {
   load();
   if (inflight[kind][id]) return inflight[kind][id];
   const p = (async () => {
     try {
+      if (kind === "song") {
+        // DB-first: a freshly enriched row spares an upstream XML fetch.
+        try {
+          const { data } = await supabase
+            .from("songs")
+            .select(
+              "*, song_artists(artist_name, position), song_tags(tag), song_links(source_id, source_name, url)",
+            )
+            .eq("song_id", id)
+            .maybeSingle();
+          const row = data as SongRow | null;
+          if (row && Date.now() - Date.parse(row.last_enriched_at) < DB_FRESH_MS) {
+            const dbInfo = infoFromRow(row);
+            if (dbInfo.title) {
+              memCache[kind][id] = { info: dbInfo, fetchedAt: Date.now() };
+              persist(kind);
+              notify();
+              return dbInfo;
+            }
+          }
+        } catch {
+          /* DB is an optimisation only — fall through upstream */
+        }
+      }
       const text = await fetchEndpoint(endpointPath(kind, id));
+
       const doc = parseXml(text);
       const info = extractInfo(kind, doc);
       if (kind === "song" && info.title) {
