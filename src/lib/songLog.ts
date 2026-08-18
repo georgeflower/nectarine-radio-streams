@@ -46,13 +46,17 @@ export const logSongPlay = ({ songId, playstart, lengthSec, requester }: SongPla
 };
 
 // Song metadata enrichment. Same fire-and-forget contract as logSongPlay.
-const ingested = new Set<string>();
+// Map (not Set) so a long-lived session re-ingests once the DB row goes stale.
+const ingested = new Map<string, number>();
+const INGEST_TTL_MS = 6 * 60 * 60 * 1000;
 
 export const ingestSong = (songId: string, doc: unknown): void => {
   try {
     if (!songId || !doc) return;
-    if (ingested.has(songId)) return;
-    ingested.add(songId);
+    const last = ingested.get(songId);
+    if (last !== undefined && Date.now() - last < INGEST_TTL_MS) return;
+    ingested.set(songId, Date.now());
+
 
     void fetch(`${SUPABASE_URL}/functions/v1/song-ingest`, {
       method: "POST",
