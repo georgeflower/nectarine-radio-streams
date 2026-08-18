@@ -8,6 +8,12 @@ export const ENDPOINTS = ["queue", "oneliner", "online", "streams"] as const;
 export type Endpoint = (typeof ENDPOINTS)[number];
 
 export const AUTO_REFRESH_INTERVAL_MS = 30_000;
+export const REFRESH_INTERVAL_MS: Record<Endpoint, number> = {
+  queue: 30_000,
+  oneliner: 30_000,
+  online: 10 * 60_000,
+  streams: 60 * 60_000,
+};
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_ONELINERS = 12;
 const MAX_QUEUE = 5;
