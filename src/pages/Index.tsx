@@ -552,9 +552,22 @@ const Index = () => {
       );
     }
     refreshAll();
+    const seedTimestamps = () => {
+      const now = Date.now();
+      lastFetchAtRef.current = Object.fromEntries(
+        ENDPOINTS.map((ep) => [ep, now]),
+      ) as Record<Endpoint, number>;
+    };
+    seedTimestamps();
     const id = window.setInterval(() => {
       if (!document.hidden) {
-        void refreshAll();
+        const now = Date.now();
+        for (const ep of ENDPOINTS) {
+          if (now - lastFetchAtRef.current[ep] >= REFRESH_INTERVAL_MS[ep]) {
+            lastFetchAtRef.current[ep] = now;
+            void loadEndpoint(ep);
+          }
+        }
         return;
       }
       // Hidden: keep metadata (MediaSession + scrobbler) alive with one request
@@ -562,14 +575,17 @@ const Index = () => {
       if (audioPlayingRef.current) void refreshNowPlaying();
     }, AUTO_REFRESH_INTERVAL_MS);
     const onVisible = () => {
-      if (!document.hidden) void refreshAll();
+      if (!document.hidden) {
+        seedTimestamps();
+        void refreshAll();
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refreshAll, refreshNowPlaying]);
+  }, [refreshAll, refreshNowPlaying, loadEndpoint]);
 
   const now = playlist.now;
 
