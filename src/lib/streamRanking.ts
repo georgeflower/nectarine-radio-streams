@@ -58,21 +58,21 @@ export const isUnreliable = (row: StreamReliabilityRow | undefined): boolean => 
   // automatically, so this needs no stored state.
   const recentConnects = Number(row.recent_connects) || 0;
   const recentIncidents = Number(row.recent_incidents) || 0;
-  if (recentConnects >= 1 && recentIncidents === 0) return false;
+  if (recentConnects >= 3 && recentIncidents === 0) return false;
 
   const connects = Number(row.connects) || 0;
   const failures = Number(row.failures) || 0;
-
 
   let flagged = false;
   if (isShortRunner(row)) flagged = true;
   else if (connects + failures >= 5 && reliabilityScore(row) < 0.5) flagged = true;
 
   if (flagged && failureRate(connects, failures) < 0.1) {
-    console.warn(
-      `[streamRanking] miscalibrated? flagging ${row.stream_url} as unreliable despite a low failure rate`,
-      { connects, failures, avg_played_sec_before_failure: row.avg_played_sec_before_failure },
-    );
+    console.warn(`[streamRanking] miscalibrated? flagging ${row.stream_url} as unreliable despite a low failure rate`, {
+      connects,
+      failures,
+      avg_played_sec_before_failure: row.avg_played_sec_before_failure,
+    });
   }
   return flagged;
 };
@@ -114,5 +114,3 @@ export const rankStreams = (
     return reliabilityScore(br) - reliabilityScore(ar);
   });
 };
-
-
