@@ -100,6 +100,45 @@ describe("streamRanking", () => {
     expect(isUnreliable(bad)).toBe(true);
   });
 
+  it("rehabilitates a stream whose only outage is old (burn.net)", () => {
+    const burn = {
+      ...row("burn.net", 3, 2),
+      raw_failures: 340,
+      incidents: 2,
+      avg_played_sec_before_failure: 3,
+      recent_connects: 2,
+      recent_incidents: 0,
+    };
+    expect(isUnreliable(burn)).toBe(false);
+  });
+
+  it("still flags a bad stream that has a recent incident", () => {
+    const bad = {
+      ...row("bad", 3, 10),
+      avg_played_sec_before_failure: 5,
+      recent_connects: 2,
+      recent_incidents: 1,
+    };
+    expect(isUnreliable(bad)).toBe(true);
+  });
+
+  it("counts recoveries as reducing the effective failure count", () => {
+    // 7 incidents, 5 recovered → failures = 2 against 60 connects
+    const netted = {
+      ...row("from-de", 60, 2),
+      incidents: 7,
+      recoveries: 5,
+      raw_failures: 56,
+      avg_played_sec_before_failure: 420,
+    };
+    expect(isShortRunner(netted)).toBe(false);
+    expect(isUnreliable(netted)).toBe(false);
+
+    // without netting, the same stream would look bad
+    const raw = { ...netted, failures: 7, connects: 5, avg_played_sec_before_failure: 10 };
+    expect(isUnreliable(raw)).toBe(true);
+  });
+
   it("ranks a proxied 192 above a direct 128", () => {
     const proxied192 = s("proxied192", "192");
     const direct128 = s("direct128", "128");
