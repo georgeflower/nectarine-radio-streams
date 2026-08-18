@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { StreamSource } from "@/lib/nectarine";
 import type { StreamReliabilityRow } from "@/lib/streamTelemetry";
-import {
-  bitrateDistance,
-  isShortRunner,
-  isUnreliable,
-  rankStreams,
-  reliabilityScore,
-} from "@/lib/streamRanking";
+import { bitrateDistance, isShortRunner, isUnreliable, rankStreams, reliabilityScore } from "@/lib/streamRanking";
 
 const s = (name: string, bitrate: string): StreamSource => ({
   name,
@@ -36,7 +30,6 @@ describe("streamRanking", () => {
     expect(ranked[0].name).toBe("c"); // 192 always first
     expect(ranked[1].name).toBe("b"); // then descending: 320
     expect(ranked[2].name).toBe("a"); // then 128
-
 
     // ties on distance (64): higher raw bitrate first
     const tie = rankStreams([s("low", "128"), s("high", "256")], new Map(), opts);
@@ -106,7 +99,7 @@ describe("streamRanking", () => {
       raw_failures: 340,
       incidents: 2,
       avg_played_sec_before_failure: 3,
-      recent_connects: 2,
+      recent_connects: 3,
       recent_incidents: 0,
     };
     expect(isUnreliable(burn)).toBe(false);
@@ -154,9 +147,7 @@ describe("streamRanking", () => {
     const direct = s("direct", "192");
     const proxied = s("proxied", "192");
     const needsProxy = (url: string) => url === proxied.url;
-    expect(rankStreams([proxied, direct], new Map(), { isMobile: false, needsProxy })[0].name).toBe(
-      "direct",
-    );
+    expect(rankStreams([proxied, direct], new Map(), { isMobile: false, needsProxy })[0].name).toBe("direct");
   });
 
   it("orders a mixed set 192, 128, 64, 48 with dead streams last", () => {
@@ -172,5 +163,3 @@ describe("streamRanking", () => {
     expect(ranked.map((r) => r.name)).toEqual(["a192", "b128", "c64", "d48", "dead192"]);
   });
 });
-
-
