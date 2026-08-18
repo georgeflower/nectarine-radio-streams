@@ -9,8 +9,8 @@ export interface EntityInfo {
   title: string;
   meta?: string; // e.g. "by Foo Artist", "23 songs", etc.
   rating?: number; // 0–5 average (songs only)
-  votes?: number;  // vote count (songs only)
-  platformId?: string;   // songs only
+  votes?: number; // vote count (songs only)
+  platformId?: string; // songs only
   platformName?: string; // songs only
 }
 
@@ -23,7 +23,7 @@ const KINDS: EntityKind[] = ["song", "artist", "group", "compilation"];
 // Stale-while-revalidate TTLs. Cached info is shown immediately; a background
 // refetch is triggered if the entry is older than this.
 const TTL_MS: Record<EntityKind, number> = {
-  song: 2 * 60 * 1000,           // ratings/votes change frequently
+  song: 2 * 60 * 1000, // ratings/votes change frequently
   artist: 24 * 60 * 60 * 1000,
   group: 24 * 60 * 60 * 1000,
   compilation: 24 * 60 * 60 * 1000,
@@ -34,10 +34,16 @@ function isStale(kind: EntityKind, fetchedAt: number): boolean {
 }
 
 const memCache: Record<EntityKind, CacheMap> = {
-  song: {}, artist: {}, group: {}, compilation: {},
+  song: {},
+  artist: {},
+  group: {},
+  compilation: {},
 };
 const inflight: Record<EntityKind, Record<string, Promise<EntityInfo>>> = {
-  song: {}, artist: {}, group: {}, compilation: {},
+  song: {},
+  artist: {},
+  group: {},
+  compilation: {},
 };
 const listeners = new Set<() => void>();
 let loaded = false;
@@ -56,7 +62,20 @@ function load() {
   }
 }
 
+const MAX_ENTRIES = 500;
+
+function evict(kind: EntityKind) {
+  const map = memCache[kind];
+  const keys = Object.keys(map);
+  if (keys.length <= MAX_ENTRIES) return;
+  keys
+    .sort((a, b) => map[a].fetchedAt - map[b].fetchedAt)
+    .slice(0, keys.length - MAX_ENTRIES)
+    .forEach((k) => delete map[k]);
+}
+
 function persist(kind: EntityKind) {
+  evict(kind);
   if (typeof localStorage === "undefined") return;
   try {
     localStorage.setItem(STORAGE_PREFIX + kind, JSON.stringify(memCache[kind]));
