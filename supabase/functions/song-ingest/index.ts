@@ -158,14 +158,14 @@ Deno.serve(async (req) => {
 
     const tagsSrc = isObj(doc.tags) ? arr(doc.tags.tag) : [];
     const seenTags = new Set<string>();
-    const tags: { song_id: string; tag: string; tag_norm: string }[] = [];
+    const tags: { song_id: string; tag: string }[] = [];
     for (const t of tagsSrc.slice(0, MAX_TAGS)) {
       const tag = text(t).slice(0, 200);
       if (!tag) continue;
       const norm = tag.toLowerCase();
       if (seenTags.has(norm)) continue;
       seenTags.add(norm);
-      tags.push({ song_id: songId, tag, tag_norm: norm });
+      tags.push({ song_id: songId, tag });
     }
 
     const linksSrc = isObj(doc.links) ? arr(doc.links.link) : [];
