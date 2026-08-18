@@ -2,6 +2,7 @@
 // human titles plus a small "meta" subtitle, with in-memory + localStorage caching.
 import { fetchEndpoint, parseXml, xmlNodeToObject } from "./nectarine";
 import { ingestSong } from "./songLog";
+import { supabase } from "@/integrations/supabase/client";
 
 export type EntityKind = "song" | "artist" | "group" | "compilation";
 
@@ -12,22 +13,28 @@ export interface EntityInfo {
   votes?: number; // vote count (songs only)
   platformId?: string; // songs only
   platformName?: string; // songs only
+  tags?: string[];
+  links?: { sourceId: string; sourceName: string | null; url: string }[];
 }
 
 type CacheEntry = { info: EntityInfo; fetchedAt: number };
 type CacheMap = Record<string, CacheEntry>;
 
-const STORAGE_PREFIX = "nectarine-entity-cache-v3-";
+const STORAGE_PREFIX = "nectarine-entity-cache-v4-";
 const KINDS: EntityKind[] = ["song", "artist", "group", "compilation"];
+
+// How long a DB row counts as fresh enough to serve without re-fetching upstream.
+const DB_FRESH_MS = 6 * 60 * 60 * 1000;
 
 // Stale-while-revalidate TTLs. Cached info is shown immediately; a background
 // refetch is triggered if the entry is older than this.
 const TTL_MS: Record<EntityKind, number> = {
-  song: 2 * 60 * 1000, // ratings/votes change frequently
+  song: 30 * 60 * 1000,
   artist: 24 * 60 * 60 * 1000,
   group: 24 * 60 * 60 * 1000,
   compilation: 24 * 60 * 60 * 1000,
 };
+
 
 function isStale(kind: EntityKind, fetchedAt: number): boolean {
   return Date.now() - fetchedAt > TTL_MS[kind];
