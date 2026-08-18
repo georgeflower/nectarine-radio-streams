@@ -1,21 +1,10 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { getCachedInfo, requestInfo, subscribe } from "@/lib/entityCache";
 
 type LinkRow = {
   source_id: string;
   source_name: string | null;
   url: string | null;
-};
-
-const cache = new Map<string, LinkRow[]>();
-
-const fetchLinks = async (songId: string): Promise<LinkRow[]> => {
-  const { data, error } = await supabase
-    .from("song_links")
-    .select("source_id, source_name, url")
-    .eq("song_id", songId);
-  if (error) throw error;
-  return (data ?? []) as LinkRow[];
 };
 
 const modArchiveDownload = (rows: LinkRow[]): string | null => {
@@ -30,38 +19,22 @@ const modArchiveDownload = (rows: LinkRow[]): string | null => {
   }
 };
 
+const readLinks = (songId: string): LinkRow[] =>
+  (getCachedInfo("song", songId)?.links ?? []).map((l) => ({
+    source_id: l.sourceId,
+    source_name: l.sourceName,
+    url: l.url,
+  }));
+
 const SongLinks = ({ songId }: { songId: string }) => {
-  const [rows, setRows] = useState<LinkRow[]>(() => cache.get(songId) ?? []);
+  const [rows, setRows] = useState<LinkRow[]>(() => readLinks(songId));
 
   useEffect(() => {
-    let cancelled = false;
-    const cached = cache.get(songId);
-    setRows(cached ?? []);
-    if (cached && cached.length > 0) return;
-
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-
-    const run = async (isRetry: boolean) => {
-      try {
-        const data = await fetchLinks(songId);
-        if (cancelled) return;
-        if (data.length === 0 && !isRetry) {
-          retryTimer = setTimeout(() => void run(true), 3000);
-          return;
-        }
-        cache.set(songId, data);
-        setRows(data);
-      } catch {
-        // supplementary info — never surface errors
-      }
-    };
-
-    void run(false);
-    return () => {
-      cancelled = true;
-      if (retryTimer) clearTimeout(retryTimer);
-    };
+    setRows(readLinks(songId));
+    requestInfo("song", songId);
+    return subscribe(() => setRows(readLinks(songId)));
   }, [songId]);
+
 
   const valid = rows.filter((r) => !!r.url);
   if (valid.length === 0) return null;
