@@ -69,7 +69,7 @@ function evict(kind: EntityKind) {
   const keys = Object.keys(map);
   if (keys.length <= MAX_ENTRIES) return;
   keys
-    .sort((a, b) => map[a].fetchedAt - map[b].fetchedAt)
+    .sort((a, b) => (map[a]?.fetchedAt ?? 0) - (map[b]?.fetchedAt ?? 0))
     .slice(0, keys.length - MAX_ENTRIES)
     .forEach((k) => delete map[k]);
 }
