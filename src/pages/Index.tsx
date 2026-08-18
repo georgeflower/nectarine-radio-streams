@@ -875,7 +875,9 @@ const Index = () => {
                     <p className="text-sm">
                       Time Left: <span className="text-foreground"><TimeLeft playstart={now.playstart} lengthSec={now.lengthSec} /></span>
                     </p>
+                    <SongLinks songId={now.songId} />
                   </>
+
                 ) : (
                   <p className="text-muted-foreground text-sm">No track info yet…</p>
                 )}
