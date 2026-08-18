@@ -1,6 +1,7 @@
 // Resolves Nectarine entity IDs (song / artist / group / compilation) to their
 // human titles plus a small "meta" subtitle, with in-memory + localStorage caching.
-import { fetchEndpoint, parseXml } from "./nectarine";
+import { fetchEndpoint, parseXml, xmlNodeToObject } from "./nectarine";
+import { ingestSong } from "./songLog";
 
 export type EntityKind = "song" | "artist" | "group" | "compilation";
 
