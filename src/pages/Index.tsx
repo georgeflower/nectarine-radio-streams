@@ -39,6 +39,8 @@ import LastfmButton, { LastfmLights } from "@/components/LastfmButton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ReactivityDrawer from "@/components/ReactivityDrawer";
 import PerformanceTipsModal from "@/components/PerformanceTipsModal";
+import SongLinks from "@/components/SongLinks";
+
 import {
   handleLastfmCallback,
   clearLastfmAuthFailure,
@@ -875,7 +877,9 @@ const Index = () => {
                     <p className="text-sm">
                       Time Left: <span className="text-foreground"><TimeLeft playstart={now.playstart} lengthSec={now.lengthSec} /></span>
                     </p>
+                    <SongLinks songId={now.songId} />
                   </>
+
                 ) : (
                   <p className="text-muted-foreground text-sm">No track info yet…</p>
                 )}
