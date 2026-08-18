@@ -230,12 +230,22 @@ export type StreamReliabilityRow = {
   stream_name: string | null;
   bitrate: number | null;
   connects: number | null;
+  /** Collapsed failure incidents, net of recoveries. */
   failures: number | null;
   handover_events: number | null;
   avg_played_sec_before_failure: number | null;
   live_seeks?: number | null;
   avg_live_seek_lag_sec?: number | null;
   last_seen_at: string | null;
+  /** Uncollapsed failure row count (debugging only). */
+  raw_failures?: number | null;
+  /** Collapsed incidents, before the recovery subtraction. */
+  incidents?: number | null;
+  recoveries?: number | null;
+  /** `ended` events — excluded from failures (proxy 402s cut). */
+  ended_events?: number | null;
+  recent_connects?: number | null;
+  recent_incidents?: number | null;
 };
 
 const RELIABILITY_TTL_MS = 10 * 60 * 1000;
