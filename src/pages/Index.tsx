@@ -39,6 +39,8 @@ import LastfmButton, { LastfmLights } from "@/components/LastfmButton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ReactivityDrawer from "@/components/ReactivityDrawer";
 import PerformanceTipsModal from "@/components/PerformanceTipsModal";
+import SongLinks from "@/components/SongLinks";
+
 import {
   handleLastfmCallback,
   clearLastfmAuthFailure,
