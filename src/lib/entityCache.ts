@@ -264,7 +264,7 @@ async function resolveOne(kind: EntityKind, id: string): Promise<EntityInfo> {
           const { data } = await supabase
             .from("songs")
             .select(
-              "*, song_artists(artist_name, position), song_tags(tag), song_links(source_id, source_name, url)",
+              "title, rating, votes, length_sec, platform_id, platform_name, last_enriched_at, song_artists(artist_name, position), song_tags(tag), song_links(source_id, source_name, url),
             )
             .eq("song_id", id)
             .maybeSingle();
