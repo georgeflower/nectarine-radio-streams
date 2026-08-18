@@ -387,36 +387,7 @@ export type Database = {
       }
     }
     Functions: {
-      song_play_counts_agg: {
-        Args: never
-        Returns: {
-          first_played: string
-          last_played: string
-          plays: number
-          song_id: string
-        }[]
-      }
-      stream_reliability_agg: {
-        Args: never
-        Returns: {
-          avg_live_seek_lag_sec: number
-          avg_played_sec_before_failure: number
-          bitrate: number
-          connects: number
-          ended_events: number
-          failures: number
-          handover_events: number
-          incidents: number
-          last_seen_at: string
-          live_seeks: number
-          raw_failures: number
-          recent_connects: number
-          recent_incidents: number
-          recoveries: number
-          stream_name: string
-          stream_url: string
-        }[]
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
