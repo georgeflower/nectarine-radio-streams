@@ -31,11 +31,19 @@ export const reliabilityScore = (row: StreamReliabilityRow | undefined): number 
 // how long playback actually survived before the failure.
 export const SHORT_RUN_SEC = 60;
 
+export const SHORT_RUN_FAILURE_RATE = 0.3;
+
+const failureRate = (connects: number, failures: number): number => {
+  const total = connects + failures;
+  return total > 0 ? failures / total : 0;
+};
+
 export const isShortRunner = (row: StreamReliabilityRow | undefined): boolean => {
   if (!row) return false;
   const connects = Number(row.connects) || 0;
   const failures = Number(row.failures) || 0;
   if (failures < 2 || connects + failures < 3) return false;
+  if (failureRate(connects, failures) < SHORT_RUN_FAILURE_RATE) return false;
   const avg = row.avg_played_sec_before_failure;
   if (avg === null || avg === undefined) return false;
   const n = Number(avg);
@@ -44,11 +52,28 @@ export const isShortRunner = (row: StreamReliabilityRow | undefined): boolean =>
 
 export const isUnreliable = (row: StreamReliabilityRow | undefined): boolean => {
   if (!row) return false;
-  if (isShortRunner(row)) return true;
   const connects = Number(row.connects) || 0;
   const failures = Number(row.failures) || 0;
-  if (connects + failures < 5) return false;
-  return reliabilityScore(row) < 0.5;
+
+  let flagged = false;
+  if (isShortRunner(row)) flagged = true;
+  else if (connects + failures >= 5 && reliabilityScore(row) < 0.5) flagged = true;
+
+  if (flagged && failureRate(connects, failures) < 0.1) {
+    console.warn(
+      `[streamRanking] miscalibrated? flagging ${row.stream_url} as unreliable despite a low failure rate`,
+      { connects, failures, avg_played_sec_before_failure: row.avg_played_sec_before_failure },
+    );
+  }
+  return flagged;
+};
+
+// 192 is the sweet spot; anything else sorts by descending bitrate below it.
+const bitrateRank = (stream: StreamSource): [number, number] => {
+  const n = rawBitrate(stream);
+  if (!Number.isFinite(n)) return [2, 0]; // unknown last
+  if (n === TARGET_BITRATE) return [0, 0];
+  return [1, -n];
 };
 
 export const rankStreams = (
@@ -57,33 +82,28 @@ export const rankStreams = (
   opts: { isMobile: boolean; needsProxy: (url: string) => boolean },
 ): StreamSource[] => {
   return [...streams].sort((a, b) => {
-    const ap = opts.needsProxy(a.url);
-    const bp = opts.needsProxy(b.url);
-    // Direct streams beat proxied streams on every platform. A proxy hop is an
-    // extra point of failure and is especially fragile under VPNs.
-    if (ap !== bp) return ap ? 1 : -1;
-
     const ar = reliability.get(a.url);
     const br = reliability.get(b.url);
 
+    // 1. dead streams last
     const au = isUnreliable(ar);
     const bu = isUnreliable(br);
     if (au !== bu) return au ? 1 : -1;
 
-    const ad = bitrateDistance(a);
-    const bd = bitrateDistance(b);
-    if (ad !== bd) return ad - bd;
+    // 2. bitrate: 192 first, then descending, unknown last
+    const [ag, av] = bitrateRank(a);
+    const [bg, bv] = bitrateRank(b);
+    if (ag !== bg) return ag - bg;
+    if (av !== bv) return av - bv;
 
-    const abr = Number(rawBitrate(a)) || 0;
-    const bbr = Number(rawBitrate(b)) || 0;
-    if (abr !== bbr) return bbr - abr;
-
-    const rs = reliabilityScore(br) - reliabilityScore(ar);
-    if (rs !== 0) return rs;
-
-    // Final tie-break everywhere: a direct connection beats a proxied hop.
+    // 3. direct beats proxied
+    const ap = opts.needsProxy(a.url);
+    const bp = opts.needsProxy(b.url);
     if (ap !== bp) return ap ? 1 : -1;
-    return 0;
+
+    // 4. reliability score descending
+    return reliabilityScore(br) - reliabilityScore(ar);
   });
 };
+
 

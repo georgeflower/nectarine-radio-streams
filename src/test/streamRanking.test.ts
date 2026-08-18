@@ -33,9 +33,10 @@ describe("streamRanking", () => {
   it("prefers 192 over both 128 and 320", () => {
     const list = [s("a", "128"), s("b", "320"), s("c", "192")];
     const ranked = rankStreams(list, new Map(), opts);
-    expect(ranked[0].name).toBe("c");
-    expect(ranked[1].name).toBe("a"); // 64 away
-    expect(ranked[2].name).toBe("b"); // 128 away
+    expect(ranked[0].name).toBe("c"); // 192 always first
+    expect(ranked[1].name).toBe("b"); // then descending: 320
+    expect(ranked[2].name).toBe("a"); // then 128
+
 
     // ties on distance (64): higher raw bitrate first
     const tie = rankStreams([s("low", "128"), s("high", "256")], new Map(), opts);
@@ -75,7 +76,7 @@ describe("streamRanking", () => {
   });
 
   it("demotes a stream that always dies after a few seconds", () => {
-    const shortRun = { ...row("short", 1, 2), avg_played_sec_before_failure: 11 };
+    const shortRun = { ...row("short", 1, 5), avg_played_sec_before_failure: 11 };
     expect(isShortRunner(shortRun)).toBe(true);
     expect(isUnreliable(shortRun)).toBe(true);
 
@@ -89,30 +90,48 @@ describe("streamRanking", () => {
     expect(isShortRunner(thin)).toBe(false);
   });
 
-  it("prefers a direct stream over a proxied one when all else is equal", () => {
+  it("does not condemn a mostly-healthy stream with a few quick failures", () => {
+    const good = { ...row("inversi0n", 61, 4), avg_played_sec_before_failure: 5 };
+    expect(isShortRunner(good)).toBe(false);
+    expect(isUnreliable(good)).toBe(false);
+
+    const bad = { ...row("ers35", 3, 10), avg_played_sec_before_failure: 5 };
+    expect(isShortRunner(bad)).toBe(true);
+    expect(isUnreliable(bad)).toBe(true);
+  });
+
+  it("ranks a proxied 192 above a direct 128", () => {
+    const proxied192 = s("proxied192", "192");
+    const direct128 = s("direct128", "128");
+    const needsProxy = (url: string) => url === proxied192.url;
+    const ranked = rankStreams([direct128, proxied192], new Map(), {
+      isMobile: false,
+      needsProxy,
+    });
+    expect(ranked[0].name).toBe("proxied192");
+  });
+
+  it("prefers a direct 192 over a proxied 192", () => {
     const direct = s("direct", "192");
     const proxied = s("proxied", "192");
     const needsProxy = (url: string) => url === proxied.url;
-
     expect(rankStreams([proxied, direct], new Map(), { isMobile: false, needsProxy })[0].name).toBe(
       "direct",
     );
-    expect(rankStreams([proxied, direct], new Map(), { isMobile: true, needsProxy })[0].name).toBe(
-      "direct",
-    );
   });
 
-  it("prefers a direct 192 stream over a more reliable proxied 192 stream on desktop", () => {
-    const direct = s("direct", "192");
-    const proxied = s("proxied", "192");
-    const needsProxy = (url: string) => url === proxied.url;
-    const reliability = new Map<string, StreamReliabilityRow>([
-      [direct.url, { ...row(direct.url, 5, 5), avg_played_sec_before_failure: 30 }],
-      [proxied.url, { ...row(proxied.url, 50, 1), avg_played_sec_before_failure: 300 }],
+  it("orders a mixed set 192, 128, 64, 48 with dead streams last", () => {
+    const a192 = s("a192", "192");
+    const b128 = s("b128", "128");
+    const c64 = s("c64", "64");
+    const d48 = s("d48", "48");
+    const dead = s("dead192", "192");
+    const rel = new Map<string, StreamReliabilityRow>([
+      [dead.url, { ...row(dead.url, 0, 12), avg_played_sec_before_failure: 2 }],
     ]);
-
-    const ranked = rankStreams([proxied, direct], reliability, { isMobile: false, needsProxy });
-    expect(ranked[0].name).toBe("direct");
+    const ranked = rankStreams([d48, dead, c64, a192, b128], rel, opts);
+    expect(ranked.map((r) => r.name)).toEqual(["a192", "b128", "c64", "d48", "dead192"]);
   });
 });
+
 
