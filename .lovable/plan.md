@@ -1,27 +1,41 @@
-Migrate project from Lovable Cloud to user's own Supabase
+Point the app at your own Supabase project
 
-Goal: Point the app, its MCP configuration, and edge function config at the user's own Supabase project instead of the Lovable-managed project.
+Target project: `https://asfcqlcwlaetbabikqny.supabase.co` (ref `asfcqlcwlaetbabikqny`) — this is the same project your MCP config already references.
 
-Steps:
+## Important caveats before we start
 
-1. Gather the user's Supabase project details
-   - Ask for the Supabase project URL (e.g. `https://<project-ref>.supabase.co`).
-   - Ask for the anon/publishable key.
+- Lovable Cloud cannot be removed from this project. It stays provisioned; we are redirecting the app's client to your project instead.
+- Backend tooling in Lovable (migration tool, edge function deploys, secrets, logs) will keep targeting the Lovable-managed project. After this switch, schema changes and edge function deploys for your own project need to be done by you in your Supabase account.
+- The app depends on edge functions (`xml-proxy`, `audio-proxy`, `song-play`, `song-ingest`, `stream-telemetry`, `song-artwork`, `lastfm-auth`, `lastfm-scrobble`) and on tables (`songs`, `song_artists`, `song_groups`, `song_tags`, `song_links`, `song_plays`, `stream_events` and the `stream_reliability` / `song_search` views). None of these exist in your project yet, so playback proxying, song enrichment, extra resource links and Last.fm will break until they are deployed there.
+- Your key is a new-format publishable key (`sb_publishable_...`). It works with the current supabase-js client.
 
-2. Update project connection files
-   - Write the new URL and publishable key to `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`).
-   - Update `.mcp.json` so the Supabase MCP server points to the new project ref.
-   - Update `supabase/config.toml` `project_id` to match the new project.
+## What I will change
 
-3. Verify the client import stays untouched
-   - `src/integrations/supabase/client.ts` is auto-generated and reads `.env`; do not edit it.
+1. `.env`
+   - `VITE_SUPABASE_URL="https://asfcqlcwlaetbabikqny.supabase.co"`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY="sb_publishable_iK__ZqFMW9kIfDUZNP33jA_A3EwQ41f"`
+   - `VITE_SUPABASE_PROJECT_ID="asfcqlcwlaetbabikqny"`
 
-4. Validate after migration
-   - Run a build check to ensure Vite replaces the env vars correctly.
-   - Confirm the project info / health checks return the new project ID.
-   - Leave the existing database schema and edge functions as-is; no migration is required on the new project unless the user wants to seed/copy data.
+2. `supabase/config.toml`
+   - `project_id = "asfcqlcwlaetbabikqny"`, keeping all existing `verify_jwt = false` function entries so they carry over when you deploy.
 
-Out of scope (unless explicitly asked):
-- Moving data from the Lovable Cloud database to the new project.
-- Reconfiguring auth providers or social login on the new project.
-- Reconnecting Lovable Cloud-specific features.
+3. `.mcp.json`
+   - Already points at `asfcqlcwlaetbabikqny`; left unchanged.
+
+4. `src/integrations/supabase/client.ts`
+   - Left untouched. It reads the env vars, so it picks up the new project automatically.
+
+5. Export the current schema
+   - Write the full SQL for all existing tables, views, grants and RLS policies to `supabase/migrations/` so you can apply it to your project with the Supabase CLI.
+
+## Verification
+
+- Restart the dev server and confirm the app boots without Supabase client errors.
+- Load the preview and check the network panel shows requests going to `asfcqlcwlaetbabikqny.supabase.co`.
+- Report which features are degraded until you deploy the functions and schema on your side.
+
+## Out of scope
+
+- Copying existing data out of the Lovable Cloud database.
+- Deploying edge functions to your project (needs your Supabase CLI login).
+- Configuring auth providers or secrets on your project.
