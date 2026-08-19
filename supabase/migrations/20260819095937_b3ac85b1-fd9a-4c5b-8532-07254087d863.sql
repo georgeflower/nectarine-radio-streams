@@ -1,0 +1,2 @@
+ALTER TABLE public.stream_events DROP CONSTRAINT stream_events_event_check;
+ALTER TABLE public.stream_events ADD CONSTRAINT stream_events_event_check CHECK (event = ANY (ARRAY['connect_ok'::text, 'error'::text, 'stall'::text, 'ended'::text, 'recovered'::text, 'failover'::text, 'switch'::text, 'connection_change'::text, 'live_seek'::text, 'play_rejected'::text]));
