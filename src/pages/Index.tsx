@@ -119,18 +119,18 @@ function LoveButton({ songId, artist, track }: { songId: string; artist: string;
 
 
 
-function SongRating({ songId }: { songId: string }) {
+function SongRating({ songId, isNowPlaying = false }: { songId: string; isNowPlaying?: boolean }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
   useEffect(() => {
     if (!songId) return;
     setInfo(getCachedInfo("song", songId));
-    requestInfo("song", songId);
+    requestInfo("song", songId, isNowPlaying ? "now" : "background");
     const unsub = subscribeEntities(() => {
       const next = getCachedInfo("song", songId);
       if (next) setInfo(next);
     });
     return unsub;
-  }, [songId]);
+  }, [songId, isNowPlaying]);
   if (!info || info.rating === undefined) return null;
   return (
     <span
