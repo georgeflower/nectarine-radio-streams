@@ -401,6 +401,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
             logPlayback("info", "wake", "mobile-soft-resume", snapshot({ reason }));
             a.play().then(() => markPlaybackAlive(a)).catch((e) => {
               logPlayback("warn", "wake", "mobile-soft-resume play() rejected", { err: String(e) });
+              telemetry("play_rejected", {
+                reason: "wake-mobile-soft-resume",
+                media_error_code: null,
+                media_error_message: `${e instanceof Error ? e.name : "unknown"}: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300),
+                network_state: a.networkState,
+                ready_state: a.readyState,
+                played_sec: playedSec(),
+              });
             });
           } else {
             logPlayback("info", "wake", "mobile: recent progress, no-op", { sinceProgress });
@@ -413,6 +421,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           logPlayback("warn", "wake", "mobile-paused-resume (past stall window)", snapshot({ reason }));
           a.play().then(() => markPlaybackAlive(a)).catch((e) => {
             logPlayback("error", "wake", "mobile-paused-resume play() failed", { err: String(e) });
+            telemetry("play_rejected", {
+              reason: "wake-mobile-paused-resume",
+              media_error_code: null,
+              media_error_message: `${e instanceof Error ? e.name : "unknown"}: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300),
+              network_state: a.networkState,
+              ready_state: a.readyState,
+              played_sec: playedSec(),
+            });
             if (Date.now() - lastProgressAtRef.current > getStallTimeoutMs()) {
               reportReconnect(`${reason}-mobile-playfail`);
               attemptRecoveryRef.current?.();
@@ -479,7 +495,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
       window.removeEventListener("pageshow", onPageshow);
       window.removeEventListener("online", onOnline);
     };
-  }, [markPlaybackAlive, notePlaybackProgress, snapshot]);
+  }, [markPlaybackAlive, notePlaybackProgress, playedSec, snapshot, telemetry]);
 
   // Network handover watchdog (wifi ↔ cellular). The old socket dies silently
   // on the interface switch, so a hard reload is the only reliable recovery.
@@ -1008,19 +1024,29 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         markPlaybackAlive(a);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        const name = err instanceof Error ? err.name : "";
+        const name = err instanceof Error ? err.name : "unknown";
         if (name === "AbortError" || /interrupted by/i.test(msg)) {
           logPlayback("info", "playUrl", "play() aborted (superseded)", { name, msg });
           return;
         }
         logPlayback("error", "playUrl", "play() failed", { name, msg });
+        if (name === "NotAllowedError") {
+          telemetry("play_rejected", {
+            reason: "playUrl",
+            media_error_code: null,
+            media_error_message: `${name}: ${msg}`.slice(0, 300),
+            network_state: a.networkState,
+            ready_state: a.readyState,
+            played_sec: playedSec(),
+          });
+        }
         throw err;
       } finally {
         lastLoadAtRef.current = Date.now();
         loadingRef.current = false;
       }
     },
-    [ensureAudioGraph, markPlaybackAlive, snapshot],
+    [ensureAudioGraph, markPlaybackAlive, playedSec, snapshot, telemetry],
   );
 
   const playSelected = useCallback(async () => {
@@ -1094,6 +1120,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           logPlayback("info", "recovery", "mobile-soft-resume (in-window)", { sinceProgress });
           a.play().then(() => markPlaybackAlive(a)).catch((e) => {
             logPlayback("warn", "recovery", "mobile-soft-resume play() rejected", { err: String(e) });
+            telemetry("play_rejected", {
+              reason: "recovery-mobile-soft-resume",
+              media_error_code: null,
+              media_error_message: `${e instanceof Error ? e.name : "unknown"}: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300),
+              network_state: a.networkState,
+              ready_state: a.readyState,
+              played_sec: playedSec(),
+            });
           });
         } else {
           logPlayback("info", "recovery", "mobile: recent progress, no-op", { sinceProgress });
@@ -1106,6 +1140,14 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         logPlayback("warn", "recovery", "mobile-paused-resume (past window)", snapshot());
         a.play().then(() => markPlaybackAlive(a)).catch((e) => {
           logPlayback("error", "recovery", "mobile-paused-resume play() failed", { err: String(e) });
+          telemetry("play_rejected", {
+            reason: "recovery-mobile-paused-resume",
+            media_error_code: null,
+            media_error_message: `${e instanceof Error ? e.name : "unknown"}: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300),
+            network_state: a.networkState,
+            ready_state: a.readyState,
+            played_sec: playedSec(),
+          });
         });
         return;
       }
