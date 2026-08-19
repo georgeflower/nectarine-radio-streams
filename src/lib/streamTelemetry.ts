@@ -22,7 +22,8 @@ export type StreamEventName =
   | "failover"
   | "switch"
   | "connection_change"
-  | "live_seek";
+  | "live_seek"
+  | "play_rejected";
 
 export type StreamEventInput = {
   event: StreamEventName;
