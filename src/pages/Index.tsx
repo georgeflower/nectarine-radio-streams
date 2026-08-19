@@ -882,8 +882,9 @@ const Index = () => {
                           : undefined
                       }
                     >
-                      <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink> <SongPlatform songId={now.songId} />{" "}
-                      <SongRating songId={now.songId} />
+                      <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink>{" "}
+                      <SongPlatform songId={now.songId} isNowPlaying />{" "}
+                      <SongRating songId={now.songId} isNowPlaying />
                     </p>
                     <p className="text-sm text-muted-foreground mb-3">
                       by <ExtLink href={artistUrl(now.artistId)}>{now.artist}</ExtLink>
