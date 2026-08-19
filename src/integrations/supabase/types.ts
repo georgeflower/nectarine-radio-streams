@@ -322,6 +322,13 @@ export type Database = {
       }
     }
     Views: {
+      song_last_played: {
+        Row: {
+          last_played_locally: string | null
+          song_id: string | null
+        }
+        Relationships: []
+      }
       song_play_counts: {
         Row: {
           first_played: string | null
