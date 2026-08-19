@@ -26,9 +26,6 @@ type CacheMap = Record<string, CacheEntry>;
 const STORAGE_PREFIX = "nectarine-entity-cache-v4-";
 const KINDS: EntityKind[] = ["song", "artist", "group", "compilation"];
 
-// How long a DB row counts as fresh enough to serve without re-fetching upstream.
-const DB_FRESH_MS = 6 * 60 * 60 * 1000;
-
 // Stale-while-revalidate TTLs. Cached info is shown immediately; a background
 // refetch is triggered if the entry is older than this.
 const TTL_MS: Record<EntityKind, number> = {
