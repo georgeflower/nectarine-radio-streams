@@ -119,18 +119,18 @@ function LoveButton({ songId, artist, track }: { songId: string; artist: string;
 
 
 
-function SongRating({ songId }: { songId: string }) {
+function SongRating({ songId, isNowPlaying = false }: { songId: string; isNowPlaying?: boolean }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
   useEffect(() => {
     if (!songId) return;
     setInfo(getCachedInfo("song", songId));
-    requestInfo("song", songId);
+    requestInfo("song", songId, isNowPlaying ? "now" : "background");
     const unsub = subscribeEntities(() => {
       const next = getCachedInfo("song", songId);
       if (next) setInfo(next);
     });
     return unsub;
-  }, [songId]);
+  }, [songId, isNowPlaying]);
   if (!info || info.rating === undefined) return null;
   return (
     <span
@@ -143,18 +143,18 @@ function SongRating({ songId }: { songId: string }) {
   );
 }
 
-function SongPlatform({ songId }: { songId: string }) {
+function SongPlatform({ songId, isNowPlaying = false }: { songId: string; isNowPlaying?: boolean }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
   useEffect(() => {
     if (!songId) return;
     setInfo(getCachedInfo("song", songId));
-    requestInfo("song", songId);
+    requestInfo("song", songId, isNowPlaying ? "now" : "background");
     const unsub = subscribeEntities(() => {
       const next = getCachedInfo("song", songId);
       if (next) setInfo(next);
     });
     return unsub;
-  }, [songId]);
+  }, [songId, isNowPlaying]);
   if (!info?.platformId || !info?.platformName) return null;
   const href = platformUrl(info.platformId);
   if (!href) return null;
@@ -882,8 +882,9 @@ const Index = () => {
                           : undefined
                       }
                     >
-                      <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink> <SongPlatform songId={now.songId} />{" "}
-                      <SongRating songId={now.songId} />
+                      <ExtLink href={songUrl(now.songId)}>{now.song}</ExtLink>{" "}
+                      <SongPlatform songId={now.songId} isNowPlaying />{" "}
+                      <SongRating songId={now.songId} isNowPlaying />
                     </p>
                     <p className="text-sm text-muted-foreground mb-3">
                       by <ExtLink href={artistUrl(now.artistId)}>{now.artist}</ExtLink>
@@ -900,7 +901,7 @@ const Index = () => {
                     <p className="text-sm">
                       Time Left: <span className="text-foreground"><TimeLeft playstart={now.playstart} lengthSec={now.lengthSec} /></span>
                     </p>
-                    <SongLinks songId={now.songId} />
+                    <SongLinks songId={now.songId} isNowPlaying />
                   </>
 
                 ) : (

@@ -26,14 +26,14 @@ const readLinks = (songId: string): LinkRow[] =>
     url: l.url,
   }));
 
-const SongLinks = ({ songId }: { songId: string }) => {
+const SongLinks = ({ songId, isNowPlaying = false }: { songId: string; isNowPlaying?: boolean }) => {
   const [rows, setRows] = useState<LinkRow[]>(() => readLinks(songId));
 
   useEffect(() => {
     setRows(readLinks(songId));
-    requestInfo("song", songId);
+    requestInfo("song", songId, isNowPlaying ? "now" : "background");
     return subscribe(() => setRows(readLinks(songId)));
-  }, [songId]);
+  }, [songId, isNowPlaying]);
 
 
   const valid = rows.filter((r) => !!r.url);
