@@ -1024,19 +1024,29 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         markPlaybackAlive(a);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        const name = err instanceof Error ? err.name : "";
+        const name = err instanceof Error ? err.name : "unknown";
         if (name === "AbortError" || /interrupted by/i.test(msg)) {
           logPlayback("info", "playUrl", "play() aborted (superseded)", { name, msg });
           return;
         }
         logPlayback("error", "playUrl", "play() failed", { name, msg });
+        if (name === "NotAllowedError") {
+          telemetry("play_rejected", {
+            reason: "playUrl",
+            media_error_code: null,
+            media_error_message: `${name}: ${msg}`.slice(0, 300),
+            network_state: a.networkState,
+            ready_state: a.readyState,
+            played_sec: playedSec(),
+          });
+        }
         throw err;
       } finally {
         lastLoadAtRef.current = Date.now();
         loadingRef.current = false;
       }
     },
-    [ensureAudioGraph, markPlaybackAlive, snapshot],
+    [ensureAudioGraph, markPlaybackAlive, playedSec, snapshot, telemetry],
   );
 
   const playSelected = useCallback(async () => {
