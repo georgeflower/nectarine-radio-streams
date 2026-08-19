@@ -15,7 +15,10 @@ export interface EntityInfo {
   platformName?: string; // songs only
   tags?: string[];
   links?: { sourceId: string; sourceName: string | null; url: string }[];
+  lastPlayedLocally?: string; // ISO timestamp of last local play observation
 }
+
+export type ResolvePriority = "now" | "background";
 
 type CacheEntry = { info: EntityInfo; fetchedAt: number };
 type CacheMap = Record<string, CacheEntry>;
@@ -229,6 +232,7 @@ type SongRow = {
   song_artists?: { artist_name: string | null; position: number | null }[] | null;
   song_tags?: { tag: string | null }[] | null;
   song_links?: { source_id: string; source_name: string | null; url: string | null }[] | null;
+  last_played_locally?: string | null;
 };
 
 function infoFromRow(row: SongRow): EntityInfo {
@@ -249,36 +253,40 @@ function infoFromRow(row: SongRow): EntityInfo {
     platformName: row.platform_name || undefined,
     tags: tags.length ? tags : undefined,
     links: links.length ? links : undefined,
+    lastPlayedLocally: row.last_played_locally || undefined,
   };
 }
 
-async function resolveOne(kind: EntityKind, id: string): Promise<EntityInfo> {
+async function resolveOne(
+  kind: EntityKind,
+  id: string,
+  priority: ResolvePriority = "background",
+): Promise<EntityInfo> {
   load();
   if (inflight[kind][id]) return inflight[kind][id];
   const p = (async () => {
     try {
       if (kind === "song") {
-        // DB-first: a freshly enriched row spares an upstream XML fetch.
+        // Server decides freshness and holds a claim, so concurrent listeners
+        // collapse into a single upstream fetch. Optimisation only.
         try {
-          const { data } = await supabase
-            .from("songs")
-            .select(
-              "title, rating, votes, length_sec, platform_id, platform_name, last_enriched_at, song_artists(artist_name, position), song_tags(tag), song_links(source_id, source_name, url)",
-            )
-            .eq("song_id", id)
-            .maybeSingle();
-          const row = data as SongRow | null;
-          if (row && Date.now() - Date.parse(row.last_enriched_at) < DB_FRESH_MS) {
-            const dbInfo = infoFromRow(row);
-            if (dbInfo.title) {
-              memCache[kind][id] = { info: dbInfo, fetchedAt: Date.now() };
-              persist(kind);
-              notify();
-              return dbInfo;
+          const { data, error } = await supabase.functions.invoke("song-refresh", {
+            body: { song_id: id, priority },
+          });
+          if (!error && data && (data as { ok?: boolean }).ok) {
+            const row = (data as { song?: SongRow | null }).song ?? null;
+            if (row) {
+              const dbInfo = infoFromRow(row);
+              if (dbInfo.title) {
+                memCache[kind][id] = { info: dbInfo, fetchedAt: Date.now() };
+                persist(kind);
+                notify();
+                return dbInfo;
+              }
             }
           }
         } catch {
-          /* DB is an optimisation only — fall through upstream */
+          /* fall through to upstream */
         }
       }
       const text = await fetchEndpoint(endpointPath(kind, id));
@@ -318,13 +326,13 @@ export function getCachedTitle(kind: EntityKind, id: string): string | undefined
   return getCachedInfo(kind, id)?.title;
 }
 
-export function requestInfo(kind: EntityKind, id: string): void {
+export function requestInfo(kind: EntityKind, id: string, priority: ResolvePriority = "background"): void {
   if (!id) return;
   load();
   if (inflight[kind][id]) return;
   const entry = memCache[kind][id];
   if (entry && !isStale(kind, entry.fetchedAt)) return;
-  void resolveOne(kind, id);
+  void resolveOne(kind, id, priority);
 }
 
 // Back-compat alias.

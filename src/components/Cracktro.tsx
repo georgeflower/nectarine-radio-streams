@@ -300,7 +300,7 @@ const Cracktro = ({
       return;
     }
     setInfo(getCachedInfo("song", songId));
-    requestInfo("song", songId);
+    requestInfo("song", songId, "now");
     const unsub = subscribeEntities(() => setInfo(getCachedInfo("song", songId)));
     return unsub;
   }, [songId]);
