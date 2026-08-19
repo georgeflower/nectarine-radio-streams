@@ -143,18 +143,18 @@ function SongRating({ songId, isNowPlaying = false }: { songId: string; isNowPla
   );
 }
 
-function SongPlatform({ songId }: { songId: string }) {
+function SongPlatform({ songId, isNowPlaying = false }: { songId: string; isNowPlaying?: boolean }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
   useEffect(() => {
     if (!songId) return;
     setInfo(getCachedInfo("song", songId));
-    requestInfo("song", songId);
+    requestInfo("song", songId, isNowPlaying ? "now" : "background");
     const unsub = subscribeEntities(() => {
       const next = getCachedInfo("song", songId);
       if (next) setInfo(next);
     });
     return unsub;
-  }, [songId]);
+  }, [songId, isNowPlaying]);
   if (!info?.platformId || !info?.platformName) return null;
   const href = platformUrl(info.platformId);
   if (!href) return null;
