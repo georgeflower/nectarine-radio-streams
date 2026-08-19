@@ -192,6 +192,7 @@ export type Database = {
           platform_name: string | null
           pouet_id: string | null
           rating: number | null
+          refresh_claimed_at: string | null
           samplerate: number | null
           song_id: string
           status_text: string | null
@@ -215,6 +216,7 @@ export type Database = {
           platform_name?: string | null
           pouet_id?: string | null
           rating?: number | null
+          refresh_claimed_at?: string | null
           samplerate?: number | null
           song_id: string
           status_text?: string | null
@@ -238,6 +240,7 @@ export type Database = {
           platform_name?: string | null
           pouet_id?: string | null
           rating?: number | null
+          refresh_claimed_at?: string | null
           samplerate?: number | null
           song_id?: string
           status_text?: string | null
