@@ -1532,12 +1532,10 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
           onClick={toggle}
           disabled={disabled}
           aria-label={playing ? "Pause stream" : "Play stream"}
-          className="h-10 w-10 shrink-0 flex items-center justify-center bg-primary text-primary-foreground rounded-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+          className="h-11 w-11 shrink-0 flex items-center justify-center bg-primary text-primary-foreground rounded-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
           style={{ boxShadow: disabled ? undefined : "var(--glow-primary)" }}
         >
-          {loading ? (
-            <span className="text-xs">…</span>
-          ) : playing ? (
+          {playing ? (
             <Pause className="h-4 w-4" />
           ) : (
             <Play className="h-4 w-4" />
@@ -1567,7 +1565,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
             onClick={() => setVolumeOpen((o) => !o)}
             aria-label="Volume"
             aria-expanded={volumeOpen}
-            className="h-10 w-10 flex items-center justify-center border border-border rounded-sm hover:border-primary transition-colors touch-manipulation"
+            className="h-11 w-11 flex items-center justify-center border border-border rounded-sm hover:border-primary transition-colors touch-manipulation"
           >
             {muted || volume === 0 ? (
               <VolumeX className="h-4 w-4" />
@@ -1609,9 +1607,9 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         </div>
       </div>
 
-      <p className="text-xs mt-1.5 break-words px-1">
+      <p className="text-xs mt-1.5 break-words px-1" style={{ fontSize: "clamp(0.7rem, 3vw, 0.75rem)" }}>
         <span className="text-muted-foreground">
-          {reconnecting ? "↻ Reconnecting… " : playing ? "● " : ""}Now:{" "}
+          {(loading && !playing) ? "Connecting… " : reconnecting ? "↻ Reconnecting… " : playing ? "● " : ""}Now:{" "}
         </span>
         <span className="font-semibold">{mediaTitle}</span>
         <span className="text-muted-foreground"> — {mediaArtist}</span>
