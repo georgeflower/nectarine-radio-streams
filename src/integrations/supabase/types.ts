@@ -323,6 +323,36 @@ export type Database = {
         }
         Relationships: []
       }
+      upstream_fetches: {
+        Row: {
+          created_at: string
+          endpoint: string
+          entity_id: string | null
+          id: number
+          outcome: string
+          source: string
+          status: number | null
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          entity_id?: string | null
+          id?: number
+          outcome: string
+          source: string
+          status?: number | null
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          entity_id?: string | null
+          id?: number
+          outcome?: string
+          source?: string
+          status?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       song_last_played: {
@@ -392,6 +422,19 @@ export type Database = {
           recoveries: number | null
           stream_name: string | null
           stream_url: string | null
+        }
+        Relationships: []
+      }
+      upstream_fetch_stats: {
+        Row: {
+          avoided: number | null
+          calls: number | null
+          endpoint: string | null
+          errors: number | null
+          hit_ratio: number | null
+          hour: string | null
+          source: string | null
+          upstream_fetches: number | null
         }
         Relationships: []
       }
