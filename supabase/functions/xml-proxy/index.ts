@@ -1,4 +1,6 @@
 // Public proxy for scenestream.net demovibes XML API (no CORS upstream).
+import { endpointOf, entityIdOf, logUpstream } from "../_shared/upstreamLedger.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
