@@ -1,4 +1,6 @@
 // Public proxy for scenestream.net demovibes XML API (no CORS upstream).
+import { endpointOf, entityIdOf, logUpstream } from "../_shared/upstreamLedger.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -55,6 +57,14 @@ Deno.serve(async (req) => {
     });
     const body = await resp.text();
 
+    logUpstream({
+      endpoint: endpointOf(path),
+      entityId: entityIdOf(path),
+      outcome: resp.ok ? "fetched" : "error",
+      source: "xml-proxy",
+      status: resp.status,
+    });
+
     return new Response(body, {
       status: resp.status,
       headers: {
@@ -63,6 +73,7 @@ Deno.serve(async (req) => {
         "Cache-Control": "public, max-age=10",
       },
     });
+
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return new Response(JSON.stringify({ error: msg }), {

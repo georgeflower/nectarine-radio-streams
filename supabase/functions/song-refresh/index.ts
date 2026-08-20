@@ -4,6 +4,11 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { XMLParser } from "npm:fast-xml-parser@4";
+import { logUpstream, type UpstreamOutcome } from "../_shared/upstreamLedger.ts";
+
+const ledger = (outcome: UpstreamOutcome, songId: string) =>
+  logUpstream({ endpoint: "song", entityId: songId, outcome, source: "song-refresh" });
+
 
 const TTL_NOW_MS = 45 * 60 * 1000;
 const TTL_BACKGROUND_MS = 6 * 60 * 60 * 1000;
@@ -252,12 +257,17 @@ Deno.serve(async (req) => {
 
     if (!existing) {
       const doc = await fetchDoc(songId);
-      if (!doc || !(await ingest(supabase, songId, doc))) return json({ ok: false });
+      if (!doc || !(await ingest(supabase, songId, doc))) {
+        ledger("error", songId);
+        return json({ ok: false });
+      }
+      ledger("fetched", songId);
       return json({ ok: true, song: await readSong(supabase, songId), source: "fetched" });
     }
 
     const age = Date.now() - Date.parse(existing.last_enriched_at as string);
     if (Number.isFinite(age) && age < ttl) {
+      ledger("cache", songId);
       return json({ ok: true, song: existing, source: "cache" });
     }
 
@@ -268,6 +278,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const claimedAt = claimRow?.refresh_claimed_at ? Date.parse(claimRow.refresh_claimed_at) : NaN;
     if (Number.isFinite(claimedAt) && Date.now() - claimedAt < CLAIM_WINDOW_MS) {
+      ledger("claimed", songId);
       return json({ ok: true, song: existing, source: "claimed-by-other" });
     }
 
@@ -275,9 +286,12 @@ Deno.serve(async (req) => {
 
     const doc = await fetchDoc(songId);
     if (!doc || !(await ingest(supabase, songId, doc))) {
+      ledger("error", songId);
       return json({ ok: true, song: existing, source: "cache" });
     }
+    ledger("fetched", songId);
     return json({ ok: true, song: await readSong(supabase, songId), source: "refreshed" });
+
   } catch (e) {
     console.error("song-refresh error", e instanceof Error ? e.message : e);
     return json({ ok: false });
