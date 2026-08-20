@@ -4,6 +4,11 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { XMLParser } from "npm:fast-xml-parser@4";
+import { logUpstream, type UpstreamOutcome } from "../_shared/upstreamLedger.ts";
+
+const ledger = (outcome: UpstreamOutcome, songId: string) =>
+  logUpstream({ endpoint: "song", entityId: songId, outcome, source: "song-refresh" });
+
 
 const TTL_NOW_MS = 45 * 60 * 1000;
 const TTL_BACKGROUND_MS = 6 * 60 * 60 * 1000;
