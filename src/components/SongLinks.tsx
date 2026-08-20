@@ -52,7 +52,7 @@ const SongLinks = ({ songId, isNowPlaying = false }: { songId: string; isNowPlay
           href={download}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs uppercase tracking-[0.15em] text-foreground hover:opacity-80"
+          className="text-xs uppercase tracking-[0.15em] text-foreground hover:opacity-80 py-2 -my-2 inline-block"
         >
           ⬇ Download
         </a>
@@ -63,7 +63,7 @@ const SongLinks = ({ songId, isNowPlaying = false }: { songId: string; isNowPlay
           href={r.url as string}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs uppercase tracking-[0.15em] text-foreground hover:opacity-80"
+          className="text-xs uppercase tracking-[0.15em] text-foreground hover:opacity-80 py-2 -my-2 inline-block"
         >
           {r.source_name ?? r.source_id}
         </a>
