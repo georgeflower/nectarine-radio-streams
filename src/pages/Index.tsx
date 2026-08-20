@@ -709,7 +709,6 @@ const Index = () => {
           style={{ fontSize: "16px" }}
         >
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold neon tracking-widest uppercase">▌Necta Compact View</h1>
             <p className="text-muted-foreground text-[10px] uppercase tracking-[0.25em] mt-1">
               Compact player for Nectarine, the demoscene radio.
             </p>
