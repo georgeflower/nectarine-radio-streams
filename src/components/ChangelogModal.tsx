@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.10";
+export const APP_VERSION = "0.7.11";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,19 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.11",
+    date: "2026-08-21",
+    changes: [
+      "Song ratings and vote counts for the currently-playing track now refresh from scenestream.net every 45 minutes instead of every 6 hours, coordinated server-side so multiple listeners never trigger duplicate requests",
+      "\"Last played\" now reflects this app's own accurate play history instead of a delayed value from scenestream.net",
+      "Added an internal ledger recording every request this app makes to scenestream.net, so traffic and cache effectiveness can be measured directly",
+      "Play and volume buttons enlarged to a full 44px tap target, and Extra Resources links now have a larger invisible tap area, both without changing their visual size",
+      "The loading and reconnecting indicators are now a single consistent status line instead of two different mechanisms",
+      "Added a short description for first-time visitors",
+      "Added diagnostic logging for a rare case where playback fails to resume automatically after being backgrounded for a long time on mobile",
+    ],
+  },
   {
     version: "0.7.10",
     date: "2026-08-18",
