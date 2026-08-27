@@ -10,7 +10,8 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.song-play]
-verify_jwt = false
+verify_jwt = true
 
 [functions.song-ingest]
-verify_jwt = false
+verify_jwt = true
+
