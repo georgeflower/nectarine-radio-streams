@@ -35,7 +35,7 @@ import {
 import { clearRoster } from "@/lib/gooseFamilyRoster";
 import Flag from "./Flag";
 import LastfmButton, { LastfmLights } from "./LastfmButton";
-import { LoveButton } from "@/pages/Index";
+import { LoveButton } from "@/components/LoveButton";
 
 type OnlineUser = { name: string; flag: string };
 
