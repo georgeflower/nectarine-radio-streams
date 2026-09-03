@@ -34,7 +34,8 @@ import {
 } from "@/lib/cracktroUi";
 import { clearRoster } from "@/lib/gooseFamilyRoster";
 import Flag from "./Flag";
-import LastfmButton from "./LastfmButton";
+import LastfmButton, { LastfmLights } from "./LastfmButton";
+import { LoveButton } from "@/pages/Index";
 
 type OnlineUser = { name: string; flag: string };
 
@@ -85,12 +86,13 @@ const LOW_FPS_THRESHOLD = 28;
 const LOW_FPS_SUSTAINED_MS = 12_000;
 const FPS_HUD_UPDATE_INTERVAL_MS = 250;
 
-type PanelId = "oneliner" | "online" | "queue" | "history" | "roster" | "diag";
+type PanelId = "oneliner" | "online" | "queue" | "history" | "roster" | "diag" | "lastfm";
 const PANELS: { id: PanelId; label: string }[] = [
   { id: "oneliner", label: "Oneliner" },
   { id: "online", label: "Online" },
   { id: "queue", label: "Up Next" },
   { id: "history", label: "Recent" },
+  { id: "lastfm", label: "LAST.FM" },
 ];
 const STORAGE_PANELS = "cracktro-panels-on";
 
@@ -198,7 +200,7 @@ const Cracktro = ({
   const [fps, setFps] = useState<number | null>(null);
   const [lowFpsDetected, setLowFpsDetected] = useState(false);
   const [panelsOn, setPanelsOn] = useState<Record<PanelId, boolean>>(() => {
-    const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: true, history: false, roster: false, diag: false };
+    const defaults: Record<PanelId, boolean> = { oneliner: false, online: false, queue: true, history: false, roster: false, diag: false, lastfm: false };
     try {
       const raw = localStorage.getItem(STORAGE_PANELS);
       if (raw) {

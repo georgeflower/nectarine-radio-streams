@@ -57,7 +57,7 @@ import {
 } from "@/lib/lastfm";
 
 /** Last.fm love toggle. Demoscene track names often do not match Last.fm's catalog. */
-function LoveButton({ songId, artist, track }: { songId: string; artist: string; track: string }) {
+export function LoveButton({ songId, artist, track }: { songId: string; artist: string; track: string }) {
   const { session } = useLastfm();
   const [loved, setLovedState] = useState(false);
   const [busy, setBusy] = useState(false);
