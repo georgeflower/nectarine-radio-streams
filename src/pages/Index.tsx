@@ -31,7 +31,7 @@ import Cracktro from "@/components/Cracktro";
 import ChangelogModal, { APP_VERSION } from "@/components/ChangelogModal";
 import WhatsNewPopup from "@/components/WhatsNewPopup";
 import Flag from "@/components/Flag";
-import { renderBBCode } from "@/lib/bbcode";
+import { renderBBCode, isAsciiArt } from "@/lib/bbcode";
 import { logSongPlay } from "@/lib/songLog";
 
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
