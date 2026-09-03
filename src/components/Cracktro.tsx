@@ -14,7 +14,7 @@ import RosterWindow from "./RosterWindow";
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
 import { formatOnelinerTime, type OnelinerEntry, QueueEntry, userUrl, formatDuration, computeTimeLeft } from "@/lib/nectarine";
 import { StageProvider } from "@/lib/stage";
-import { renderBBCode } from "@/lib/bbcode";
+import { renderBBCode, isAsciiArt } from "@/lib/bbcode";
 import { sayFromAnyGoose, setGoosePerformanceState, setProcreationEnabled } from "@/lib/gooseSocial";
 import { notePlatformChange } from "@/lib/gooseRaptureEvents";
 import { pickRatingLine } from "@/lib/gooseSongChatter";
@@ -1042,7 +1042,16 @@ const Cracktro = ({
                       })()}
                     </span>
                     <span className="text-muted-foreground">: </span>
-                    <span>{renderBBCode(o.text)}</span>
+                    <span
+                      className={
+                        isAsciiArt(o.text)
+                          ? "block font-mono whitespace-pre leading-none overflow-x-auto"
+                          : undefined
+                      }
+                    >
+                      {renderBBCode(o.text)}
+                    </span>
+
                   </li>
                 ))}
               </ul>

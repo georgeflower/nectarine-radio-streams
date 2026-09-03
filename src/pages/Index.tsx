@@ -31,7 +31,7 @@ import Cracktro from "@/components/Cracktro";
 import ChangelogModal, { APP_VERSION } from "@/components/ChangelogModal";
 import WhatsNewPopup from "@/components/WhatsNewPopup";
 import Flag from "@/components/Flag";
-import { renderBBCode } from "@/lib/bbcode";
+import { renderBBCode, isAsciiArt } from "@/lib/bbcode";
 import { logSongPlay } from "@/lib/songLog";
 
 import { getCachedInfo, requestInfo, subscribe as subscribeEntities } from "@/lib/entityCache";
@@ -1022,8 +1022,15 @@ const Index = () => {
                           </span>
                           <span className="text-muted-foreground">({formatOnelinerTime(entry.time)})</span>
                         </div>
-                        <p className="text-sm leading-snug mt-0.5 [overflow-wrap:anywhere] break-words">
+                        <p
+                          className={
+                            isAsciiArt(entry.text)
+                              ? "text-sm mt-0.5 font-mono whitespace-pre leading-none overflow-x-auto"
+                              : "text-sm leading-snug mt-0.5 [overflow-wrap:anywhere] break-words"
+                          }
+                        >
                           {renderBBCode(entry.text)}
+
                         </p>
                       </article>
                     ))
