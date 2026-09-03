@@ -1407,6 +1407,25 @@ const Cracktro = ({
           </FloatingWindow>
         )}
 
+        {panelsOn.lastfm && (
+          <FloatingWindow
+            id="lastfm"
+            title="LAST.FM"
+            defaultX={Math.max(16, (typeof window !== "undefined" ? window.innerWidth : 1200) - 220)}
+            defaultY={80}
+            defaultW={200}
+            onClose={() => togglePanel("lastfm")}
+          >
+            <div className="flex flex-col gap-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <LastfmLights />
+                <LoveButton songId={songId ?? ""} artist={artist} track={title} />
+              </div>
+              <LastfmButton compact />
+            </div>
+          </FloatingWindow>
+        )}
+
         {panelsOn.roster && (
           <RosterWindow
             defaultX={Math.max(16, (typeof window !== "undefined" ? window.innerWidth : 1200) - 320)}
