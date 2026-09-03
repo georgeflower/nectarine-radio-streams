@@ -1042,7 +1042,16 @@ const Cracktro = ({
                       })()}
                     </span>
                     <span className="text-muted-foreground">: </span>
-                    <span>{renderBBCode(o.text)}</span>
+                    <span
+                      className={
+                        isAsciiArt(o.text)
+                          ? "block font-mono whitespace-pre leading-none overflow-x-auto"
+                          : undefined
+                      }
+                    >
+                      {renderBBCode(o.text)}
+                    </span>
+
                   </li>
                 ))}
               </ul>
