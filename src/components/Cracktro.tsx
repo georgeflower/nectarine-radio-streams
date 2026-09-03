@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import Visualizer, { type VisualizerStyle } from "./Visualizer";
 import ReactivityDrawer from "./ReactivityDrawer";
 import BeatOverlay from "./BeatOverlay";
@@ -222,6 +223,9 @@ const Cracktro = ({
   // explicitly expanded.
   const [showHintChrome, setShowHintChrome] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
+  const isMobile = useIsMobile();
+  const [activeSettingsTab, setActiveSettingsTab] = useState<"visuals" | "rapture" | "panels" | "more">("visuals");
+  const controlH = isMobile ? "min-h-11" : "min-h-9";
 
   // Tutorial hints — show once per browser until dismissed.
   const TUTORIAL_BALL_KEY = "cracktro:tutorial:ballHint:v1";
@@ -417,7 +421,6 @@ const Cracktro = ({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-
   const text = useMemo(() => {
     const isFirefox = typeof navigator !== "undefined" && /Firefox/i.test(navigator.userAgent);
     return (
@@ -544,6 +547,276 @@ const Cracktro = ({
     setProcreationEnabled(procreationActive);
   }, [procreationActive]);
   const [changelogOpen, setChangelogOpen] = useState(false);
+
+
+  const resetFamilyButton = (
+    <button
+      type="button"
+      onClick={() => {
+        if (window.confirm(
+          "Reset the goose family?\n\nThis will permanently delete all your geese, eggs, goslings and grown-up offspring. The two original geese will return. Continue?",
+        )) {
+          clearRoster();
+          window.location.reload();
+        }
+      }}
+      className={`${controlH} px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-destructive/60 bg-background/60 text-destructive hover:bg-destructive/20`}
+      title="Permanently remove all family members"
+    >
+      Reset Family
+    </button>
+  );
+
+  const visualsSection = (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">Visuals</span>
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Scroller</span>
+        <button
+          type="button"
+          onClick={() => setScrollOn((v) => !v)}
+          className={`${controlH} px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+            scrollOn
+              ? "border-primary bg-primary/20 text-foreground"
+              : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+          }`}
+          aria-pressed={scrollOn}
+        >
+          {scrollOn ? "ON" : "OFF"}
+        </button>
+        {MODES.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            onClick={() => {
+              setMode(m.id);
+              if (!scrollOn) setScrollOn(true);
+            }}
+            disabled={!scrollOn}
+            className={`${controlH} px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              mode === m.id
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            } ${!scrollOn ? "opacity-40 cursor-not-allowed" : ""}`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Font</span>
+        <select
+          value={skinOverride}
+          onChange={(e) => setSkinOverride(e.target.value as Skin | "auto")}
+          className={`${controlH} px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background`}
+        >
+          <option value="auto">Auto ({autoSkin})</option>
+          <option value="xm">XM</option>
+          <option value="amiga">Amiga</option>
+          <option value="atari">Atari</option>
+          <option value="c64">C64</option>
+          <option value="default">Default</option>
+        </select>
+        <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground ml-1">FPS</span>
+        <button
+          type="button"
+          onClick={() => setFpsCounterOn((v) => !v)}
+          className={`${controlH} px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+            fpsCounterOn
+              ? "border-primary bg-primary/20 text-foreground"
+              : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+          }`}
+          aria-pressed={fpsCounterOn}
+          aria-label="Toggle FPS counter"
+        >
+          {fpsCounterOn ? "ON" : "OFF"}
+        </button>
+        <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground ml-1">Size</span>
+        {(["s", "m", "l"] as WindowSize[]).map((sz) => (
+          <button
+            key={sz}
+            type="button"
+            onClick={() => applyWindowSize(sz)}
+            className={`${controlH} px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              windowSize === sz
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-pressed={windowSize === sz}
+            title="Resize floating windows and info box"
+          >
+            {sz.toUpperCase()}
+          </button>
+        ))}
+      </div>
+      {onStyleChange && (
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Effect</span>
+          {VIZ_STYLES.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => onStyleChange(v.id)}
+              className={`${controlH} px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                style === v.id
+                  ? "border-primary bg-primary/20 text-foreground"
+                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+          <ReactivityDrawer container={portalTarget}>
+            <button
+              type="button"
+              className={`${controlH} px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background`}
+              title="Tune audio reactivity per visualizer"
+            >
+              ♪ Reactivity…
+            </button>
+          </ReactivityDrawer>
+        </div>
+      )}
+    </div>
+  );
+
+  const raptureSection = (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">Rapture Mode</span>
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setRaptureOn((v) => !v)}
+          className={`${controlH} px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+            raptureOn
+              ? "border-primary bg-primary/30 text-foreground"
+              : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+          }`}
+          aria-pressed={raptureOn}
+          title="Master toggle for geese + procreation"
+        >
+          Rapture: {raptureOn ? "ON" : "OFF"}
+        </button>
+        {[
+          { label: "Goose", state: gooseOn, toggle: () => setGooseOn((v) => !v), title: "Toggle flying goose" },
+          { label: "Brown", state: brownGooseOn, toggle: () => setBrownGooseOn((v) => !v), title: "Toggle brown flying goose" },
+          { label: "Procreation", state: procreationOn, toggle: () => setProcreationOn((v) => !v), title: "Toggle goose procreation" },
+        ].map((it) => (
+          <button
+            key={it.label}
+            type="button"
+            onClick={it.toggle}
+            disabled={!raptureOn}
+            className={`${controlH} px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              it.state && raptureOn
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            } ${!raptureOn ? "opacity-40 cursor-not-allowed" : ""}`}
+            aria-pressed={it.state}
+            title={it.title}
+          >
+            {it.label}: {it.state ? "ON" : "OFF"}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => togglePanel("roster")}
+          className={`${controlH} px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+            panelsOn.roster
+              ? "border-primary bg-primary/20 text-foreground"
+              : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+          }`}
+          aria-pressed={panelsOn.roster}
+          title="Toggle Goose Stats panel"
+        >
+          Goose Stats
+        </button>
+      </div>
+      <hr className="border-border w-full" />
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        {resetFamilyButton}
+      </div>
+    </div>
+  );
+
+  const panelsSection = (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">Panels</span>
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setInfobarOn((v) => !v)}
+          className={`${controlH} px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+            infobarOn
+              ? "border-primary bg-primary/20 text-foreground"
+              : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+          }`}
+          aria-pressed={infobarOn}
+          title="Toggle the now-playing info bar"
+        >
+          Info Bar: {infobarOn ? "ON" : "OFF"}
+        </button>
+        {PANELS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => togglePanel(p.id)}
+            className={`${controlH} px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+              panelsOn[p.id]
+                ? "border-primary bg-primary/20 text-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-pressed={panelsOn[p.id]}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const moreSection = (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">More</span>
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setBoingOn((v) => !v)}
+          className={`${controlH} px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+            boingOn
+              ? "border-primary bg-primary/20 text-foreground"
+              : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+          }`}
+          aria-pressed={boingOn}
+          title="Toggle Amiga boing ball"
+        >
+          Boing: {boingOn ? "ON" : "OFF"}
+        </button>
+        <button
+          type="button"
+          onClick={() => togglePanel("diag")}
+          className={`${controlH} px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+            panelsOn.diag
+              ? "border-primary bg-primary/20 text-foreground"
+              : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+          }`}
+          aria-pressed={panelsOn.diag}
+          title="Toggle playback diagnostics panel"
+        >
+          Diag
+        </button>
+        <LastfmButton compact />
+        <button
+          type="button"
+          onClick={() => setChangelogOpen(true)}
+          className={`${controlH} px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-muted-foreground hover:text-foreground hover:border-primary transition-colors`}
+          title="View changelog"
+        >
+          v{APP_VERSION}
+        </button>
+      </div>
+    </div>
+  );
   // Clean up any leftover sim-mode storage keys from previous versions.
   useEffect(() => {
     try {
@@ -1212,289 +1485,64 @@ const Cracktro = ({
         {/* Bottom controls bar — opened only by explicit click. */}
         <div
           className={`absolute left-0 right-0 bottom-0 flex flex-col gap-1.5 px-3 py-2 bg-card/70 border-t border-border backdrop-blur-sm transition-opacity duration-300 ${
-            settingsExpanded ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
+            isMobile ? "max-h-[50vh] overflow-hidden" : "max-h-[45vh] overflow-y-auto"
+          } ${settingsExpanded ? "opacity-100" : "opacity-0 pointer-events-none"}`}
           style={{ zIndex: 11 }}
         >
           <div className="flex items-center justify-end">
             <button
               type="button"
               onClick={() => setSettingsExpanded(false)}
-              className="min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
+              className={`${controlH} px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background`}
               aria-label="Collapse settings"
               title="Collapse settings"
             >
               ▼
             </button>
           </div>
-          {/* Sectioned settings — Visuals · Geese · Panels */}
-          <div className="flex flex-wrap items-start justify-center gap-3">
-            {/* ── Visuals ─────────────────────────── */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">Visuals</span>
-              <div className="flex flex-wrap items-center justify-center gap-1.5">
-                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Scroller</span>
-                <button
-                  type="button"
-                  onClick={() => setScrollOn((v) => !v)}
-                  className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                    scrollOn
-                      ? "border-primary bg-primary/20 text-foreground"
-                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-pressed={scrollOn}
-                >
-                  {scrollOn ? "ON" : "OFF"}
-                </button>
-                {MODES.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => {
-                      setMode(m.id);
-                      if (!scrollOn) setScrollOn(true);
-                    }}
-                    disabled={!scrollOn}
-                    className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                      mode === m.id
-                        ? "border-primary bg-primary/20 text-foreground"
-                        : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                    } ${!scrollOn ? "opacity-40 cursor-not-allowed" : ""}`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-1.5">
-                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Font</span>
-                <select
-                  value={skinOverride}
-                  onChange={(e) => setSkinOverride(e.target.value as Skin | "auto")}
-                  className="min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
-                >
-                  <option value="auto">Auto ({autoSkin})</option>
-                  <option value="xm">XM</option>
-                  <option value="amiga">Amiga</option>
-                  <option value="atari">Atari</option>
-                  <option value="c64">C64</option>
-                  <option value="default">Default</option>
-                </select>
-                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground ml-1">FPS</span>
-                <button
-                  type="button"
-                  onClick={() => setFpsCounterOn((v) => !v)}
-                  className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                    fpsCounterOn
-                      ? "border-primary bg-primary/20 text-foreground"
-                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-pressed={fpsCounterOn}
-                  aria-label="Toggle FPS counter"
-                >
-                  {fpsCounterOn ? "ON" : "OFF"}
-                </button>
-                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground ml-1">Size</span>
-                {(["s", "m", "l"] as WindowSize[]).map((sz) => (
-                  <button
-                    key={sz}
-                    type="button"
-                    onClick={() => applyWindowSize(sz)}
-                    className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                      windowSize === sz
-                        ? "border-primary bg-primary/20 text-foreground"
-                        : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                    }`}
-                    aria-pressed={windowSize === sz}
-                    title="Resize floating windows and info box"
-                  >
-                    {sz.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-              {onStyleChange && (
-                <div className="flex flex-wrap items-center justify-center gap-1.5">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Effect</span>
-                  {VIZ_STYLES.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => onStyleChange(v.id)}
-                      className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                        style === v.id
-                          ? "border-primary bg-primary/20 text-foreground"
-                          : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {v.label}
-                    </button>
-                  ))}
-                  <ReactivityDrawer container={portalTarget}>
-                    <button
-                      type="button"
-                      className="min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-foreground hover:bg-background"
-                      title="Tune audio reactivity per visualizer"
-                    >
-                      ♪ Reactivity…
-                    </button>
-                  </ReactivityDrawer>
-                </div>
-              )}
+          {!isMobile ? (
+            <div className="flex flex-wrap items-start justify-center gap-3">
+              {visualsSection}
+              <div className="w-px self-stretch bg-border hidden sm:block" aria-hidden />
+              {raptureSection}
+              <div className="w-px self-stretch bg-border hidden sm:block" aria-hidden />
+              {panelsSection}
+              <div className="w-px self-stretch bg-border hidden sm:block" aria-hidden />
+              {moreSection}
             </div>
-
-            <div className="w-px self-stretch bg-border hidden sm:block" aria-hidden />
-
-            {/* ── Geese ─────────────────────────── */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">Rapture Mode</span>
-              <div className="flex flex-wrap items-center justify-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setRaptureOn((v) => !v)}
-                  className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                    raptureOn
-                      ? "border-primary bg-primary/30 text-foreground"
-                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-pressed={raptureOn}
-                  title="Master toggle for geese + procreation"
-                >
-                  Rapture: {raptureOn ? "ON" : "OFF"}
-                </button>
+          ) : (
+            <>
+              <div className="flex items-center justify-around gap-1 border-b border-border pb-1" role="tablist" aria-label="Settings tabs">
                 {[
-                  { label: "Goose", state: gooseOn, toggle: () => setGooseOn((v) => !v), title: "Toggle flying goose" },
-                  { label: "Brown", state: brownGooseOn, toggle: () => setBrownGooseOn((v) => !v), title: "Toggle brown flying goose" },
-                  { label: "Procreation", state: procreationOn, toggle: () => setProcreationOn((v) => !v), title: "Toggle goose procreation" },
-                ].map((it) => (
+                  { id: "visuals", label: "Visuals" },
+                  { id: "rapture", label: "Rapture" },
+                  { id: "panels", label: "Panels" },
+                  { id: "more", label: "More" },
+                ].map((t) => (
                   <button
-                    key={it.label}
+                    key={t.id}
                     type="button"
-                    onClick={it.toggle}
-                    disabled={!raptureOn}
-                    className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                      it.state && raptureOn
-                        ? "border-primary bg-primary/20 text-foreground"
-                        : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                    } ${!raptureOn ? "opacity-40 cursor-not-allowed" : ""}`}
-                    aria-pressed={it.state}
-                    title={it.title}
-                  >
-                    {it.label}: {it.state ? "ON" : "OFF"}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => togglePanel("roster")}
-                  className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                    panelsOn.roster
-                      ? "border-primary bg-primary/20 text-foreground"
-                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-pressed={panelsOn.roster}
-                  title="Toggle Goose Stats panel"
-                >
-                  Goose Stats
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm(
-                      "Reset the goose family?\n\nThis will permanently delete all your geese, eggs, goslings and grown-up offspring. The two original geese will return. Continue?",
-                    )) {
-                      clearRoster();
-                      window.location.reload();
-                    }
-                  }}
-                  className="min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-destructive/60 bg-background/60 text-destructive hover:bg-destructive/20"
-                  title="Permanently remove all family members"
-                >
-                  Reset Family
-                </button>
-              </div>
-            </div>
-
-            <div className="w-px self-stretch bg-border hidden sm:block" aria-hidden />
-
-            {/* ── Panels ─────────────────────────── */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">Panels</span>
-              <div className="flex flex-wrap items-center justify-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setInfobarOn((v) => !v)}
-                  className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                    infobarOn
-                      ? "border-primary bg-primary/20 text-foreground"
-                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-pressed={infobarOn}
-                  title="Toggle the now-playing info bar"
-                >
-                  Info Bar: {infobarOn ? "ON" : "OFF"}
-                </button>
-                {PANELS.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => togglePanel(p.id)}
-                    className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                      panelsOn[p.id]
+                    role="tab"
+                    aria-selected={activeSettingsTab === t.id}
+                    onClick={() => setActiveSettingsTab(t.id as typeof activeSettingsTab)}
+                    className={`${controlH} flex-1 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
+                      activeSettingsTab === t.id
                         ? "border-primary bg-primary/20 text-foreground"
                         : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
                     }`}
-                    aria-pressed={panelsOn[p.id]}
                   >
-                    {p.label}
+                    {t.label}
                   </button>
                 ))}
               </div>
-            </div>
-
-            <div className="w-px self-stretch bg-border hidden sm:block" aria-hidden />
-
-            {/* ── Trailing: Boing + Diag + Last.fm + version ─────── */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground text-center">More</span>
-              <div className="flex flex-wrap items-center justify-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setBoingOn((v) => !v)}
-                  className={`min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                    boingOn
-                      ? "border-primary bg-primary/20 text-foreground"
-                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-pressed={boingOn}
-                  title="Toggle Amiga boing ball"
-                >
-                  Boing: {boingOn ? "ON" : "OFF"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => togglePanel("diag")}
-                  className={`min-h-9 px-2 py-1 text-[10px] uppercase tracking-widest rounded-sm border ${
-                    panelsOn.diag
-                      ? "border-primary bg-primary/20 text-foreground"
-                      : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-pressed={panelsOn.diag}
-                  title="Toggle playback diagnostics panel"
-                >
-                  Diag
-                </button>
-                <LastfmButton compact />
-                <button
-                  type="button"
-                  onClick={() => setChangelogOpen(true)}
-                  className="min-h-9 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm border border-border bg-background/60 text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
-                  title="View changelog"
-                >
-                  v{APP_VERSION}
-                </button>
+              <div className="flex-1 overflow-y-auto min-h-0 px-1 py-2">
+                {activeSettingsTab === "visuals" && visualsSection}
+                {activeSettingsTab === "rapture" && raptureSection}
+                {activeSettingsTab === "panels" && panelsSection}
+                {activeSettingsTab === "more" && moreSection}
               </div>
-            </div>
-          </div>
-
-
+            </>
+          )}
         </div>
       </StageProvider>
       {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
