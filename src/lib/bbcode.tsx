@@ -347,8 +347,38 @@ function renderTag(node: Extract<Node, { type: "tag" }>, key: string): ReactNode
   }
 }
 
+// ─── ASCII-art line-structure recovery ─────────────────────────────────────────
+// The upstream oneliner XML collapses newlines in multi-line ASCII art into a
+// single space, so art arrives as one long line of equal-length rows. Detect
+// that shape and restore the newlines so containers can render it with
+// `white-space: pre`.
+
+const ART_CHARS = /[░▒▓█▀▄▌▐■□▲▼◄►╔╗╚╝║═╠╣╦╩╬┌┐└┘│─├┤┬┴┼\\/|_+*#@=~^<>()[\]{}.:'`-]/;
+
+export function normalizeArtText(text: string): string {
+  if (!text) return text;
+  if (text.includes("\n")) return text;
+
+  const parts = text.split(" ");
+  if (parts.length < 3) return text;
+  const width = parts[0].length;
+  if (width < 8) return text;
+  if (!parts.every((p) => p.length === width)) return text;
+  // Require the rows to actually look like art, not prose of equal-length words.
+  const arty = parts.filter((p) => ART_CHARS.test(p)).length;
+  if (arty < parts.length) return text;
+
+  return parts.join("\n");
+}
+
+/** True when the (normalized) message should be rendered as preformatted art. */
+export function isAsciiArt(text: string): boolean {
+  return normalizeArtText(text ?? "").includes("\n");
+}
+
 export function renderBBCode(text: string): ReactNode[] {
   if (!text) return [];
-  const tree = parse(text);
+  const tree = parse(normalizeArtText(text));
   return renderNodes(tree);
 }
+
