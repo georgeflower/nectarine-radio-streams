@@ -1022,8 +1022,15 @@ const Index = () => {
                           </span>
                           <span className="text-muted-foreground">({formatOnelinerTime(entry.time)})</span>
                         </div>
-                        <p className="text-sm leading-snug mt-0.5 [overflow-wrap:anywhere] break-words">
+                        <p
+                          className={
+                            isAsciiArt(entry.text)
+                              ? "text-sm mt-0.5 font-mono whitespace-pre leading-none overflow-x-auto"
+                              : "text-sm leading-snug mt-0.5 [overflow-wrap:anywhere] break-words"
+                          }
+                        >
                           {renderBBCode(entry.text)}
+
                         </p>
                       </article>
                     ))
