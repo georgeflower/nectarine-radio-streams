@@ -419,6 +419,33 @@ const Index = () => {
     }
   }, [theme]);
 
+  // juN3bula: rotate the day's colour into inline custom properties.
+  useEffect(() => {
+    const root = document.documentElement;
+    const clear = () => {
+      for (const name of JUNEBULA_VAR_NAMES) root.style.removeProperty(name);
+    };
+    if (theme !== "junebula") {
+      clear();
+      return;
+    }
+    const apply = () => {
+      const vars = junebulaCssVars(currentJunebulaColor());
+      for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+    };
+    apply();
+    const timer = window.setInterval(apply, 60000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") apply();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVis);
+      clear();
+    };
+  }, [theme]);
+
   useEffect(() => {
     document.documentElement.setAttribute("data-scanlines", scanlines ? "on" : "off");
   }, [scanlines]);
