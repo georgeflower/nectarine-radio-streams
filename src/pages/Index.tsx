@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useWakeLock } from "@/hooks/useWakeLock";
+import { currentJunebulaColor, junebulaCssVars, JUNEBULA_VAR_NAMES } from "@/lib/junebula";
 import {
   AUTO_REFRESH_INTERVAL_MS,
   REFRESH_INTERVAL_MS,
