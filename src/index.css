@@ -256,6 +256,39 @@
   --gradient-scanlines: none;
 }
 
+/* ─── juN3bula — 14-day rotating colour system (june.style) ──────────────── */
+[data-theme="junebula"] {
+  --background: 0 0% 5%;                /* #0c0c0c */
+  --foreground: 45 100% 50%;            /* ORANGE accent fallback #ffd200 */
+  --card: 0 0% 8%;                      /* #141414 */
+  --card-foreground: 45 100% 50%;
+  --popover: 0 0% 8%;
+  --popover-foreground: 45 100% 50%;
+  --primary: 32 100% 50%;               /* ORANGE main #ff8700 */
+  --primary-foreground: 0 0% 5%;
+  --secondary: 0 0% 4.3%;               /* #0b0b0b */
+  --secondary-foreground: 45 100% 50%;
+  --muted: 0 0% 4.3%;
+  --muted-foreground: 45 100% 50%;
+  --accent: 45 100% 50%;
+  --accent-foreground: 0 0% 5%;
+  --destructive: 0 70% 45%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 32 100% 50%;
+  --input: 32 100% 50%;
+  --ring: 32 100% 50%;
+  --radius: 0.25rem;
+  --glow-primary: 0 0 12px rgba(255, 135, 0, 0.35), 0 0 30px rgba(255, 135, 0, 0.15);
+  --glow-accent: 0 0 12px rgba(255, 210, 0, 0.35);
+  --gradient-scanlines: repeating-linear-gradient(
+    0deg,
+    hsl(0 0% 5% / 0) 0px,
+    hsl(0 0% 5% / 0) 2px,
+    hsl(0 0% 0% / 0.35) 3px,
+    hsl(0 0% 0% / 0) 4px
+  );
+}
+
 /* ─── Simple — minimal light ─────────────────────────────────────────────── */
 [data-theme="simple"] {
   --background: 0 0% 98%;
