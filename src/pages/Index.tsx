@@ -153,7 +153,8 @@ type ThemeId =
   | "orange"
   | "nostalgia-c"
   | "original"
-  | "simple";
+  | "simple"
+  | "junebula";
 const THEMES: { id: ThemeId; label: string; attr: string | null }[] = [
   { id: "nostalgia", label: "Blue blue", attr: "workbench" },
   { id: "legacy", label: "CRT", attr: null },
@@ -164,6 +165,7 @@ const THEMES: { id: ThemeId; label: string; attr: string | null }[] = [
   { id: "nostalgia-c", label: "Nostalgia-C", attr: "nostalgia-c" },
   { id: "original", label: "Original", attr: "original" },
   { id: "simple", label: "Simple", attr: "simple" },
+  { id: "junebula", label: "juN3bula", attr: "junebula" },
 ];
 const THEME_STORAGE_KEY = "nectarine-theme";
 const SCANLINES_STORAGE_KEY = "nectarine-scanlines";
