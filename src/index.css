@@ -282,8 +282,8 @@
   --glow-accent: 0 0 12px rgba(255, 210, 0, 0.35);
   --gradient-scanlines: repeating-linear-gradient(
     0deg,
-    hsl(0 0% 5% / 0) 0px,
-    hsl(0 0% 5% / 0) 2px,
+    hsl(0 0% 0% / 0) 0px,
+    hsl(0 0% 0% / 0) 2px,
     hsl(0 0% 0% / 0.35) 3px,
     hsl(0 0% 0% / 0) 4px
   );
@@ -424,6 +424,30 @@
   [data-theme="orange"] .crt::before,
   [data-theme="original"] .crt::before {
     display: none;
+  }
+  /* juN3bula CRT: june.style-style scanlines + aperture grille + vignette.
+     Not gated by data-scanlines — this theme always runs the CRT effect. */
+  [data-theme="junebula"] .crt::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 51;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        hsl(0 0% 0% / 0.3) 0px,
+        hsl(0 0% 0% / 0.3) 1px,
+        transparent 1px,
+        transparent 3px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        hsl(0 0% 0% / 0.18) 0px,
+        hsl(0 0% 0% / 0.18) 1px,
+        transparent 1px,
+        transparent 3px
+      );
   }
 }
 
