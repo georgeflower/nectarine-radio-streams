@@ -448,8 +448,12 @@ const Index = () => {
   }, [theme]);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-scanlines", scanlines ? "on" : "off");
-  }, [scanlines]);
+    // juN3bula is a CRT theme (mirrors june.style): scanlines are always on
+    // while it is active. The user's stored preference is left untouched and
+    // applies again when switching to another theme.
+    const on = scanlines || theme === "junebula";
+    document.documentElement.setAttribute("data-scanlines", on ? "on" : "off");
+  }, [scanlines, theme]);
 
   const loadEndpoint = useCallback(async (endpoint: Endpoint): Promise<PlaylistData | null> => {
     try {
