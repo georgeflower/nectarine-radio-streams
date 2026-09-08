@@ -170,6 +170,8 @@ const THEMES: { id: ThemeId; label: string; attr: string | null }[] = [
 ];
 const THEME_STORAGE_KEY = "nectarine-theme";
 const SCANLINES_STORAGE_KEY = "nectarine-scanlines";
+const CRT_GRILLE_STORAGE_KEY = "nectarine-crt-grille";
+const UI_OPACITY_STORAGE_KEY = "nectarine-ui-opacity";
 
 const EMPTY_PLAYLIST: PlaylistData = { now: null, queue: [], history: [] };
 
@@ -408,6 +410,25 @@ const Index = () => {
   });
 
   const [scanlines, setScanlines] = usePersistedBool(SCANLINES_STORAGE_KEY, false);
+  const [crtGrille, setCrtGrille] = usePersistedBool(CRT_GRILLE_STORAGE_KEY, false);
+  const [uiOpacity, setUiOpacity] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem(UI_OPACITY_STORAGE_KEY));
+      if (Number.isFinite(v) && v >= 0.3 && v <= 1) return v;
+    } catch {
+      // ignore
+    }
+    return 0.6;
+  });
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--ui-alpha", String(uiOpacity));
+    try {
+      localStorage.setItem(UI_OPACITY_STORAGE_KEY, String(uiOpacity));
+    } catch {
+      // ignore
+    }
+  }, [uiOpacity]);
 
   useEffect(() => {
     const def = THEMES.find((t) => t.id === theme);
@@ -454,6 +475,11 @@ const Index = () => {
     const on = scanlines || theme === "junebula";
     document.documentElement.setAttribute("data-scanlines", on ? "on" : "off");
   }, [scanlines, theme]);
+
+  useEffect(() => {
+    if (crtGrille) document.documentElement.setAttribute("data-crt", "grille");
+    else document.documentElement.removeAttribute("data-crt");
+  }, [crtGrille]);
 
   const loadEndpoint = useCallback(async (endpoint: Endpoint): Promise<PlaylistData | null> => {
     try {
@@ -680,15 +706,10 @@ const Index = () => {
           </div>
         )}
         <header
-          className="flex flex-col gap-3 mb-5 border-b border-border pb-4 md:flex-row md:items-center md:justify-between"
+          className="flex items-center justify-center gap-3 mb-5 border-b border-border pb-4"
           style={{ fontSize: "16px" }}
         >
-          <div>
-            <p className="text-muted-foreground text-[10px] uppercase tracking-[0.25em] mt-1">
-              Compact player for Nectarine, the demoscene radio.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 md:justify-end w-full md:w-auto">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 w-full">
             <select
               value={theme}
               onChange={(e) => setTheme(e.target.value as ThemeId)}
@@ -757,6 +778,31 @@ const Index = () => {
                 >
                   Scanlines: {scanlines ? "On" : "Off"}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setCrtGrille((v) => !v)}
+                  aria-pressed={crtGrille}
+                  title="Use the juN3bula CRT grille on every theme"
+                  className="min-h-10 px-2 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation text-left"
+                >
+                  CRT grille: {crtGrille ? "On" : "Off"}
+                </button>
+                <label
+                  htmlFor="ui-opacity"
+                  className="text-[10px] uppercase tracking-widest text-muted-foreground px-1"
+                >
+                  Transparency: {Math.round((1 - uiOpacity) * 100)}%
+                </label>
+                <input
+                  id="ui-opacity"
+                  type="range"
+                  min={0.3}
+                  max={1}
+                  step={0.05}
+                  value={uiOpacity}
+                  onChange={(e) => setUiOpacity(Number(e.target.value))}
+                  className="w-full accent-primary touch-manipulation"
+                />
                 <label className="text-[10px] uppercase tracking-widest text-muted-foreground px-1">Visualizer</label>
                 <select
                   value={vizStyle}
