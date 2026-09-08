@@ -62,6 +62,39 @@ export type Database = {
         }
         Relationships: []
       }
+      listener_days: {
+        Row: {
+          client_id: string
+          country: string
+          day: string
+          first_seen_at: string
+          id: number
+          last_seen_at: string
+          net_hash: string | null
+          platform: string | null
+        }
+        Insert: {
+          client_id: string
+          country?: string
+          day: string
+          first_seen_at?: string
+          id?: number
+          last_seen_at?: string
+          net_hash?: string | null
+          platform?: string | null
+        }
+        Update: {
+          client_id?: string
+          country?: string
+          day?: string
+          first_seen_at?: string
+          id?: number
+          last_seen_at?: string
+          net_hash?: string | null
+          platform?: string | null
+        }
+        Relationships: []
+      }
       song_artists: {
         Row: {
           artist_id: string
