@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { createRawEmail, delta, renderDigestHtml, weekEnd, weekStart, type DigestData } from "../../supabase/functions/weekly-digest/digest";
+import { countryRows, createRawEmail, delta, renderDigestHtml, weekEnd, weekStart, type DigestData } from "../../supabase/functions/weekly-digest/digest";
+
+const data: DigestData = {
+  weekLabel: "2026-09-07 – 2026-09-13",
+  isTest: true,
+  plays: 62,
+  playsDelta: "-85%",
+  uniqueSongs: 60,
+  loves: 3,
+  unloves: 1,
+  lovesDelta: "new",
+  logins: 2,
+  loginsDelta: "±0",
+  busiestDay: "Tue 08 Sep (62 plays)",
+  topSongs: [{ title: "Melo <3", artists: "Mosaik & Co", plays: 1 }],
+  trend: [{ week: "2026-08-31", plays: 405 }, { week: "2026-09-07", plays: 62 }],
+};
 
 describe("weekly digest helpers", () => {
   it("finds the Stockholm Monday for the current and previous week", () => {
@@ -21,21 +37,6 @@ describe("weekly digest helpers", () => {
     expect(delta(62, 405)).toBe("-85%");
   });
 
-  const data: DigestData = {
-    weekLabel: "2026-09-07 – 2026-09-13",
-    isTest: true,
-    plays: 62,
-    playsDelta: "-85%",
-    uniqueSongs: 60,
-    loves: 3,
-    unloves: 1,
-    lovesDelta: "new",
-    logins: 2,
-    loginsDelta: "±0",
-    busiestDay: "Tue 08 Sep (62 plays)",
-    topSongs: [{ title: "Melo <3", artists: "Mosaik & Co", plays: 1 }],
-    trend: [{ week: "2026-08-31", plays: 405 }, { week: "2026-09-07", plays: 62 }],
-  };
 
   it("renders escaped HTML with all sections", () => {
     const html = renderDigestHtml(data);
@@ -53,5 +54,32 @@ describe("weekly digest helpers", () => {
     expect(decoded).toContain("To: a@b.se");
     expect(decoded).toContain("Subject: =?UTF-8?B?");
     expect(decoded).toContain("<p>hi</p>");
+  });
+});
+
+describe("weekly digest listeners", () => {
+  it("builds a country table with shares and an Other bucket", () => {
+    const rows = countryRows([
+      { country: "SE", listeners: 6 }, { country: "DE", listeners: 3 }, { country: "??", listeners: 1 },
+      { country: "US", listeners: 1 }, { country: "NO", listeners: 1 },
+    ], 3);
+    expect(rows.map((r) => r.label)).toEqual(["🇸🇪 Sweden", "🇩🇪 Germany", "Unknown", "Other"]);
+    expect(rows.map((r) => r.share)).toEqual([50, 25, 8, 17]);
+    expect(rows[3].listeners).toBe(2);
+    expect(countryRows([])).toEqual([]);
+  });
+
+  it("renders listener stats, countries and merged-browser note", () => {
+    const html = renderDigestHtml({
+      ...data,
+      listeners: 39, listenersRaw: 42, listenersDelta: "+10%",
+      countries: [{ country: "SE", listeners: 30 }, { country: "FI", listeners: 9 }],
+      trend: [{ week: "2026-08-31", plays: 405, listeners: 35 }, { week: "2026-09-07", plays: 62, listeners: 39 }],
+    });
+    expect(html).toContain("Unique listeners");
+    expect(html).toContain("42 browsers, 3 merged");
+    expect(html).toContain("🇸🇪 Sweden");
+    expect(html).toContain("77%");
+    expect(html).toContain("35 👤");
   });
 });

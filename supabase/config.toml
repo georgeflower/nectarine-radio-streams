@@ -15,3 +15,6 @@ verify_jwt = true
 [functions.song-ingest]
 verify_jwt = true
 
+
+[functions.listener-ping]
+verify_jwt = true

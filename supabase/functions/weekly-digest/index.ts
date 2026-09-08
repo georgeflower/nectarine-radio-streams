@@ -57,9 +57,10 @@ Deno.serve(async (req) => {
     if (statsErr) return json({ error: `stats failed: ${statsErr.message}` }, 500);
 
     const s = stats as Record<string, unknown>;
-    const trend = (s.trend as { week_start: string; plays: number }[]) ?? [];
+    const trend = (s.trend as { week_start: string; plays: number; listeners?: number }[]) ?? [];
     const top = (s.top_songs as { title: string; artists: string | null; plays: number }[]) ?? [];
     const busiest = s.busiest_day as { day: string; plays: number } | null;
+    const countries = (s.countries as { country: string; listeners: number }[]) ?? [];
 
     const templateData: DigestData = {
       weekLabel: `${ws} – ${weekEnd(ws)}`,
@@ -74,7 +75,11 @@ Deno.serve(async (req) => {
       loginsDelta: delta(Number(s.logins ?? 0), Number(s.prev_logins ?? 0)),
       busiestDay: busiest ? `${busiest.day} (${busiest.plays} plays)` : "—",
       topSongs: top.map((t) => ({ title: t.title, artists: t.artists ?? "", plays: Number(t.plays) })),
-      trend: trend.map((t) => ({ week: t.week_start, plays: Number(t.plays) })),
+      trend: trend.map((t) => ({ week: t.week_start, plays: Number(t.plays), listeners: Number(t.listeners ?? 0) })),
+      listeners: Number(s.listeners ?? 0),
+      listenersRaw: Number(s.listeners_raw ?? 0),
+      listenersDelta: delta(Number(s.listeners ?? 0), Number(s.prev_listeners ?? 0)),
+      countries: countries.map((c) => ({ country: String(c.country ?? "??"), listeners: Number(c.listeners ?? 0) })),
     };
 
     if (!recipient) {
@@ -87,7 +92,7 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: "Gmail connection is not linked", preview: templateData }, 200);
     }
 
-    const subject = `Necta weekly digest ${templateData.weekLabel}: ${templateData.plays} plays, ${templateData.loves} loves${isTest ? " (test)" : ""}`;
+    const subject = `Necta weekly digest ${templateData.weekLabel}: ${templateData.listeners} listeners, ${templateData.plays} plays, ${templateData.loves} loves${isTest ? " (test)" : ""}`;
     const raw = createRawEmail(recipient, subject, renderDigestHtml(templateData));
     const res = await fetch(GMAIL_SEND_URL, {
       method: "POST",
