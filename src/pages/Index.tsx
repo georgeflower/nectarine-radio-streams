@@ -719,16 +719,13 @@ const Index = () => {
             </button>
           </div>
         )}
-        <header
-          className="flex items-center justify-center gap-3 mb-5 border-b border-border pb-4"
-          style={{ fontSize: "16px" }}
-        >
-          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 w-full">
+        <header className="mb-3 border-b border-border pb-3">
+          <div className="grid grid-cols-3 gap-2 md:flex md:flex-nowrap md:items-center md:justify-center md:gap-3 w-full">
             <select
               value={theme}
               onChange={(e) => setTheme(e.target.value as ThemeId)}
               aria-label="Theme"
-              className="min-h-11 px-2 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation flex-1 min-w-0 md:flex-none"
+              className="min-h-10 md:min-h-11 px-2 py-1 text-[10px] md:text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation w-full md:w-auto truncate"
             >
               {THEMES.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -737,7 +734,7 @@ const Index = () => {
               ))}
             </select>
             <div
-              className="flex items-center rounded-sm border border-border bg-card/60 shrink-0"
+              className="flex items-center justify-center rounded-sm border border-border bg-card/60 w-full md:w-auto"
               role="group"
               aria-label="Text size"
             >
@@ -746,11 +743,11 @@ const Index = () => {
                 onClick={() => adjustFont(-0.1)}
                 disabled={fontScale <= 0.7}
                 aria-label="Decrease text size"
-                className="min-h-11 w-10 text-sm font-bold hover:opacity-90 disabled:opacity-40 touch-manipulation"
+                className="min-h-10 md:min-h-11 w-8 md:w-10 text-sm font-bold hover:opacity-90 disabled:opacity-40 touch-manipulation"
               >
                 A−
               </button>
-              <span className="px-2 text-[10px] uppercase tracking-widest text-muted-foreground tabular-nums">
+              <span className="px-1 md:px-2 text-[10px] md:text-xs uppercase tracking-widest text-muted-foreground tabular-nums">
                 {Math.round(fontScale * 100)}%
               </span>
               <button
@@ -758,7 +755,7 @@ const Index = () => {
                 onClick={() => adjustFont(0.1)}
                 disabled={fontScale >= 1.6}
                 aria-label="Increase text size"
-                className="min-h-11 w-10 text-sm font-bold hover:opacity-90 disabled:opacity-40 touch-manipulation"
+                className="min-h-10 md:min-h-11 w-8 md:w-10 text-sm font-bold hover:opacity-90 disabled:opacity-40 touch-manipulation"
               >
                 A+
               </button>
@@ -766,7 +763,7 @@ const Index = () => {
             <button
               type="button"
               onClick={() => setCracktroOpen(true)}
-              className="min-h-11 px-3 py-2 uppercase text-xs tracking-widest rounded-sm border border-primary/60 bg-card/60 text-primary hover:bg-primary hover:text-primary-foreground transition-colors touch-manipulation shrink-0"
+              className="min-h-10 md:min-h-11 px-2 py-1 uppercase text-[10px] md:text-xs tracking-widest rounded-sm border border-primary/60 bg-card/60 text-primary hover:bg-primary hover:text-primary-foreground transition-colors touch-manipulation w-full md:w-auto whitespace-nowrap overflow-hidden text-ellipsis"
               title="Open cracktro scroller mode in a window"
             >
               ▶ Scroller Mode
@@ -775,7 +772,7 @@ const Index = () => {
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="min-h-11 px-3 py-2 uppercase text-xs tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card transition-colors touch-manipulation shrink-0"
+                  className="min-h-10 md:min-h-11 px-2 py-1 uppercase text-[10px] md:text-xs tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:bg-card transition-colors touch-manipulation w-full md:w-auto whitespace-nowrap overflow-hidden text-ellipsis"
                   title="More settings"
                   aria-label="Settings"
                 >
@@ -863,7 +860,7 @@ const Index = () => {
             </Popover>
             <button
               onClick={refreshAll}
-              className="min-h-11 px-3 py-2 bg-primary text-primary-foreground uppercase text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity touch-manipulation shrink-0"
+              className="min-h-10 md:min-h-11 px-2 py-1 bg-primary text-primary-foreground uppercase text-[10px] md:text-xs tracking-widest rounded-sm hover:opacity-90 transition-opacity touch-manipulation w-full md:w-auto whitespace-nowrap overflow-hidden text-ellipsis"
               style={{ boxShadow: "var(--glow-primary)" }}
             >
               Refresh
