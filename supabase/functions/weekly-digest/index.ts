@@ -81,8 +81,7 @@ Deno.serve(async (req) => {
       if (done) return json({ ok: true, skipped: "already sent", week_start: ws });
     }
 
-    const { data: stats, error: statsErr } = await supabase
-      .schema("private").rpc("weekly_digest_stats", { week_start: ws });
+    const { data: stats, error: statsErr } = await supabase.rpc("weekly_digest_stats", { week_start: ws });
     if (statsErr) return json({ error: `stats failed: ${statsErr.message}` }, 500);
 
     const s = stats as Record<string, unknown>;
@@ -91,7 +90,7 @@ Deno.serve(async (req) => {
     const busiest = s.busiest_day as { day: string; plays: number } | null;
 
     const templateData = {
-      weekLabel: `${ws} – ${iso(...(((d) => [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()] as [number, number, number])(new Date(Date.parse(ws) + 6 * 86400000))))}`,
+      weekLabel: `${ws} – ${new Date(Date.parse(ws) + 6 * 86400000).toISOString().slice(0, 10)}`,
       isTest,
       plays: Number(s.plays ?? 0),
       playsDelta: delta(Number(s.plays ?? 0), Number(s.prev_plays ?? 0)),
