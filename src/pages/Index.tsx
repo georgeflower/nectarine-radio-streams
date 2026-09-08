@@ -706,15 +706,10 @@ const Index = () => {
           </div>
         )}
         <header
-          className="flex flex-col gap-3 mb-5 border-b border-border pb-4 md:flex-row md:items-center md:justify-between"
+          className="flex items-center justify-center gap-3 mb-5 border-b border-border pb-4"
           style={{ fontSize: "16px" }}
         >
-          <div>
-            <p className="text-muted-foreground text-[10px] uppercase tracking-[0.25em] mt-1">
-              Compact player for Nectarine, the demoscene radio.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 md:justify-end w-full md:w-auto">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 w-full">
             <select
               value={theme}
               onChange={(e) => setTheme(e.target.value as ThemeId)}
