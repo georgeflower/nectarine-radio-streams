@@ -802,21 +802,22 @@ const Index = () => {
                   CRT grille: {crtGrille ? "On" : "Off"}
                 </button>
                 <label
-                  htmlFor="ui-opacity"
+                  htmlFor="ui-transparency"
                   className="text-[10px] uppercase tracking-widest text-muted-foreground px-1"
                 >
-                  Transparency: {Math.round((1 - uiOpacity) * 100)}%
+                  Transparency: {Math.round(uiTransparency * 100)}%
                 </label>
                 <input
-                  id="ui-opacity"
+                  id="ui-transparency"
                   type="range"
-                  min={0.3}
+                  min={0}
                   max={1}
                   step={0.05}
-                  value={uiOpacity}
-                  onChange={(e) => setUiOpacity(Number(e.target.value))}
+                  value={uiTransparency}
+                  onChange={(e) => setUiTransparency(Number(e.target.value))}
                   className="w-full accent-primary touch-manipulation"
                 />
+
                 <label className="text-[10px] uppercase tracking-widest text-muted-foreground px-1">Visualizer</label>
                 <select
                   value={vizStyle}
