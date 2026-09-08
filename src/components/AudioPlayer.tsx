@@ -12,6 +12,7 @@ import {
 } from "@/lib/nowPlaying";
 import { attachBufferedStream, isMseAudioSupported, type BufferedStreamHandle } from "@/lib/bufferedStream";
 import { setAudioController, setAudioControlState, setPlayerTime } from "@/lib/cracktroUi";
+import { pingListener } from "@/lib/listenerPing";
 import {
   getBestArtworkUrl,
   requestSongArtwork,
@@ -1738,6 +1739,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
               network_state: el?.networkState ?? null,
               ready_state: el?.readyState ?? null,
             });
+            pingListener();
           }
           if (stablePlaybackTimerRef.current !== null) {
             window.clearTimeout(stablePlaybackTimerRef.current);
