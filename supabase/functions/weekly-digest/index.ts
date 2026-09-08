@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: "Gmail connection is not linked", preview: templateData }, 200);
     }
 
-    const subject = `Necta weekly digest ${templateData.weekLabel}: ${templateData.plays} plays, ${templateData.loves} loves${isTest ? " (test)" : ""}`;
+    const subject = `Necta weekly digest ${templateData.weekLabel}: ${templateData.listeners} listeners, ${templateData.plays} plays, ${templateData.loves} loves${isTest ? " (test)" : ""}`;
     const raw = createRawEmail(recipient, subject, renderDigestHtml(templateData));
     const res = await fetch(GMAIL_SEND_URL, {
       method: "POST",
