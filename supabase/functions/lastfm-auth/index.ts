@@ -1,5 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { crypto as stdCrypto } from "https://deno.land/std@0.224.0/crypto/mod.ts";
+import { recordAppEvent } from "../_shared/appEvents.ts";
 
 const API_KEY = Deno.env.get("LASTFM_API_KEY")!;
 const API_SECRET = Deno.env.get("LASTFM_API_SECRET")!;
@@ -82,6 +83,7 @@ Deno.serve(async (req) => {
 
     const data = await signedCall({ method: "auth.getSession", token });
     if (data?.session?.key) {
+      recordAppEvent({ event: "lastfm_login", sessionKey: data.session.key });
       return new Response(
         JSON.stringify({
           sessionKey: data.session.key,

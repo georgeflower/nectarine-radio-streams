@@ -1,5 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { crypto as stdCrypto } from "https://deno.land/std@0.224.0/crypto/mod.ts";
+import { recordAppEvent } from "../_shared/appEvents.ts";
 
 const API_KEY = Deno.env.get("LASTFM_API_KEY")!;
 const API_SECRET = Deno.env.get("LASTFM_API_SECRET")!;
@@ -29,7 +30,7 @@ async function signedCall(params: Record<string, string>) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { action, sessionKey, artist, track, album, timestamp, duration, username } =
+    const { action, sessionKey, artist, track, album, timestamp, duration, username, songId } =
       await req.json();
 
     const json = (data: unknown, status = 200) =>
@@ -82,6 +83,9 @@ Deno.serve(async (req) => {
       return json({ error: "bad action" }, 400);
     }
     const data = await signedCall(params);
+    if ((action === "love" || action === "unlove") && data && !data.error) {
+      recordAppEvent({ event: action, songId: songId ? String(songId) : null, sessionKey: String(sessionKey) });
+    }
     return json(data);
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {

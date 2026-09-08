@@ -31,7 +31,7 @@ export function LoveButton({ songId, artist, track }: { songId: string; artist: 
     const next = !loved;
     setLovedState(next);
     setBusy(true);
-    const res = await setLoved(artist, track, next);
+    const res = await setLoved(artist, track, next, songId);
     setBusy(false);
     if (!res.ok) {
       setLovedState(!next);

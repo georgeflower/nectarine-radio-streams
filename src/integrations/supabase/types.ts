@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_events: {
+        Row: {
+          created_at: string
+          event: string
+          id: number
+          session_hash: string | null
+          song_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event: string
+          id?: number
+          session_hash?: string | null
+          song_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event?: string
+          id?: number
+          session_hash?: string | null
+          song_id?: string | null
+        }
+        Relationships: []
+      }
+      digest_runs: {
+        Row: {
+          id: number
+          is_test: boolean
+          recipient: string | null
+          sent_at: string
+          week_start: string
+        }
+        Insert: {
+          id?: number
+          is_test?: boolean
+          recipient?: string | null
+          sent_at?: string
+          week_start: string
+        }
+        Update: {
+          id?: number
+          is_test?: boolean
+          recipient?: string | null
+          sent_at?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
       song_artists: {
         Row: {
           artist_id: string
@@ -440,7 +488,7 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      weekly_digest_stats: { Args: { week_start: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
