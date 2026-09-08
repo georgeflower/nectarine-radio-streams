@@ -476,6 +476,11 @@ const Index = () => {
     document.documentElement.setAttribute("data-scanlines", on ? "on" : "off");
   }, [scanlines, theme]);
 
+  useEffect(() => {
+    if (crtGrille) document.documentElement.setAttribute("data-crt", "grille");
+    else document.documentElement.removeAttribute("data-crt");
+  }, [crtGrille]);
+
   const loadEndpoint = useCallback(async (endpoint: Endpoint): Promise<PlaylistData | null> => {
     try {
       const text = await fetchEndpoint(endpoint);
