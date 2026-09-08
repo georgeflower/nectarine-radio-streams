@@ -170,6 +170,8 @@ const THEMES: { id: ThemeId; label: string; attr: string | null }[] = [
 ];
 const THEME_STORAGE_KEY = "nectarine-theme";
 const SCANLINES_STORAGE_KEY = "nectarine-scanlines";
+const CRT_GRILLE_STORAGE_KEY = "nectarine-crt-grille";
+const UI_OPACITY_STORAGE_KEY = "nectarine-ui-opacity";
 
 const EMPTY_PLAYLIST: PlaylistData = { now: null, queue: [], history: [] };
 
