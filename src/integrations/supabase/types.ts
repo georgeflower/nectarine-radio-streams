@@ -40,18 +40,21 @@ export type Database = {
       }
       digest_runs: {
         Row: {
+          id: number
           is_test: boolean
           recipient: string | null
           sent_at: string
           week_start: string
         }
         Insert: {
+          id?: number
           is_test?: boolean
           recipient?: string | null
           sent_at?: string
           week_start: string
         }
         Update: {
+          id?: number
           is_test?: boolean
           recipient?: string | null
           sent_at?: string
