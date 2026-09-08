@@ -97,6 +97,7 @@ export function renderDigestHtml(d: DigestData): string {
         <div style="background:#ffb347;height:10px;width:${Math.max(2, Math.round((t.plays / max) * 100))}%"></div>
       </td>
       <td style="padding:4px 8px;color:#e8e8f0;font-size:12px;text-align:right">${t.plays}</td>
+      <td style="padding:4px 8px;color:#9a9ab0;font-size:12px;text-align:right;white-space:nowrap">${t.listeners ?? 0} 👤</td>
     </tr>`).join("");
 
   const topRows = d.topSongs.length
@@ -108,20 +109,37 @@ export function renderDigestHtml(d: DigestData): string {
       </tr>`).join("")
     : `<tr><td style="padding:6px 8px;color:#9a9ab0;font-size:13px">No plays this week.</td></tr>`;
 
+  const listeners = d.listeners ?? 0;
+  const raw = d.listenersRaw ?? listeners;
+  const merged = raw - listeners;
+  const listenerSub = `${d.listenersDelta ?? "±0"} vs last week${merged > 0 ? ` · ${raw} browsers, ${merged} merged` : ""}`;
+  const cRows = countryRows(d.countries ?? []);
+  const countryTable = cRows.length
+    ? cRows.map((c) =>
+      `<tr>
+        <td style="padding:5px 8px;color:#e8e8f0;font-size:13px">${esc(c.label)}</td>
+        <td style="padding:5px 8px;color:#ffb347;font-size:13px;text-align:right;white-space:nowrap">${c.listeners}</td>
+        <td style="padding:5px 8px;color:#9a9ab0;font-size:12px;text-align:right;white-space:nowrap">${c.share}%</td>
+      </tr>`).join("")
+    : `<tr><td style="padding:6px 8px;color:#9a9ab0;font-size:13px">No listeners recorded this week.</td></tr>`;
+
   return `<!doctype html><html><body style="margin:0;background:#0b0b10;font-family:ui-monospace,Menlo,Consolas,monospace;color:#e8e8f0">
 <div style="max-width:600px;margin:0 auto;padding:24px 16px">
   <div style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#ffb347">Necta · weekly digest${d.isTest ? " · test" : ""}</div>
   <h1 style="font-size:20px;margin:6px 0 18px;color:#ffffff">Week ${esc(d.weekLabel)}</h1>
   <table cellspacing="0" cellpadding="0" style="width:100%;border-collapse:separate;border-spacing:6px 6px">
-    <tr>${stat("Plays", d.plays, `${d.playsDelta} vs last week`)}${stat("Unique songs", d.uniqueSongs)}</tr>
-    <tr>${stat("Loves", d.loves, `${d.lovesDelta} vs last week${d.unloves ? ` · ${d.unloves} unloved` : ""}`)}${stat("Last.fm sign-ins", d.logins, `${d.loginsDelta} vs last week`)}</tr>
+    <tr>${stat("Unique listeners", listeners, listenerSub)}${stat("Plays", d.plays, `${d.playsDelta} vs last week`)}</tr>
+    <tr>${stat("Unique songs", d.uniqueSongs)}${stat("Loves", d.loves, `${d.lovesDelta} vs last week${d.unloves ? ` · ${d.unloves} unloved` : ""}`)}</tr>
+    <tr>${stat("Last.fm sign-ins", d.logins, `${d.loginsDelta} vs last week`)}<td></td></tr>
   </table>
   <p style="font-size:13px;color:#9a9ab0;margin:14px 0 20px">Busiest day: <span style="color:#e8e8f0">${esc(d.busiestDay)}</span></p>
-  <h2 style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#9a9ab0;margin:0 0 6px">Top songs</h2>
+  <h2 style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#9a9ab0;margin:0 0 6px">Listeners per country</h2>
+  <table cellspacing="0" cellpadding="0" style="width:100%;border:1px solid #2a2a3a;background:#14141c">${countryTable}</table>
+  <h2 style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#9a9ab0;margin:22px 0 6px">Top songs</h2>
   <table cellspacing="0" cellpadding="0" style="width:100%;border:1px solid #2a2a3a;background:#14141c">${topRows}</table>
-  <h2 style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#9a9ab0;margin:22px 0 6px">Plays, last 4 weeks</h2>
+  <h2 style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#9a9ab0;margin:22px 0 6px">Plays and listeners, last 4 weeks</h2>
   <table cellspacing="0" cellpadding="0" style="width:100%;border:1px solid #2a2a3a;background:#14141c">${trendRows}</table>
-  <p style="font-size:11px;color:#5a5a70;margin-top:24px">Weeks run Monday–Sunday, Stockholm time.</p>
+  <p style="font-size:11px;color:#5a5a70;margin-top:24px">Weeks run Monday–Sunday, Stockholm time. Listeners are counted once per browser and merged when the same network fingerprint reappears; no IP addresses are stored.</p>
 </div></body></html>`;
 }
 
