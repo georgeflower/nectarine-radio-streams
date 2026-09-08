@@ -3,44 +3,16 @@
 // "Send digest now" test button (rate-limited, always to the configured owner).
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { createRawEmail, delta, renderDigestHtml, weekEnd, weekStart, type DigestData } from "./digest.ts";
 
-const TZ = "Europe/Stockholm";
 const TEST_COOLDOWN_MS = 60 * 60 * 1000;
+const GMAIL_SEND_URL = "https://connector-gateway.lovable.dev/google_mail/gmail/v1/users/me/messages/send";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-
-/** Calendar date (YYYY-MM-DD) in Stockholm for a given instant. */
-function localDate(d: Date): { y: number; m: number; d: number; dow: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short",
-  }).formatToParts(d);
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-  const dowMap: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
-  return { y: Number(get("year")), m: Number(get("month")), d: Number(get("day")), dow: dowMap[get("weekday")] ?? 0 };
-}
-
-const iso = (y: number, m: number, d: number) => {
-  const t = new Date(Date.UTC(y, m - 1, d));
-  return t.toISOString().slice(0, 10);
-};
-
-/** Monday of the current Stockholm week, minus `weeksBack` weeks. */
-export function weekStart(now: Date, weeksBack: number): string {
-  const l = localDate(now);
-  const t = new Date(Date.UTC(l.y, l.m - 1, l.d));
-  t.setUTCDate(t.getUTCDate() - l.dow - weeksBack * 7);
-  return iso(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
-}
-
-export function delta(cur: number, prev: number): string {
-  if (prev === 0) return cur === 0 ? "±0" : "new";
-  const pct = Math.round(((cur - prev) / prev) * 100);
-  return `${pct >= 0 ? "+" : ""}${pct}%`;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -89,8 +61,8 @@ Deno.serve(async (req) => {
     const top = (s.top_songs as { title: string; artists: string | null; plays: number }[]) ?? [];
     const busiest = s.busiest_day as { day: string; plays: number } | null;
 
-    const templateData = {
-      weekLabel: `${ws} – ${new Date(Date.parse(ws) + 6 * 86400000).toISOString().slice(0, 10)}`,
+    const templateData: DigestData = {
+      weekLabel: `${ws} – ${weekEnd(ws)}`,
       isTest,
       plays: Number(s.plays ?? 0),
       playsDelta: delta(Number(s.plays ?? 0), Number(s.prev_plays ?? 0)),
@@ -109,18 +81,29 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: "DIGEST_RECIPIENT_EMAIL is not configured", preview: templateData }, 200);
     }
 
-    const { data: sendRes, error: sendErr } = await supabase.functions.invoke("send-transactional-email", {
-      body: {
-        templateName: "weekly-digest",
-        recipientEmail: recipient,
-        idempotencyKey: isTest ? `weekly-digest-test-${Date.now()}` : `weekly-digest-${ws}`,
-        templateData,
-      },
-    });
-    if (sendErr) {
-      console.error("[weekly-digest] send failed", sendErr.message);
-      return json({ ok: false, error: `send failed: ${sendErr.message}`, preview: templateData }, 502);
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY") ?? "";
+    const gmailKey = Deno.env.get("GOOGLE_MAIL_API_KEY") ?? "";
+    if (!lovableKey || !gmailKey) {
+      return json({ ok: false, error: "Gmail connection is not linked", preview: templateData }, 200);
     }
+
+    const subject = `Necta weekly digest ${templateData.weekLabel}: ${templateData.plays} plays, ${templateData.loves} loves${isTest ? " (test)" : ""}`;
+    const raw = createRawEmail(recipient, subject, renderDigestHtml(templateData));
+    const res = await fetch(GMAIL_SEND_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": gmailKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ raw }),
+    });
+    if (!res.ok) {
+      const details = await res.text();
+      console.error(`[weekly-digest] Gmail send failed [${res.status}]: ${details}`);
+      return json({ ok: false, error: `Gmail send failed (${res.status})`, status: res.status, details }, res.status);
+    }
+    const sendRes = await res.json().catch(() => null);
 
     await supabase.from("digest_runs").insert({ week_start: ws, recipient, is_test: isTest });
     return json({ ok: true, week_start: ws, test: isTest, send: sendRes ?? null });
