@@ -16,8 +16,40 @@ export type DigestData = {
   loginsDelta: string;
   busiestDay: string;
   topSongs: { title: string; artists: string; plays: number }[];
-  trend: { week: string; plays: number }[];
+  trend: { week: string; plays: number; listeners?: number }[];
+  listeners?: number;
+  listenersRaw?: number;
+  listenersDelta?: string;
+  countries?: { country: string; listeners: number }[];
 };
+
+const COUNTRY_NAMES: Record<string, string> = {
+  SE: "Sweden", NO: "Norway", DK: "Denmark", FI: "Finland", DE: "Germany", NL: "Netherlands", GB: "United Kingdom",
+  US: "United States", FR: "France", PL: "Poland", ES: "Spain", IT: "Italy", AT: "Austria", CH: "Switzerland",
+  BE: "Belgium", CZ: "Czechia", HU: "Hungary", CA: "Canada", AU: "Australia", JP: "Japan", BR: "Brazil", RU: "Russia",
+  UA: "Ukraine", PT: "Portugal", IE: "Ireland", EE: "Estonia", LV: "Latvia", LT: "Lithuania", GR: "Greece", RO: "Romania",
+};
+
+const flag = (cc: string) =>
+  /^[A-Z]{2}$/.test(cc) ? String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)) : "";
+
+export const countryLabel = (cc: string): string =>
+  cc === "??" ? "Unknown" : `${flag(cc)} ${COUNTRY_NAMES[cc] ?? cc}`.trim();
+
+/** Top N countries by listeners plus an "Other" bucket, with rounded shares. */
+export function countryRows(
+  countries: { country: string; listeners: number }[],
+  limit = 10,
+): { label: string; listeners: number; share: number }[] {
+  const total = countries.reduce((a, c) => a + c.listeners, 0);
+  if (total === 0) return [];
+  const sorted = [...countries].sort((a, b) => b.listeners - a.listeners || a.country.localeCompare(b.country));
+  const head = sorted.slice(0, limit);
+  const rest = sorted.slice(limit).reduce((a, c) => a + c.listeners, 0);
+  const rows = head.map((c) => ({ label: countryLabel(c.country), listeners: c.listeners, share: Math.round((c.listeners / total) * 100) }));
+  if (rest > 0) rows.push({ label: "Other", listeners: rest, share: Math.round((rest / total) * 100) });
+  return rows;
+}
 
 function localDate(d: Date): { y: number; m: number; d: number; dow: number } {
   const parts = new Intl.DateTimeFormat("en-US", {
