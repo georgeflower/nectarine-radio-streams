@@ -224,9 +224,15 @@ export async function setLoved(
   artist: string,
   track: string,
   loved: boolean,
+  songId?: string,
 ): Promise<LastfmCallResult> {
   if (!current) return { ok: false, kind: "auth", message: "No Last.fm session" };
-  const data = await callScrobble({ action: loved ? "love" : "unlove", artist, track });
+  const data = await callScrobble({
+    action: loved ? "love" : "unlove",
+    artist,
+    track,
+    ...(songId ? { songId } : {}),
+  });
   return resultOf(data);
 }
 
