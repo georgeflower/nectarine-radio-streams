@@ -172,6 +172,7 @@ const THEME_STORAGE_KEY = "nectarine-theme";
 const SCANLINES_STORAGE_KEY = "nectarine-scanlines";
 const CRT_GRILLE_STORAGE_KEY = "nectarine-crt-grille";
 const UI_OPACITY_STORAGE_KEY = "nectarine-ui-opacity";
+const UI_TRANSPARENCY_STORAGE_KEY = "nectarine-ui-transparency";
 
 const EMPTY_PLAYLIST: PlaylistData = { now: null, queue: [], history: [] };
 
@@ -411,24 +412,37 @@ const Index = () => {
 
   const [scanlines, setScanlines] = usePersistedBool(SCANLINES_STORAGE_KEY, false);
   const [crtGrille, setCrtGrille] = usePersistedBool(CRT_GRILLE_STORAGE_KEY, false);
-  const [uiOpacity, setUiOpacity] = useState<number>(() => {
+  const [uiTransparency, setUiTransparency] = useState<number>(() => {
     try {
-      const v = Number(localStorage.getItem(UI_OPACITY_STORAGE_KEY));
-      if (Number.isFinite(v) && v >= 0.3 && v <= 1) return v;
+      const raw = localStorage.getItem(UI_TRANSPARENCY_STORAGE_KEY);
+      const v = Number(raw);
+      if (raw !== null && Number.isFinite(v) && v >= 0 && v <= 1) return v;
+      // migrate old opacity-based key
+      const old = Number(localStorage.getItem(UI_OPACITY_STORAGE_KEY));
+      if (Number.isFinite(old) && old > 0 && old <= 1) return 1 - old;
     } catch {
       // ignore
     }
-    return 0.6;
+    return 0.4;
   });
 
   useEffect(() => {
-    document.documentElement.style.setProperty("--ui-alpha", String(uiOpacity));
+    const t = Math.min(1, Math.max(0, uiTransparency));
+    const root = document.documentElement;
+    root.style.setProperty("--ui-alpha", String(1 - t));
+    // text + smileys only start fading past 70%
+    const fadeStart = 0.7;
+    const fade = t <= fadeStart ? 0 : (t - fadeStart) / (1 - fadeStart);
+    root.style.setProperty("--ui-content-opacity", String(1 - fade * 0.85));
+    // blur eases off after 70% so 100% is almost totally see-through
+    root.style.setProperty("--ui-blur", `${(t <= fadeStart ? 1 : 1 - fade) * 4}px`);
     try {
-      localStorage.setItem(UI_OPACITY_STORAGE_KEY, String(uiOpacity));
+      localStorage.setItem(UI_TRANSPARENCY_STORAGE_KEY, String(t));
     } catch {
       // ignore
     }
-  }, [uiOpacity]);
+  }, [uiTransparency]);
+
 
   useEffect(() => {
     const def = THEMES.find((t) => t.id === theme);
@@ -788,21 +802,22 @@ const Index = () => {
                   CRT grille: {crtGrille ? "On" : "Off"}
                 </button>
                 <label
-                  htmlFor="ui-opacity"
+                  htmlFor="ui-transparency"
                   className="text-[10px] uppercase tracking-widest text-muted-foreground px-1"
                 >
-                  Transparency: {Math.round((1 - uiOpacity) * 100)}%
+                  Transparency: {Math.round(uiTransparency * 100)}%
                 </label>
                 <input
-                  id="ui-opacity"
+                  id="ui-transparency"
                   type="range"
-                  min={0.3}
+                  min={0}
                   max={1}
                   step={0.05}
-                  value={uiOpacity}
-                  onChange={(e) => setUiOpacity(Number(e.target.value))}
+                  value={uiTransparency}
+                  onChange={(e) => setUiTransparency(Number(e.target.value))}
                   className="w-full accent-primary touch-manipulation"
                 />
+
                 <label className="text-[10px] uppercase tracking-widest text-muted-foreground px-1">Visualizer</label>
                 <select
                   value={vizStyle}

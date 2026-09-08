@@ -54,6 +54,8 @@
     --sidebar-border: 28 60% 25%;
     --sidebar-ring: 28 100% 60%;
     --ui-alpha: 0.6;
+    --ui-content-opacity: 1;
+    --ui-blur: 4px;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-right: env(safe-area-inset-right, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -357,8 +359,10 @@
 
 @layer components {
   .panel {
-    @apply border border-border rounded-sm p-4 backdrop-blur-sm;
-    background-color: hsl(var(--card) / var(--ui-alpha));
+    @apply border border-border rounded-sm p-4;
+    background-color: hsl(var(--card) / min(1, calc(var(--ui-alpha) + 0.2)));
+    backdrop-filter: blur(var(--ui-blur));
+    opacity: var(--ui-content-opacity);
     box-shadow: inset 0 0 30px hsl(20 30% 0% / 0.6), 0 0 0 1px hsl(28 60% 25% / 0.4);
   }
   [data-theme="gem"] .panel,
@@ -516,4 +520,9 @@ html[data-cracktro-active] *::-webkit-scrollbar {
 /* ─── User transparency setting (main view surfaces) ─────────────────────── */
 html:not([data-cracktro-active]) .bg-card\/60 {
   background-color: hsl(var(--card) / var(--ui-alpha));
+  opacity: var(--ui-content-opacity);
+}
+html[data-cracktro-active] .panel {
+  opacity: 1;
+  backdrop-filter: blur(4px);
 }
