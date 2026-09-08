@@ -54,6 +54,8 @@
     --sidebar-border: 28 60% 25%;
     --sidebar-ring: 28 100% 60%;
     --ui-alpha: 0.6;
+    --ui-content-opacity: 1;
+    --ui-blur: 4px;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-right: env(safe-area-inset-right, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -516,4 +518,9 @@ html[data-cracktro-active] *::-webkit-scrollbar {
 /* ─── User transparency setting (main view surfaces) ─────────────────────── */
 html:not([data-cracktro-active]) .bg-card\/60 {
   background-color: hsl(var(--card) / var(--ui-alpha));
+  opacity: var(--ui-content-opacity);
+}
+html[data-cracktro-active] .panel {
+  opacity: 1;
+  backdrop-filter: blur(4px);
 }
