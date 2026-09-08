@@ -778,6 +778,31 @@ const Index = () => {
                 >
                   Scanlines: {scanlines ? "On" : "Off"}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setCrtGrille((v) => !v)}
+                  aria-pressed={crtGrille}
+                  title="Use the juN3bula CRT grille on every theme"
+                  className="min-h-10 px-2 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation text-left"
+                >
+                  CRT grille: {crtGrille ? "On" : "Off"}
+                </button>
+                <label
+                  htmlFor="ui-opacity"
+                  className="text-[10px] uppercase tracking-widest text-muted-foreground px-1"
+                >
+                  Transparency: {Math.round((1 - uiOpacity) * 100)}%
+                </label>
+                <input
+                  id="ui-opacity"
+                  type="range"
+                  min={0.3}
+                  max={1}
+                  step={0.05}
+                  value={uiOpacity}
+                  onChange={(e) => setUiOpacity(Number(e.target.value))}
+                  className="w-full accent-primary touch-manipulation"
+                />
                 <label className="text-[10px] uppercase tracking-widest text-muted-foreground px-1">Visualizer</label>
                 <select
                   value={vizStyle}
