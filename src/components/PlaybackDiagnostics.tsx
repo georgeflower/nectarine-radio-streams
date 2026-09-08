@@ -79,6 +79,30 @@ const pct = (n: number): string => `${Math.round(n * 100)}%`;
 const PlaybackDiagnostics = ({ onClose }: Props) => {
   const [rows, setRows] = useState<StreamReliabilityRow[]>([]);
   const [relLoading, setRelLoading] = useState(false);
+  const [digestBusy, setDigestBusy] = useState(false);
+  const sendDigestNow = useCallback(async () => {
+    setDigestBusy(true);
+    const { toast } = await import("sonner");
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data, error } = await supabase.functions.invoke("weekly-digest", { body: { test: true } });
+      if (error) {
+        const { FunctionsHttpError } = await import("@supabase/supabase-js");
+        const details = error instanceof FunctionsHttpError ? await error.context.text() : error.message;
+        let msg = details;
+        try { msg = JSON.parse(details).error ?? details; } catch { /* plain text */ }
+        toast.error(`Digest not sent: ${msg}`);
+      } else if (data?.ok) {
+        toast.success("Test digest sent — check your inbox.");
+      } else {
+        toast.error(`Digest not sent: ${data?.error ?? "unknown error"}`);
+      }
+    } catch (e) {
+      toast.error(`Digest not sent: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setDigestBusy(false);
+    }
+  }, []);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(
     () => getAudioControlState().selectedUrl,
   );
