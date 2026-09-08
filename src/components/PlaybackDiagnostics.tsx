@@ -320,7 +320,16 @@ const PlaybackDiagnostics = ({ onClose }: Props) => {
           )}
         </div>
 
-        <div className="flex justify-end pt-1 border-t border-border">
+        <div className="flex items-center justify-between gap-2 pt-1 border-t border-border">
+          <button
+            type="button"
+            disabled={digestBusy}
+            onClick={sendDigestNow}
+            title="Email this week's plays, loves and Last.fm sign-ins to the owner"
+            className="text-[10px] uppercase tracking-widest px-2 py-1 rounded-sm border border-border hover:border-primary disabled:opacity-50"
+          >
+            {digestBusy ? "Sending…" : "Send digest now"}
+          </button>
           <button
             type="button"
             onClick={() => {
