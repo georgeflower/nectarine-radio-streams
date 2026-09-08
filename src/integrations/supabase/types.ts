@@ -488,7 +488,7 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      weekly_digest_stats: { Args: { week_start: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
