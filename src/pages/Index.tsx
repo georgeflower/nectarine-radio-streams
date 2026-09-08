@@ -410,6 +410,25 @@ const Index = () => {
   });
 
   const [scanlines, setScanlines] = usePersistedBool(SCANLINES_STORAGE_KEY, false);
+  const [crtGrille, setCrtGrille] = usePersistedBool(CRT_GRILLE_STORAGE_KEY, false);
+  const [uiOpacity, setUiOpacity] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem(UI_OPACITY_STORAGE_KEY));
+      if (Number.isFinite(v) && v >= 0.3 && v <= 1) return v;
+    } catch {
+      // ignore
+    }
+    return 0.6;
+  });
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--ui-alpha", String(uiOpacity));
+    try {
+      localStorage.setItem(UI_OPACITY_STORAGE_KEY, String(uiOpacity));
+    } catch {
+      // ignore
+    }
+  }, [uiOpacity]);
 
   useEffect(() => {
     const def = THEMES.find((t) => t.id === theme);
