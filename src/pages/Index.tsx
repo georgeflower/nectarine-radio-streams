@@ -176,6 +176,11 @@ const UI_TRANSPARENCY_STORAGE_KEY = "nectarine-ui-transparency";
 
 const EMPTY_PLAYLIST: PlaylistData = { now: null, queue: [], history: [] };
 
+/** Escalating retry schedule after a track is due to end. Initial cushion is
+ *  handled separately; these are the gaps between subsequent attempts. */
+const TRACK_END_BACKOFF_MS = [800, 1200, 1600, 2000, 2500];
+
+
 const usePersistedBool = (key: string, initial: boolean): [boolean, React.Dispatch<React.SetStateAction<boolean>>] => {
   const [value, setValue] = useState<boolean>(() => {
     try {
