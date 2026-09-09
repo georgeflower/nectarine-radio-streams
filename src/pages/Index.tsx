@@ -57,9 +57,12 @@ import {
   type LastfmAuthFailure,
 } from "@/lib/lastfm";
 
+const BASE_TITLE = "Nectarine Demoscene Radio Player";
 
-
-
+function truncate(str: string, max: number): string {
+  if (str.length <= max) return str;
+  return str.slice(0, max - 1) + "…";
+}
 
 function SongRating({ songId, isNowPlaying = false }: { songId: string; isNowPlaying?: boolean }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
