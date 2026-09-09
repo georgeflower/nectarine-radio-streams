@@ -689,7 +689,10 @@ const Index = () => {
           songId={now?.songId}
           nowPlaying={now}
           onExit={() => setCracktroOpen(false)}
-          onStyleChange={(s) => setVizStyle(s)}
+          onStyleChange={(s) => {
+            vizUserSetRef.current = true;
+            setVizStyle(s);
+          }}
           oneliners={oneliners}
           users={users}
           usersTotal={usersTotal}
