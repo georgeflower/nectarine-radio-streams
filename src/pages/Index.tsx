@@ -317,6 +317,8 @@ const Index = () => {
     online: 0,
     streams: 0,
   });
+  const themeUserSetRef = useRef(false);
+  const vizUserSetRef = useRef(false);
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
