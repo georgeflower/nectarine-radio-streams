@@ -4,7 +4,7 @@
 
 - Entry route renders `src/pages/Index.tsx`.
 - `Index` owns the main state for playlist, oneliners, online users, streams, UI toggles, visualizer style, and cracktro mode.
-- `refreshAll()` runs on an interval (`AUTO_REFRESH_INTERVAL_MS`) and fetches all Demovibes XML endpoints in parallel.
+- Endpoints refresh on separate intervals — `queue` and `oneliner` every 30s, `online` every 10 minutes, `streams` every 60 minutes (`REFRESH_INTERVAL_MS`). While hidden but playing only `queue` refreshes; while hidden and paused nothing does. A track-end scheduler also refreshes `queue` when the current track is due to finish, with an escalating retry backoff.
 
 ## XML fetch path (`xml-proxy`)
 

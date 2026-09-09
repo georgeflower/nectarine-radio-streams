@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-export const APP_VERSION = "0.7.11";
+export const APP_VERSION = "0.7.12";
 
 interface ChangelogEntry {
   version: string;
@@ -9,6 +9,20 @@ interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.12",
+    date: "2026-09-07",
+    changes: [
+      "New juN3bula theme mirroring the 14-day rotating colour system from june.style — the palette changes daily and updates itself while the page is open",
+      "Multi-line ASCII art in the Infamous Oneliner now renders as intended instead of collapsing into a jumble",
+      "The scroller's settings menu no longer covers the whole screen on mobile — it's now a tabbed panel, and the desktop bar is height-capped",
+      "Larger tap targets throughout the scroller settings, and \"Reset Family\" moved away from the frequently-used toggles",
+      "New LAST.FM panel in scroller mode with the love button and activity lights, so a track can be loved without leaving the scroller",
+      "Track titles now update noticeably faster when a song changes",
+      "Fixed stream reliability ranking, which had silently stopped working — unreliable streams were no longer being demoted",
+      "Closed an unauthenticated write path to the song database",
+    ],
+  },
   {
     version: "0.7.11",
     date: "2026-08-21",
