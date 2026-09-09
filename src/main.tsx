@@ -72,9 +72,10 @@ if (isProd && !inIframe && !isPreviewHost) {
     try {
       window.dispatchEvent(new CustomEvent("nectarine:update-available", { detail: res }));
     } catch { /* ignore */ }
-    // Auto-reload when the tab is hidden OR when nothing is currently
-    // playing — either way the user won't hear an interruption.
-    if (document.visibilityState === "hidden" || !isAudioPlaying()) {
+    // Auto-reload only when the tab is hidden AND nothing is playing. A hidden
+    // tab that is still playing must never be reloaded: it stops the audio, and
+    // autoplay policy then blocks automatic resume until a user gesture.
+    if (document.visibilityState === "hidden" && !isAudioPlaying()) {
       void forceReloadForNewVersion();
     }
   });

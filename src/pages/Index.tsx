@@ -317,6 +317,8 @@ const Index = () => {
     online: 0,
     streams: 0,
   });
+  const themeUserSetRef = useRef(false);
+  const vizUserSetRef = useRef(false);
   const audioLevel = useAudioLevel(analyser, vizStyle !== "off");
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [cracktroOpen, setCracktroOpen] = useState(false);
@@ -335,7 +337,7 @@ const Index = () => {
 
   useEffect(() => {
     try {
-      localStorage.setItem(VIZ_STORAGE_KEY, vizStyle);
+      if (vizUserSetRef.current) localStorage.setItem(VIZ_STORAGE_KEY, vizStyle);
     } catch {
       // ignore
     }
@@ -457,7 +459,7 @@ const Index = () => {
     if (def?.attr) document.documentElement.setAttribute("data-theme", def.attr);
     else document.documentElement.removeAttribute("data-theme");
     try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
+      if (themeUserSetRef.current) localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
       // ignore
     }
@@ -687,7 +689,10 @@ const Index = () => {
           songId={now?.songId}
           nowPlaying={now}
           onExit={() => setCracktroOpen(false)}
-          onStyleChange={(s) => setVizStyle(s)}
+          onStyleChange={(s) => {
+            vizUserSetRef.current = true;
+            setVizStyle(s);
+          }}
           oneliners={oneliners}
           users={users}
           usersTotal={usersTotal}
@@ -740,7 +745,10 @@ const Index = () => {
           <div className="grid grid-cols-3 gap-2 md:flex md:flex-nowrap md:items-center md:justify-center md:gap-3 w-full">
             <select
               value={theme}
-              onChange={(e) => setTheme(e.target.value as ThemeId)}
+              onChange={(e) => {
+                themeUserSetRef.current = true;
+                setTheme(e.target.value as ThemeId);
+              }}
               aria-label="Theme"
               className="min-h-10 md:min-h-11 px-2 py-1 text-[10px] md:text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation w-full md:w-auto truncate"
             >
@@ -835,7 +843,10 @@ const Index = () => {
                 <label className="text-[10px] uppercase tracking-widest text-muted-foreground px-1">Visualizer</label>
                 <select
                   value={vizStyle}
-                  onChange={(e) => setVizStyle(e.target.value as VisualizerStyle)}
+                  onChange={(e) => {
+                    vizUserSetRef.current = true;
+                    setVizStyle(e.target.value as VisualizerStyle);
+                  }}
                   aria-label="Visualizer style"
                   className="min-h-10 px-2 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation"
                 >
