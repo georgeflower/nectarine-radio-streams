@@ -419,7 +419,6 @@ const Index = () => {
     }
     return "orange";
   });
-  const themeUserSetRef = useRef(false);
 
   const [scanlines, setScanlines] = usePersistedBool(SCANLINES_STORAGE_KEY, false);
   const [crtGrille, setCrtGrille] = usePersistedBool(CRT_GRILLE_STORAGE_KEY, false);
