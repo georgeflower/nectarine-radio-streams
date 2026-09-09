@@ -647,17 +647,19 @@ const Index = () => {
       // show the old track and trigger a pointless retry every time.
       const fetched = await refreshNowPlaying();
       const key = keyOf(fetched ?? playlistRef.current);
-      if (key === nowKey && attempts < 3) {
+      if (key === nowKey && attempts < TRACK_END_BACKOFF_MS.length) {
+        const delay = TRACK_END_BACKOFF_MS[attempts];
         attempts += 1;
-        timer = window.setTimeout(() => void run(), 3000);
+        timer = window.setTimeout(() => void run(), delay);
       }
     };
 
-    timer = window.setTimeout(() => void run(), Math.max(left, 0) + 1500);
+    timer = window.setTimeout(() => void run(), Math.max(left, 0) + 400);
     return () => {
       if (timer !== null) window.clearTimeout(timer);
     };
   }, [nowKey, nowPlaystart, nowLength, refreshNowPlaying]);
+
 
 
 
