@@ -616,6 +616,21 @@ const Index = () => {
     });
   }, [now]);
 
+  // Live track title in the browser tab: only when this client is actually
+  // playing audio, so the tab doubles as a "this is the noisy tab" indicator.
+  useEffect(() => {
+    if (audioPlaying && now?.song) {
+      const song = truncate(now.song, 40);
+      const artist = now.artist ? truncate(now.artist, 40) : "";
+      document.title = artist ? `▶ ${song} — ${artist}` : `▶ ${song}`;
+    } else {
+      document.title = BASE_TITLE;
+    }
+    return () => {
+      document.title = BASE_TITLE;
+    };
+  }, [now?.song, now?.artist, audioPlaying]);
+
 
   // Schedule a refresh for the moment the current track is due to end so the
   // metadata pipeline updates instantly instead of waiting out the interval.
