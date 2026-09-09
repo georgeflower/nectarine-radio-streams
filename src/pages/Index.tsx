@@ -57,9 +57,12 @@ import {
   type LastfmAuthFailure,
 } from "@/lib/lastfm";
 
+const BASE_TITLE = "Nectarine Demoscene Radio Player";
 
-
-
+function truncate(str: string, max: number): string {
+  if (str.length <= max) return str;
+  return str.slice(0, max - 1) + "…";
+}
 
 function SongRating({ songId, isNowPlaying = false }: { songId: string; isNowPlaying?: boolean }) {
   const [info, setInfo] = useState(() => getCachedInfo("song", songId));
@@ -563,14 +566,6 @@ const Index = () => {
 
 
   useEffect(() => {
-    document.title = "Nectarine Demoscene Radio · Compact API View";
-    const meta = document.querySelector('meta[name="description"]');
-    if (meta) {
-      meta.setAttribute(
-        "content",
-        "Compact viewer for the Nectarine demoscene radio API: now playing, queue, oneliner, online users and live streams.",
-      );
-    }
     refreshAll();
     const seedTimestamps = () => {
       const now = Date.now();
@@ -620,6 +615,21 @@ const Index = () => {
       requester: now.requester,
     });
   }, [now]);
+
+  // Live track title in the browser tab: only when this client is actually
+  // playing audio, so the tab doubles as a "this is the noisy tab" indicator.
+  useEffect(() => {
+    if (audioPlaying && now?.song) {
+      const song = truncate(now.song, 40);
+      const artist = now.artist ? truncate(now.artist, 40) : "";
+      document.title = artist ? `▶ ${song} — ${artist}` : `▶ ${song}`;
+    } else {
+      document.title = BASE_TITLE;
+    }
+    return () => {
+      document.title = BASE_TITLE;
+    };
+  }, [now?.song, now?.artist, audioPlaying]);
 
 
   // Schedule a refresh for the moment the current track is due to end so the
