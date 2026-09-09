@@ -459,7 +459,7 @@ const Index = () => {
     if (def?.attr) document.documentElement.setAttribute("data-theme", def.attr);
     else document.documentElement.removeAttribute("data-theme");
     try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
+      if (themeUserSetRef.current) localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
       // ignore
     }
