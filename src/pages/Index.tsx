@@ -566,14 +566,6 @@ const Index = () => {
 
 
   useEffect(() => {
-    document.title = "Nectarine Demoscene Radio · Compact API View";
-    const meta = document.querySelector('meta[name="description"]');
-    if (meta) {
-      meta.setAttribute(
-        "content",
-        "Compact viewer for the Nectarine demoscene radio API: now playing, queue, oneliner, online users and live streams.",
-      );
-    }
     refreshAll();
     const seedTimestamps = () => {
       const now = Date.now();
