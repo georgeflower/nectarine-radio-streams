@@ -840,7 +840,10 @@ const Index = () => {
                 <label className="text-[10px] uppercase tracking-widest text-muted-foreground px-1">Visualizer</label>
                 <select
                   value={vizStyle}
-                  onChange={(e) => setVizStyle(e.target.value as VisualizerStyle)}
+                  onChange={(e) => {
+                    vizUserSetRef.current = true;
+                    setVizStyle(e.target.value as VisualizerStyle);
+                  }}
                   aria-label="Visualizer style"
                   className="min-h-10 px-2 py-2 text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation"
                 >
