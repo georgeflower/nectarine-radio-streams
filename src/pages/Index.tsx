@@ -742,7 +742,10 @@ const Index = () => {
           <div className="grid grid-cols-3 gap-2 md:flex md:flex-nowrap md:items-center md:justify-center md:gap-3 w-full">
             <select
               value={theme}
-              onChange={(e) => setTheme(e.target.value as ThemeId)}
+              onChange={(e) => {
+                themeUserSetRef.current = true;
+                setTheme(e.target.value as ThemeId);
+              }}
               aria-label="Theme"
               className="min-h-10 md:min-h-11 px-2 py-1 text-[10px] md:text-xs uppercase tracking-widest rounded-sm border border-border bg-card/60 text-foreground hover:opacity-90 touch-manipulation w-full md:w-auto truncate"
             >
