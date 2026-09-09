@@ -337,7 +337,7 @@ const Index = () => {
 
   useEffect(() => {
     try {
-      localStorage.setItem(VIZ_STORAGE_KEY, vizStyle);
+      if (vizUserSetRef.current) localStorage.setItem(VIZ_STORAGE_KEY, vizStyle);
     } catch {
       // ignore
     }
