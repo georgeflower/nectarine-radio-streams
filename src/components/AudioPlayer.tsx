@@ -40,6 +40,8 @@ import {
   type StreamReliabilityRow,
 } from "@/lib/streamTelemetry";
 import { rankStreams } from "@/lib/streamRanking";
+import { setFakeAudioState } from "@/lib/fakeAudio";
+
 
 type Props = {
   streams: StreamSource[];
