@@ -78,8 +78,13 @@ export async function forceReloadForNewVersion(): Promise<void> {
   } catch {
     // ignore
   }
+  try {
+    await fetch("/", { cache: "reload", credentials: "same-origin" });
+  } catch {
+    // ignore — best effort
+  }
   const url = new URL(location.href);
-  url.searchParams.set("_v", Date.now().toString());
+  url.searchParams.delete("_v");
   location.replace(url.toString());
 }
 
