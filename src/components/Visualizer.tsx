@@ -6,6 +6,15 @@ import {
   type ReactivitySettings,
   type ModeReactivity,
 } from "@/lib/reactivitySettings";
+import {
+  bpmForSeed,
+  fillFakeSpectrum,
+  fillFakeWaveform,
+  getFakeAudioState,
+  hashSeed,
+  sampleFake,
+} from "@/lib/fakeAudio";
+
 
 export type VisualizerStyle =
   | "off"
