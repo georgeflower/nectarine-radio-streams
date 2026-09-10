@@ -263,7 +263,30 @@ const Visualizer = ({ analyser, style }: Props) => {
           beat = true;
           beatCooldownRef.current = 10;
         }
+      } else {
+        // No analyser (mobile keeps Web Audio disabled): synthesize a
+        // deterministic mix so the visualizers still move with the music.
+        const fake = getFakeAudioState();
+        if (fake.playing) {
+          const seed = hashSeed(fake.songId ?? "nectarine");
+          const bpm = bpmForSeed(seed);
+          const nowMs = performance.now();
+          const s = sampleFake(nowMs, seed, bpm);
+          const master = settingsSnapshot.global.masterIntensity;
+          bass = s.bass * master;
+          lowMid = s.lowMid * master;
+          mid = s.mid * master;
+          treble = s.treble * master;
+          rms = s.rms;
+          beat = s.beat;
+          fillFakeSpectrum(freq, s, seed, nowMs);
+          fillFakeWaveform(time, s.rms, nowMs);
+        } else {
+          freq.fill(0);
+          time.fill(128);
+        }
       }
+
 
       return { bass, lowMid, mid, treble, rms, beat, freq, time };
     };
