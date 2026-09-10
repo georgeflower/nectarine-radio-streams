@@ -1018,7 +1018,8 @@ export const useAudioLevel = (analyser: AnalyserNode | null, enabled = true): nu
 
 /**
  * Returns a number that bumps to 1 on each detected kick and decays back to 0.
- * Use for flash/scale overlays. Returns 0 when analyser is null or disabled.
+ * Use for flash/scale overlays. Uses synthetic beats when there is no analyser
+ * (mobile); returns 0 when disabled.
  */
 export const useBeat = (analyser: AnalyserNode | null, enabled = true): number => {
   const [pulse, setPulse] = useState(0);
@@ -1028,25 +1029,39 @@ export const useBeat = (analyser: AnalyserNode | null, enabled = true): number =
   const pulseRef = useRef(0);
 
   useEffect(() => {
-    if (!analyser || !enabled) {
+    if (!enabled) {
       setPulse(0);
       return;
     }
 
     const tick = () => {
-      const { bass } = getFreqFrame(analyser);
-      const avg = avgRef.current;
-      avgRef.current = avg * 0.92 + bass * 0.08;
-      if (cooldownRef.current > 0) cooldownRef.current -= 1;
-      if (bass > avg * 1.35 && bass > 0.15 && cooldownRef.current <= 0) {
-        pulseRef.current = Math.min(1, 0.6 + bass);
-        cooldownRef.current = 10;
+      if (analyser) {
+        const { bass } = getFreqFrame(analyser);
+        const avg = avgRef.current;
+        avgRef.current = avg * 0.92 + bass * 0.08;
+        if (cooldownRef.current > 0) cooldownRef.current -= 1;
+        if (bass > avg * 1.35 && bass > 0.15 && cooldownRef.current <= 0) {
+          pulseRef.current = Math.min(1, 0.6 + bass);
+          cooldownRef.current = 10;
+        }
+      } else {
+        const fake = getFakeAudioState();
+        if (fake.playing) {
+          const seed = hashSeed(fake.songId ?? "nectarine");
+          const s = sampleFake(performance.now(), seed + 977, bpmForSeed(seed));
+          if (cooldownRef.current > 0) cooldownRef.current -= 1;
+          if (s.beat && cooldownRef.current <= 0) {
+            pulseRef.current = Math.min(1, 0.6 + s.bass);
+            cooldownRef.current = 10;
+          }
+        }
       }
       pulseRef.current *= 0.86;
       if (pulseRef.current < 0.01) pulseRef.current = 0;
       setPulse(pulseRef.current);
       rafRef.current = requestAnimationFrame(tick);
     };
+
     rafRef.current = requestAnimationFrame(tick);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
