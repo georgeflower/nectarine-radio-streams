@@ -977,7 +977,8 @@ export default Visualizer;
 
 /**
  * Lightweight hook that returns a 0..1 bass level derived from an analyser node.
- * Updates via rAF; returns 0 when analyser is null.
+ * Updates via rAF; falls back to synthetic reactivity when there is no analyser
+ * (mobile), and returns 0 when disabled.
  */
 export const useAudioLevel = (analyser: AnalyserNode | null, enabled = true): number => {
   const [level, setLevel] = useState(0);
@@ -985,17 +986,27 @@ export const useAudioLevel = (analyser: AnalyserNode | null, enabled = true): nu
   const smoothRef = useRef(0);
 
   useEffect(() => {
-    if (!analyser || !enabled) {
+    if (!enabled) {
       setLevel(0);
       return;
     }
 
     const tick = () => {
-      const { bass } = getFreqFrame(analyser);
+      let bass = 0;
+      if (analyser) {
+        bass = getFreqFrame(analyser).bass;
+      } else {
+        const fake = getFakeAudioState();
+        if (fake.playing) {
+          const seed = hashSeed(fake.songId ?? "nectarine");
+          bass = sampleFake(performance.now(), seed + 211, bpmForSeed(seed)).bass;
+        }
+      }
       smoothRef.current = smoothRef.current * 0.7 + bass * 0.3;
       setLevel(smoothRef.current);
       rafRef.current = requestAnimationFrame(tick);
     };
+
     rafRef.current = requestAnimationFrame(tick);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
