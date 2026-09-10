@@ -6,6 +6,15 @@ import {
   type ReactivitySettings,
   type ModeReactivity,
 } from "@/lib/reactivitySettings";
+import {
+  bpmForSeed,
+  fillFakeSpectrum,
+  fillFakeWaveform,
+  getFakeAudioState,
+  hashSeed,
+  sampleFake,
+} from "@/lib/fakeAudio";
+
 
 export type VisualizerStyle =
   | "off"
@@ -180,12 +189,15 @@ const Visualizer = ({ analyser, style }: Props) => {
     let MAX_COMETS = qState.profile.maxComets;
     let MAX_SPARKLES = qState.profile.maxSparkles;
 
-    const freq: Uint8Array<ArrayBuffer> | null = analyser
-      ? (new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>)
-      : null;
-    const time: Uint8Array<ArrayBuffer> | null = analyser
-      ? (new Uint8Array(new ArrayBuffer(analyser.fftSize)) as Uint8Array<ArrayBuffer>)
-      : null;
+    // Allocated unconditionally: on mobile there is no analyser, and the
+    // synthetic fallback path still needs buffers to fill.
+    const freq = new Uint8Array(
+      new ArrayBuffer(analyser?.frequencyBinCount ?? 1024),
+    ) as Uint8Array<ArrayBuffer>;
+    const time = new Uint8Array(
+      new ArrayBuffer(analyser?.fftSize ?? 2048),
+    ) as Uint8Array<ArrayBuffer>;
+
 
     // Live reactivity settings; updated via store subscription so users can tune
     // without reinitializing the render loop.
@@ -260,7 +272,30 @@ const Visualizer = ({ analyser, style }: Props) => {
           beat = true;
           beatCooldownRef.current = 10;
         }
+      } else {
+        // No analyser (mobile keeps Web Audio disabled): synthesize a
+        // deterministic mix so the visualizers still move with the music.
+        const fake = getFakeAudioState();
+        if (fake.playing) {
+          const seed = hashSeed(fake.songId ?? "nectarine");
+          const bpm = bpmForSeed(seed);
+          const nowMs = performance.now();
+          const s = sampleFake(nowMs, seed, bpm);
+          const master = settingsSnapshot.global.masterIntensity;
+          bass = s.bass * master;
+          lowMid = s.lowMid * master;
+          mid = s.mid * master;
+          treble = s.treble * master;
+          rms = s.rms;
+          beat = s.beat;
+          fillFakeSpectrum(freq, s, seed, nowMs);
+          fillFakeWaveform(time, s.rms, nowMs);
+        } else {
+          freq.fill(0);
+          time.fill(128);
+        }
       }
+
 
       return { bass, lowMid, mid, treble, rms, beat, freq, time };
     };
@@ -942,7 +977,8 @@ export default Visualizer;
 
 /**
  * Lightweight hook that returns a 0..1 bass level derived from an analyser node.
- * Updates via rAF; returns 0 when analyser is null.
+ * Updates via rAF; falls back to synthetic reactivity when there is no analyser
+ * (mobile), and returns 0 when disabled.
  */
 export const useAudioLevel = (analyser: AnalyserNode | null, enabled = true): number => {
   const [level, setLevel] = useState(0);
@@ -950,17 +986,27 @@ export const useAudioLevel = (analyser: AnalyserNode | null, enabled = true): nu
   const smoothRef = useRef(0);
 
   useEffect(() => {
-    if (!analyser || !enabled) {
+    if (!enabled) {
       setLevel(0);
       return;
     }
 
     const tick = () => {
-      const { bass } = getFreqFrame(analyser);
+      let bass = 0;
+      if (analyser) {
+        bass = getFreqFrame(analyser).bass;
+      } else {
+        const fake = getFakeAudioState();
+        if (fake.playing) {
+          const seed = hashSeed(fake.songId ?? "nectarine");
+          bass = sampleFake(performance.now(), seed + 211, bpmForSeed(seed)).bass;
+        }
+      }
       smoothRef.current = smoothRef.current * 0.7 + bass * 0.3;
       setLevel(smoothRef.current);
       rafRef.current = requestAnimationFrame(tick);
     };
+
     rafRef.current = requestAnimationFrame(tick);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -972,7 +1018,8 @@ export const useAudioLevel = (analyser: AnalyserNode | null, enabled = true): nu
 
 /**
  * Returns a number that bumps to 1 on each detected kick and decays back to 0.
- * Use for flash/scale overlays. Returns 0 when analyser is null or disabled.
+ * Use for flash/scale overlays. Uses synthetic beats when there is no analyser
+ * (mobile); returns 0 when disabled.
  */
 export const useBeat = (analyser: AnalyserNode | null, enabled = true): number => {
   const [pulse, setPulse] = useState(0);
@@ -982,25 +1029,39 @@ export const useBeat = (analyser: AnalyserNode | null, enabled = true): number =
   const pulseRef = useRef(0);
 
   useEffect(() => {
-    if (!analyser || !enabled) {
+    if (!enabled) {
       setPulse(0);
       return;
     }
 
     const tick = () => {
-      const { bass } = getFreqFrame(analyser);
-      const avg = avgRef.current;
-      avgRef.current = avg * 0.92 + bass * 0.08;
-      if (cooldownRef.current > 0) cooldownRef.current -= 1;
-      if (bass > avg * 1.35 && bass > 0.15 && cooldownRef.current <= 0) {
-        pulseRef.current = Math.min(1, 0.6 + bass);
-        cooldownRef.current = 10;
+      if (analyser) {
+        const { bass } = getFreqFrame(analyser);
+        const avg = avgRef.current;
+        avgRef.current = avg * 0.92 + bass * 0.08;
+        if (cooldownRef.current > 0) cooldownRef.current -= 1;
+        if (bass > avg * 1.35 && bass > 0.15 && cooldownRef.current <= 0) {
+          pulseRef.current = Math.min(1, 0.6 + bass);
+          cooldownRef.current = 10;
+        }
+      } else {
+        const fake = getFakeAudioState();
+        if (fake.playing) {
+          const seed = hashSeed(fake.songId ?? "nectarine");
+          const s = sampleFake(performance.now(), seed + 977, bpmForSeed(seed));
+          if (cooldownRef.current > 0) cooldownRef.current -= 1;
+          if (s.beat && cooldownRef.current <= 0) {
+            pulseRef.current = Math.min(1, 0.6 + s.bass);
+            cooldownRef.current = 10;
+          }
+        }
       }
       pulseRef.current *= 0.86;
       if (pulseRef.current < 0.01) pulseRef.current = 0;
       setPulse(pulseRef.current);
       rafRef.current = requestAnimationFrame(tick);
     };
+
     rafRef.current = requestAnimationFrame(tick);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);

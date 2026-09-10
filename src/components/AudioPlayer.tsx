@@ -40,6 +40,8 @@ import {
   type StreamReliabilityRow,
 } from "@/lib/streamTelemetry";
 import { rankStreams } from "@/lib/streamRanking";
+import { setFakeAudioState } from "@/lib/fakeAudio";
+
 
 type Props = {
   streams: StreamSource[];
@@ -219,6 +221,12 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
   useEffect(() => {
     onPlayingChange?.(playing);
   }, [playing, onPlayingChange]);
+
+  // Feed the synthetic-reactivity fallback used when Web Audio is disabled.
+  useEffect(() => {
+    setFakeAudioState({ playing, songId: currentSongId ?? null });
+  }, [playing, currentSongId]);
+
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<NowPlayingTrack | null>(null);
