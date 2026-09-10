@@ -180,12 +180,15 @@ const Visualizer = ({ analyser, style }: Props) => {
     let MAX_COMETS = qState.profile.maxComets;
     let MAX_SPARKLES = qState.profile.maxSparkles;
 
-    const freq: Uint8Array<ArrayBuffer> | null = analyser
-      ? (new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>)
-      : null;
-    const time: Uint8Array<ArrayBuffer> | null = analyser
-      ? (new Uint8Array(new ArrayBuffer(analyser.fftSize)) as Uint8Array<ArrayBuffer>)
-      : null;
+    // Allocated unconditionally: on mobile there is no analyser, and the
+    // synthetic fallback path still needs buffers to fill.
+    const freq = new Uint8Array(
+      new ArrayBuffer(analyser?.frequencyBinCount ?? 1024),
+    ) as Uint8Array<ArrayBuffer>;
+    const time = new Uint8Array(
+      new ArrayBuffer(analyser?.fftSize ?? 2048),
+    ) as Uint8Array<ArrayBuffer>;
+
 
     // Live reactivity settings; updated via store subscription so users can tune
     // without reinitializing the render loop.
