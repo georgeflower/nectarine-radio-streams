@@ -1223,18 +1223,30 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
     const a = audioRef.current;
     logPlayback("warn", "stall", `${eventName} event`, snapshot());
     if (IS_MOBILE) {
-      if (typeof document !== "undefined" && document.hidden) {
-        logPlayback("info", "stall", "mobile hidden, ignore");
-        return;
+      const hidden = typeof document !== "undefined" && document.hidden;
+      if (hidden) {
+        // A hidden stall must still be recorded — silent background underruns
+        // were previously dropped with no telemetry and no recovery path.
+        logPlayback("info", "stall", `${eventName} hidden — telemetry + long-window timer`);
+        telemetry("stall", {
+          reason: `mobile-${eventName}-hidden`,
+          network_state: a?.networkState ?? null,
+          ready_state: a?.readyState ?? null,
+          played_sec: playedSec(),
+        });
       }
       notePlaybackProgress(a);
       const sinceProgress = Date.now() - lastProgressAtRef.current;
       const remaining = getStallTimeoutMs() - sinceProgress;
+      // Backgrounded timers are throttled, so hidden stalls get a longer
+      // window before recovery to avoid false positives.
+      const armMs = hidden
+        ? Math.max(getStallTimeoutMs() * 2, 45_000)
+        : Math.max(1000, remaining);
       if (remaining > 0) {
         setReconnecting(false);
         if (stallTimerRef.current !== null) return;
-        if (typeof document !== "undefined" && document.hidden) return;
-        logPlayback("info", "stall", `mobile: arm timer ${Math.max(1000, remaining)}ms`);
+        logPlayback("info", "stall", `mobile: arm timer ${armMs}ms`);
         stallTimerRef.current = window.setTimeout(() => {
           stallTimerRef.current = null;
           const audio = audioRef.current;
@@ -1251,7 +1263,7 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
             });
             attemptRecovery({ reason: `mobile-${eventName}-timeout` });
           }
-        }, Math.max(1000, remaining));
+        }, armMs);
         return;
       }
       reportStall();
@@ -1462,13 +1474,16 @@ const AudioPlayer = ({ streams, currentTrack, currentSongId, onAnalyserReady, on
         artwork,
       });
     }
-    mediaSession.playbackState = playing ? "playing" : "paused";
+    // Report "playing" whenever the user intends playback, even mid-reconnect:
+    // an active MediaSession helps a backgrounded tab keep execution priority,
+    // and flipping to "paused" during recovery undermines the recovery timer.
+    mediaSession.playbackState = (playing || shouldPlayRef.current) ? "playing" : "paused";
     try {
       mediaSession.setPositionState?.();
     } catch {
       // Some browsers do not support clearing MediaSession position state.
     }
-  }, [mediaArtist, mediaTitle, playing, selectedStream, stationConfig?.artworkUrl, currentSongId, songArtworkTick]);
+  }, [mediaArtist, mediaTitle, playing, reconnecting, selectedStream, stationConfig?.artworkUrl, currentSongId, songArtworkTick]);
 
 
   useEffect(() => {
