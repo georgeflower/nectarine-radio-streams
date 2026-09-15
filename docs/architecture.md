@@ -97,6 +97,9 @@ Tables `songs` (+ `song_artists`, `song_groups`, `song_tags`, `song_links`), `so
 - `song-ingest` — writes parsed song detail, piggybacking on XML the client already fetched, so it adds no upstream requests.
 - `song-refresh` — owns freshness. Returns the DB row and only fetches upstream when stale, using `refresh_claimed_at` so concurrent clients produce one request. TTL 45 min for the currently-playing track, 6 h otherwise.
 - `stream-telemetry` — playback events (errors, stalls, handovers, live seeks, play rejections). Requires `verify_jwt = false` because it flushes via `sendBeacon`. Prunes rows older than 90 days.
+- `listener-ping` (client: `src/lib/listenerPing.ts`) — once per browser per Stockholm day, the first time playback actually starts, records `(day, client_id, platform, country, salted network hash)` into `listener_days`. The country comes from edge headers when present, else a short server-side IP lookup; the IP itself is never stored, only a weekly-salted SHA-256 of IP + user agent. Always answers 200 so it can never disturb playback.
+- `weekly-digest` — the owner's weekly listening report: plays, loves/unloves, Last.fm sign-ins, unique listeners (with same-network browser merging) and per-country breakdown, all from a private `weekly_digest_stats` function. Fired by a Monday 07:00 Stockholm cron with a shared secret, or by the in-app "Send digest now" button (hourly cooldown, always mails the owner). Sent via the connected Gmail account; `digest_runs` makes each real week idempotent.
+- `song-artwork` (client: `src/lib/songArtwork.ts`) — resolves a song's screenshot URL for the OS lockscreen / notification artwork. Two-step scrape of scenestream.net (song page → screenshot page, the IDs don't match), then routes the image through wsrv.nl so animated GIFs arrive as static PNGs (iOS MediaSession won't render them). The client caches results for 24h in memory + localStorage and falls back to the app icon.
 
 `entityCache` reads songs DB-first via PostgREST (an embedded query, not a function invocation), falling back to the XML path when a song is absent. This replaced a 2-minute per-client TTL and is the main reason upstream traffic fell from roughly 890 to 130 requests/hour per open tab.
 
@@ -104,7 +107,7 @@ Stream ordering (`streamRanking.ts`): 192 kbps first, then descending bitrate, w
 
 ## Themes
 
-Ten themes are driven by CSS custom properties on `[data-theme]`. `juN3bula` is the exception — `src/lib/junebula.ts` computes the day's colour from ISO week parity and weekday, and `Index.tsx` applies it as inline custom properties, refreshing every 60s and on tab focus.
+Ten themes are driven by CSS custom properties on `[data-theme]`. `juN3bula` is the exception — `src/lib/junebula.ts` computes the day's colour from ISO week parity and weekday, and `Index.tsx` applies it as inline custom properties, refreshing every 60s and on tab focus. The `/junebula` route (`src/pages/Junebula.tsx`) is a standalone reference page listing every parity/day combination with its hex and HSL values, marking today; it follows the live rotation by default, supports previewing any day (repainting the whole page), and refreshes on the same 60s/visibility cadence.
 
 ## Notable files and responsibilities
 
@@ -123,9 +126,15 @@ Ten themes are driven by CSS custom properties on `[data-theme]`. `juN3bula` is 
 - `src/lib/streamTelemetry.ts` — anonymous stream event batching and reliability view
 - `src/lib/gooseLearnedPhrases.ts` — current phrase-level learning
 - `src/lib/gooseLearnedLexicon.ts` — new rule-based token lexicon design
+- `src/pages/Junebula.tsx` — `/junebula` route: full juN3bula palette reference page
+- `src/lib/listenerPing.ts` — daily unique-listener ping for the weekly digest
+- `src/lib/songArtwork.ts` — cached song screenshot resolution for MediaSession artwork
 - `supabase/functions/xml-proxy/index.ts` — safe XML proxy
 - `supabase/functions/audio-proxy/index.ts` — safe audio proxy with host allowlist
 - `supabase/functions/song-play/index.ts` — write-only play logging
 - `supabase/functions/song-ingest/index.ts` — song metadata enrichment
 - `supabase/functions/song-refresh/index.ts` — server-side freshness and upstream claim coordination
 - `supabase/functions/stream-telemetry/index.ts` — anonymous playback telemetry sink
+- `supabase/functions/listener-ping/index.ts` — daily listener day/country recording
+- `supabase/functions/weekly-digest/index.ts` — owner's weekly stats email via Gmail
+- `supabase/functions/song-artwork/index.ts` — song screenshot URL scraping for lockscreen artwork
