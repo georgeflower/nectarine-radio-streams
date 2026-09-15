@@ -4,6 +4,7 @@
 
 - Entry route renders `src/pages/Index.tsx`.
 - `Index` owns the main state for playlist, oneliners, online users, streams, UI toggles, visualizer style, and cracktro mode.
+- The canonical page title and description live only in `index.html` — the runtime overwrite that used to rewrite them after load was removed. While audio is playing, `document.title` shows `▶ Track — Artist` (both truncated to 40 chars), driven by a single `BASE_TITLE` constant in `Index.tsx`.
 - Endpoints refresh on separate intervals — `queue` and `oneliner` every 30s, `online` every 10 minutes, `streams` every 60 minutes (`REFRESH_INTERVAL_MS`). While hidden but playing only `queue` refreshes; while hidden and paused nothing does. A track-end scheduler also refreshes `queue` when the current track is due to finish, with an escalating retry backoff.
 
 ## XML fetch path (`xml-proxy`)
@@ -36,6 +37,12 @@
    - optional MSE buffering via `src/lib/bufferedStream.ts` (desktop only — disabled on mobile so the OS media stack handles background buffering)
    - AudioContext/AnalyserNode hookup for visualizers + BPM (desktop only — skipped on mobile so iOS/Android keep playing when backgrounded)
    - background-resume watchdog on `visibilitychange` / `pageshow` / `online` / `focus`
+   - Mobile stalls while hidden are recorded and armed with a longer recovery
+     window (2× the stall timeout, min 45s) rather than ignored. Backgrounded
+     timers are throttled, so the longer window avoids false positives.
+   - MediaSession `playbackState` reports "playing" whenever playback is intended,
+     including mid-reconnect — an active session helps a backgrounded tab keep
+     execution priority on Android.
    - Media Session metadata updates and optional station now-playing polling
    - Last.fm now-playing + scrobble on track change (30–1800s of actual playback) and via a 240s interval, with paused time excluded; a `pagehide` flush catches the final track of a session; auth failures clear the session and surface a reconnect banner
 
