@@ -10,6 +10,19 @@ interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.7.13",
+    date: "2026-09-16",
+    changes: [
+      "The browser tab now shows the currently playing track, so you can find the tab that's making noise",
+      "Fixed background playback being killed when a new version was detected — a hidden tab that is still playing is no longer force-reloaded",
+      "Your chosen theme is no longer overwritten when an older cached copy of the app loads briefly on startup",
+      "Fixed silent stalls on Android while the app is backgrounded: these were previously ignored entirely, with no recovery attempt and no logging",
+      "The media session now reports as playing during a reconnect, so Android is less likely to suspend the app mid-recovery",
+      "Cold launches should now settle on the current version instead of briefly showing an old one",
+      "Page title and description are now consistent everywhere instead of being rewritten after load",
+    ],
+  },
+  {
     version: "0.7.12",
     date: "2026-09-07",
     changes: [
