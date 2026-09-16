@@ -132,7 +132,7 @@ describe("streamRanking", () => {
     expect(isUnreliable(raw)).toBe(true);
   });
 
-  it("ranks a proxied 192 above a direct 128", () => {
+  it("ranks a direct 128 above a proxied 192", () => {
     const proxied192 = s("proxied192", "192");
     const direct128 = s("direct128", "128");
     const needsProxy = (url: string) => url === proxied192.url;
@@ -140,14 +140,33 @@ describe("streamRanking", () => {
       isMobile: false,
       needsProxy,
     });
-    expect(ranked[0].name).toBe("proxied192");
+    expect(ranked[0].name).toBe("direct128");
   });
 
-  it("prefers a direct 192 over a proxied 192", () => {
-    const direct = s("direct", "192");
-    const proxied = s("proxied", "192");
+  it("ranks a direct 48 above a proxied 192", () => {
+    const direct48 = s("direct48", "48");
+    const proxied192 = s("proxied192", "192");
+    const needsProxy = (url: string) => url === proxied192.url;
+    expect(rankStreams([proxied192, direct48], new Map(), { isMobile: false, needsProxy })[0].name).toBe("direct48");
+  });
+
+  it("still orders direct streams by bitrate: 192 first, then descending", () => {
+    const a192 = s("a192", "192");
+    const b128 = s("b128", "128");
+    const c48 = s("c48", "48");
+    const ranked = rankStreams([c48, a192, b128], new Map(), opts);
+    expect(ranked.map((r) => r.name)).toEqual(["a192", "b128", "c48"]);
+  });
+
+  it("ranks a dead direct stream below a healthy proxied one", () => {
+    const dead = s("deadDirect", "192");
+    const proxied = s("healthyProxied", "128");
+    const rel = new Map<string, StreamReliabilityRow>([
+      [dead.url, { ...row(dead.url, 0, 12), avg_played_sec_before_failure: 2 }],
+    ]);
     const needsProxy = (url: string) => url === proxied.url;
-    expect(rankStreams([proxied, direct], new Map(), { isMobile: false, needsProxy })[0].name).toBe("direct");
+    const ranked = rankStreams([dead, proxied], rel, { isMobile: false, needsProxy });
+    expect(ranked[0].name).toBe("healthyProxied");
   });
 
   it("orders a mixed set 192, 128, 64, 48 with dead streams last", () => {

@@ -99,16 +99,18 @@ export const rankStreams = (
     const bu = isUnreliable(br);
     if (au !== bu) return au ? 1 : -1;
 
-    // 2. bitrate: 192 first, then descending, unknown last
+    // 2. direct beats proxied — the proxy's 400s edge-function wall clock
+    // kills every proxied stream after ~6m45s, so connection stability
+    // outranks bitrate entirely
+    const ap = opts.needsProxy(a.url);
+    const bp = opts.needsProxy(b.url);
+    if (ap !== bp) return ap ? 1 : -1;
+
+    // 3. bitrate: 192 first, then descending, unknown last
     const [ag, av] = bitrateRank(a);
     const [bg, bv] = bitrateRank(b);
     if (ag !== bg) return ag - bg;
     if (av !== bv) return av - bv;
-
-    // 3. direct beats proxied
-    const ap = opts.needsProxy(a.url);
-    const bp = opts.needsProxy(b.url);
-    if (ap !== bp) return ap ? 1 : -1;
 
     // 4. reliability score descending
     return reliabilityScore(br) - reliabilityScore(ar);
