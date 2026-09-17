@@ -3,7 +3,7 @@
 ## Confirmed cause
 
 - The live site serves its startup HTML with `no-cache, must-revalidate`, and the current project does not register a service worker.
-- Android is launching the home-screen installation from an old 0.7.7 page/process snapshot before the current network response wins.
+- The evidence points to Android restoring the home-screen installation from an old 0.7.7 page/process snapshot before the current network response wins.
 - The 0.7.7 code writes its theme to the shared `nectarine-theme` key immediately on render. The current guard cannot stop that write because the old bundle is the code executing during the brief flash.
 - The current app also renders before its cold-start version check finishes, so a stale bundle can become visible before reload begins.
 
@@ -13,6 +13,7 @@
    - Introduce a new durable theme preference key that 0.7.7 does not know about.
    - Read the new key first and migrate the legacy value only when the new key has never been created.
    - Save explicit theme selections to the new key. A briefly restored 0.7.7 page may still alter its legacy key, but the current app will no longer trust that overwritten value.
+   - Because 0.7.7 may overwrite the old key before this fix runs for the first time, the theme may need to be selected once after the update; subsequent stale launches cannot change it.
 
 2. **Gate current cold starts before rendering**
    - On the published standalone app, run the existing freshness comparison before mounting the React interface.
