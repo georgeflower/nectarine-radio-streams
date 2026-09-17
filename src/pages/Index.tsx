@@ -30,6 +30,7 @@ import BeatOverlay from "@/components/BeatOverlay";
 import PlaybackDiagnostics from "@/components/PlaybackDiagnostics";
 import Cracktro from "@/components/Cracktro";
 import ChangelogModal, { APP_VERSION } from "@/components/ChangelogModal";
+import { readThemePreference, writeThemePreference } from "@/lib/themePreference";
 import WhatsNewPopup from "@/components/WhatsNewPopup";
 import Flag from "@/components/Flag";
 import { renderBBCode, isAsciiArt } from "@/lib/bbcode";
@@ -171,7 +172,6 @@ const THEMES: { id: ThemeId; label: string; attr: string | null }[] = [
   { id: "simple", label: "Simple", attr: "simple" },
   { id: "junebula", label: "juN3bula", attr: "junebula" },
 ];
-const THEME_STORAGE_KEY = "nectarine-theme";
 const SCANLINES_STORAGE_KEY = "nectarine-scanlines";
 const CRT_GRILLE_STORAGE_KEY = "nectarine-crt-grille";
 const UI_OPACITY_STORAGE_KEY = "nectarine-ui-opacity";
@@ -411,13 +411,8 @@ const Index = () => {
     setFontScale((s) => Math.min(1.6, Math.max(0.7, Math.round((s + delta) * 10) / 10)));
 
   const [theme, setTheme] = useState<ThemeId>(() => {
-    try {
-      const v = localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null;
-      if (v && THEMES.some((t) => t.id === v)) return v;
-    } catch {
-      // ignore
-    }
-    return "orange";
+    const isThemeId = (value: string): value is ThemeId => THEMES.some((t) => t.id === value);
+    return readThemePreference(isThemeId, "orange");
   });
 
   const [scanlines, setScanlines] = usePersistedBool(SCANLINES_STORAGE_KEY, false);
@@ -458,11 +453,7 @@ const Index = () => {
     const def = THEMES.find((t) => t.id === theme);
     if (def?.attr) document.documentElement.setAttribute("data-theme", def.attr);
     else document.documentElement.removeAttribute("data-theme");
-    try {
-      if (themeUserSetRef.current) localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch {
-      // ignore
-    }
+    if (themeUserSetRef.current) writeThemePreference(theme);
   }, [theme]);
 
   // juN3bula: rotate the day's colour into inline custom properties.

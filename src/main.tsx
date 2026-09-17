@@ -4,10 +4,14 @@ import "./index.css";
 import {
   startVersionPolling,
   forceReloadForNewVersion,
-  checkForNewVersion,
 } from "./lib/versionCheck";
+import { prepareFreshStartup } from "./lib/startupFreshness";
 
-createRoot(document.getElementById("root")!).render(<App />);
+function renderApp() {
+  const root = document.getElementById("root");
+  if (!root) return;
+  createRoot(root).render(<App />);
+}
 
 // Version polling is only safe in production on the real published origin.
 // In dev / Lovable preview / iframe, index.html changes constantly (HMR,
@@ -35,36 +39,11 @@ function isAudioPlaying(): boolean {
 }
 
 if (isProd && !inIframe && !isPreviewHost) {
-  // Cold-start freshness check: if the loaded bundle is already stale when
-  // the user opens the app, reload immediately — but only within the first
-  // 15s window so we can never interrupt an active listening session later.
-  const COLD_RELOAD_KEY = "nectarine-cold-reload";
-  const startedAt = Date.now();
+  // Check before mounting so an installed app cannot paint a stale interface
+  // while Android revalidates its cached launch document.
   void (async () => {
-    try {
-      const res = await checkForNewVersion();
-      if (res.stale && Date.now() - startedAt < 15_000) {
-        let alreadyReloaded = false;
-        try {
-          alreadyReloaded = sessionStorage.getItem(COLD_RELOAD_KEY) === "1";
-        } catch {
-          // Private-mode or storage-disabled browsers: treat as not yet reloaded.
-        }
-        if (alreadyReloaded) {
-          console.warn("[version] cold-start still stale after reload, skipping to avoid loop", res);
-        } else {
-          console.info("[version] cold-start stale bundle, reloading", res);
-          try {
-            sessionStorage.setItem(COLD_RELOAD_KEY, "1");
-          } catch {
-            // Ignore storage failures; the reload itself is still allowed.
-          }
-          void forceReloadForNewVersion();
-        }
-      }
-    } catch {
-      // ignore
-    }
+    const shouldRender = await prepareFreshStartup();
+    if (shouldRender) renderApp();
   })();
 
   startVersionPolling((res) => {
@@ -79,4 +58,6 @@ if (isProd && !inIframe && !isPreviewHost) {
       void forceReloadForNewVersion();
     }
   });
+} else {
+  renderApp();
 }
