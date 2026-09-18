@@ -1,31 +1,60 @@
-# Goose learning design (non-AI)
+# Goose learning design
 
-## Current implementation (`gooseLearnedPhrases.ts`)
+This document describes the deterministic, browser-local goose learning systems used to generate contextual chatter without external AI services.
 
-The current system is phrase-level and browser-local:
+## 1) Goals
 
-- learns sanitized short full-line phrases from oneliners
-- stores in `localStorage` under `goose-learned-phrases`
-- tracks `seen`, `lastSeenAt`, and recent `users`
-- rejects obvious sensitive material (URLs, secrets, long numeric blobs)
-- supports weighted phrase picking and emphatic trigger matching
+The learning system is intended to:
 
-This is deterministic and lightweight, but it treats each phrase as an indivisible unit.
+- keep output playful but bounded and safe
+- derive style from real oneliner traffic
+- remain deterministic and lightweight
+- avoid sending chat content to third-party model providers
 
-## Limitations of whole-phrase learning
+## 2) Current two-layer model
 
-- low recombination power: learned strings are reused verbatim
-- weak style transfer: punctuation/emoticon style not modeled separately
-- sparse reuse: similar phrases with minor differences do not reinforce each other
-- limited mood/context adaptation
+The app uses two related learning paths.
 
-## Proposal: lexicon-based non-AI system
+### A) Phrase memory (`gooseLearnedPhrases.ts`)
 
-Add a token lexicon that learns reusable short expressions and style markers from oneliners. Keep it deterministic and rules-based.
+Stores short sanitized phrase-level memories in local storage.
 
-Implemented design artifact: `src/lib/gooseLearnedLexicon.ts`.
+Key traits:
 
-### Token categories
+- line-level phrase capture
+- frequency and recency tracking
+- recent-user tracking for diversity
+- weighted selection support
+- emphatic trigger matching support
+
+Storage key: `goose-learned-phrases`.
+
+### B) Lexicon memory (`gooseLearnedLexicon.ts`)
+
+Stores token/category-level data for recombination.
+
+Key traits:
+
+- tokenization and category tagging
+- mood-aware selection weighting
+- deterministic tie-breaking and bounded output
+- template-based utterance assembly
+
+Storage key: `goose-learned-lexicon-v1`.
+
+## 3) Why phrase-only learning was not enough
+
+Phrase-only memory is simple but limited:
+
+- low recombination potential
+- weak adaptation across similar but non-identical lines
+- poor separation of style markers vs semantic fragments
+
+The lexicon layer addresses this by learning reusable, typed fragments.
+
+## 4) Lexicon categories and mood model
+
+Token categories include:
 
 - `greeting`
 - `laughter`
@@ -37,9 +66,7 @@ Implemented design artifact: `src/lib/gooseLearnedLexicon.ts`.
 - `emphasis`
 - `neutral`
 
-### Mood model
-
-Coarse moods derived from recent lines:
+Mood model (coarse):
 
 - `calm`
 - `friendly`
@@ -47,57 +74,78 @@ Coarse moods derived from recent lines:
 - `chaotic`
 - `silly`
 
-Mood is inferred with token/reaction heuristics and punctuation intensity signals.
+Mood is inferred from token/reaction heuristics and punctuation intensity patterns.
 
-### Weighted selection strategy
+## 5) Selection and generation strategy
 
-Each token stores:
+Each learned token tracks attributes such as:
 
-- frequency (`seen`)
-- recency (`lastSeenAt`)
-- distinct users (`users`)
-- style flags (e.g. `all-caps`, `emoticon`, `punct-heavy`, `elongated`)
+- seen count
+- last seen time
+- distinct user set (bounded)
+- style flags (caps/emoticon/punctuation/elongation signals)
 
-Selection score combines these values plus mood-specific boosts, then chooses the best token deterministically (stable tie-breaking).
+Generation pipeline:
 
-### Phrase template generation
+1. select target mood profile
+2. score candidate tokens with frequency/recency/mood weighting
+3. choose deterministic winners (stable tie handling)
+4. assemble utterance from short templates
+5. clamp/sanitize final output length and characters
 
-Bird utterances are built from short templates such as:
+## 6) Safety constraints
 
-- greeting + hype
-- laughter + emphasis
-- heart + neutral
-- slang + hype
+The learning path rejects or strips risky content patterns, including:
 
-Fallback tokens are used when categories are sparse. Output is clipped and sanitized to stay short and safe.
+- URLs and token-like strings
+- email-like material
+- long numeric blobs
+- oversized raw lines
 
-### Safety rules
+Output is additionally constrained by:
 
-- no URL/email/token-like strings
-- reject long numeric patterns and long raw lines
-- keep token length capped
-- keep generated output short (`maxLen`, default 48)
-- strip unsafe characters before final output
+- max token lengths
+- bounded utterance length
+- final sanitization pass before display
 
-### Persistence strategy
+## 7) Persistence and corruption tolerance
 
-- `localStorage` key: `goose-learned-lexicon-v1`
-- bounded token count (`MAX_TOKENS`)
-- bounded per-token user list (`MAX_USERS_PER_TOKEN`)
-- resilient parse + clamp behavior for corrupted/invalid stored data
+Both learning stores are browser-local and bounded.
 
-## Suggested implementation steps
+Resilience safeguards include:
 
-1. Learn lexicon on incoming oneliner events (white goose path first).
-2. Blend lexicon output with existing goose dialogue/reaction systems.
-3. Add optional mood-aware cracktro callbacks (overlay/scroller tweaks).
-4. Add cooldowns per utterance template to avoid repetition.
-5. Add migration path if storage schema evolves.
+- parse guards for invalid/corrupt stored payloads
+- clamp logic for max token/user sizes
+- deterministic fallback behavior when sparse data is present
 
-## Suggested tests
+This keeps learning robust without requiring backend state.
 
-- tokenization filters URLs/secrets and keeps short expressive tokens
-- category classification for hearts/laughter/winks/emphasis
-- learning updates seen/recency/users and enforces caps
-- mood derivation from curated recent line sets
-- utterance builder outputs safe, bounded strings
+## 8) Integration points
+
+Goose learning data can influence:
+
+- reactive chatter in standard UI mode
+- cracktro goose behavior
+- oneliner-triggered micro-events and dialogue flavoring
+
+Integration is intentionally additive and should not block core playback flows.
+
+## 9) Test strategy
+
+Relevant tests should validate:
+
+- token/phrase extraction and safety filters
+- categorization and mood inference heuristics
+- learning updates for recency/frequency/user caps
+- deterministic output shape under fixed inputs
+- bounded string length and character sanitization
+
+## 10) Future-safe extension principles
+
+When extending goose learning:
+
+1. preserve deterministic behavior
+2. preserve offline/browser-local operation
+3. keep strict safety filtering before persistence
+4. version storage schemas explicitly
+5. include migration/fallback behavior for schema changes

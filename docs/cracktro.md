@@ -1,80 +1,111 @@
 # Cracktro mode
 
-## What cracktro mode is today
+Cracktro mode is the app's demoscene scene-layer: a fullscreen-capable, effect-heavy presentation shell over live radio data.
 
-Cracktro mode is a fullscreen retro scene launched from the main page. It overlays the app with a demoscene-inspired presentation while keeping live Nectarine stream data visible through floating windows.
+## 1) Purpose
 
-## Scene composition
+Cracktro provides an immersive viewing/listening mode while retaining core station context:
 
-Current scene includes:
+- current song metadata
+- oneliner feed
+- online users
+- queue/history visibility
 
-- analyser-driven visualizer backdrop
-- beat overlay flashes/reactivity
-- optional animated text scroller with selectable modes:
-  - sinus
-  - bouncy
-  - zoomer
-  - wobble
-  - copper
-  - vector
-- optional now-playing info bar (title/artist/platform/rating)
-- optional flying white goose
-- optional flying brown goose
+It is designed as a reactive "scene" rather than a static alternate page layout.
+
+## 2) Scene composition
+
+Current scene elements include:
+
+- visualizer backdrop
+- beat-reactive overlay
+- optional scroller with multiple movement styles
+- optional now-playing info bar
+- optional flying geese (white and brown variants)
 - optional boing ball
-- goose platform banter (Amiga / Atari) on track change
-- periodic "Have you seen Rapture?" routine every 10 minutes
-- goose reaction when Rapture posts in oneliner
-- floating draggable panels for:
-  - oneliner
-  - online users
-  - up next queue
-  - recent history
+- draggable floating windows for live data and diagnostics
 
-## Current controls and persistence
+The scene is launched from the main page and can stay windowed or switch to browser fullscreen.
 
-Cracktro settings bar provides toggles for:
+## 3) Window and fullscreen model
 
-- scroller on/off + mode
-- font/skin override
-- info bar on/off
-- goose, brown goose, boing ball
+- default entry is in-page/windowed scene mode
+- user may request browser fullscreen
+- if fullscreen request is denied, cracktro remains usable in non-fullscreen fallback layout
+- exiting fullscreen preserves scene state and restores surrounding UI context
+
+## 4) Interaction controls
+
+Cracktro exposes user controls for:
+
+- scroller enable + mode selection
+- skin/font override settings
+- info bar visibility
+- goose/boing toggles
 - floating panel visibility
-- visualizer effect selection
+- visualizer effect selection and related display behavior
 
-Visibility and preferences are persisted in `localStorage` so scene state survives page reloads.
+Controls are designed for real-time toggling while playback continues.
 
-## Dynamic expansion ideas (long-term)
+## 5) Floating panel system
 
-- **Session phases**: evolve visuals as listening time increases (warmup → peak → late-night).
-- **Palette drift**: subtle hue transitions tied to BPM confidence and track changes.
-- **Panel choreography**: optional auto-layouts that reposition floating windows based on activity.
-- **Goose troupe events**: periodic scripted moments (flyby, sync dance, “greetz parade”).
-- **Milestone badges**: unlock cosmetic scene modifiers after oneliner/queue/session milestones.
+Typical cracktro panels:
 
-## Event-driven ideas
+- oneliner
+- online users
+- up next queue
+- recent history
+- diagnostics
+- Last.fm status/actions
+- goose roster/family state (when enabled)
 
-### Oneliner-driven
+Panels are draggable and can be hidden/shown independently to support different viewing styles.
 
-- trigger short visual stingers from reaction classes (heart/laughter/wink)
-- use lexicon mood (`friendly`, `hype`, etc.) to switch scroller style profile
-- map emphatic punctuation bursts to temporary overlay intensity boosts
+## 6) Persistence behavior
 
-### BPM-driven
+Cracktro preferences are persisted in browser local storage so scene state survives reloads:
 
-- when BPM is locked, enable stronger beat-synced flashes and timed sprite movements
-- when BPM confidence drops, fall back to calmer animation profile
+- enabled visual extras
+- panel visibility map
+- selected scroller mode
+- skin override and related preferences
 
-### Queue-change driven
+This keeps cracktro behavior consistent across sessions on the same browser/device.
 
-- detect now-playing transition and run short scene transition animation
-- theme modifiers for genre/platform heuristics from metadata
+## 7) Event-driven behavior currently present
 
-### Online-user driven
+- track-change-triggered goose banter variants
+- periodic "Have you seen Rapture?" routine
+- oneliner-triggered goose reaction flows
 
-- when online count spikes, temporarily open/animate online panel
-- optional “crowd mode” visual layer based on active user thresholds
+These routines are deterministic and integrated with existing goose/reaction systems.
 
-### Session-duration driven
+## 8) Performance considerations
 
-- every N minutes unlock one extra active element (new sprite, overlay, panel style)
-- progressive wear/patina effects for oldschool monitor vibe over long sessions
+Cracktro intentionally shares rendering/audio-analysis systems with the main visualizer path.
+
+Practical implications:
+
+- quality tiering and analyzer costs affect scene smoothness
+- lower-power devices may require simpler effect combinations
+- panel count and overlay intensity can materially change FPS
+
+For diagnostics, use the in-app performance tips and diagnostics panel while testing cracktro-heavy setups.
+
+## 9) Extension guidance
+
+When expanding cracktro, preserve these invariants:
+
+1. playback resilience first (never gate audio on visual extras)
+2. toggles should be independently controllable
+3. all new scene features need safe defaults
+4. persisted keys must be versionable and migration-aware
+5. avoid introducing behavior that breaks hidden-tab/background playback assumptions
+
+## 10) Candidate expansion directions
+
+- stronger queue-transition scene stingers
+- BPM confidence profiles that alter animation intensity
+- timed panel choreography presets
+- additional sprite actors with bounded CPU budgets
+- user-selectable cracktro presets for mobile vs desktop
