@@ -6,11 +6,13 @@ import {
   forceReloadForNewVersion,
 } from "./lib/versionCheck";
 import { prepareFreshStartup } from "./lib/startupFreshness";
+import { initOfflineFavicon } from "./lib/offlineFavicon";
 
 function renderApp() {
   const root = document.getElementById("root");
   if (!root) return;
   createRoot(root).render(<App />);
+  initOfflineFavicon();
 }
 
 // Version polling is only safe in production on the real published origin.
